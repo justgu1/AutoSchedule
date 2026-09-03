@@ -64,6 +64,7 @@ Acesse `http://localhost:8080`.
 | `make build` | Reconstrói as imagens |
 | `make ps` | Verifica o status dos serviços |
 | `make logs` | Acompanha os logs |
+| `make test` | Roda os testes do backend |
 
 ### Live-reload (PHP + React)
 
@@ -91,6 +92,7 @@ curl http://localhost:8080/health
 - [Arquitetura](docs/architecture.md)
 - [Regras de negócio](docs/business-rules.md)
 - [Banco de dados](docs/database.md)
+- [Testes](docs/testing.md)
 - [Worklist do sprint](Worklist.md)
 
 ## Processo seletivo

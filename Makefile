@@ -1,4 +1,4 @@
-.PHONY: setup up down restart build logs ps
+.PHONY: setup up down restart build logs ps test
 
 setup:
 	@if [ -f .env ]; then \
@@ -81,3 +81,6 @@ logs:
 
 ps:
 	@watch -n 2 'docker compose ps'
+
+test:
+	@docker compose exec backend vendor/bin/phpunit

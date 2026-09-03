@@ -1,0 +1,135 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http;
+
+final class Request
+{
+    private readonly string $path;
+
+    /**
+     * @param array<string, string> $headers
+     * @param array<string, string> $query
+     * @param array<string, string> $params
+     */
+    public function __construct(
+        private readonly string $method,
+        string $path,
+        private readonly array $headers = [],
+        private readonly array $query = [],
+        private readonly string $body = '',
+        private array $params = [],
+    ) {
+        // Normaliza aqui, sai sempre normalizado.
+        $this->path = self::normalizePath($path);
+    }
+
+    public static function fromGlobals(?string $rawBody = null): self
+    {
+        $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? HttpMethod::Get->value));
+
+        if ($rawBody === null && (HttpMethod::tryFrom($method)?->hasBody() ?? false)) {
+            $rawBody = (string) file_get_contents('php://input');
+        }
+
+        return new self(
+            method: $method,
+            path: self::resolvePath((string) ($_SERVER['PATH_INFO'] ?? $_SERVER['REQUEST_URI'] ?? '/')),
+            headers: self::resolveHeaders(),
+            query: $_GET,
+            body: $rawBody ?? '',
+        );
+    }
+
+    public function method(): string
+    {
+        return $this->method;
+    }
+
+    public function path(): string
+    {
+        return $this->path;
+    }
+
+    public function header(string $name, ?string $default = null): ?string
+    {
+        return $this->headers[strtolower($name)] ?? $default;
+    }
+
+    public function query(string $name, ?string $default = null): ?string
+    {
+        return $this->query[$name] ?? $default;
+    }
+
+    public function body(): string
+    {
+        return $this->body;
+    }
+
+    /**
+     * @throws \JsonException quando o corpo não é um JSON válido
+     */
+    public function json(): mixed
+    {
+        return json_decode($this->body, associative: true, flags: JSON_THROW_ON_ERROR);
+    }
+
+    public function param(string $name, ?string $default = null): ?string
+    {
+        return $this->params[$name] ?? $default;
+    }
+
+    /** @return array<string, string> */
+    public function params(): array
+    {
+        return $this->params;
+    }
+
+    /** @param array<string, string> $params */
+    public function withParams(array $params): self
+    {
+        $clone = clone $this;
+        $clone->params = $params;
+
+        return $clone;
+    }
+
+    private static function resolvePath(string $path): string
+    {
+        $path = strtok($path, '?');
+
+        return $path === false || $path === '' ? '/' : $path;
+    }
+
+    public static function normalizePath(string $path): string
+    {
+        if ($path === '' || $path === '/') {
+            return '/';
+        }
+
+        return rtrim($path, '/');
+    }
+
+    /** @return array<string, string> */
+    private static function resolveHeaders(): array
+    {
+        if (function_exists('getallheaders')) {
+            /** @var array<string, string> $headers */
+            $headers = getallheaders() ?: [];
+
+            return array_change_key_case($headers, CASE_LOWER);
+        }
+
+        $headers = [];
+
+        foreach ($_SERVER as $key => $value) {
+            if (is_string($key) && str_starts_with($key, 'HTTP_') && is_string($value)) {
+                $name = strtolower(str_replace('_', '-', substr($key, 5)));
+                $headers[$name] = $value;
+            }
+        }
+
+        return $headers;
+    }
+}

@@ -19,7 +19,8 @@ COPY backend/composer.json backend/composer.lock* ./
 RUN composer install \
     --no-interaction \
     --prefer-dist \
-    --no-progress
+    --no-progress \
+    --no-dev
 
 COPY backend/ .
 
