@@ -3,14 +3,14 @@ FROM php:8.4-fpm-alpine
 WORKDIR /var/www/html
 
 RUN apk add --no-cache \
+        postgresql-libs \
+    && apk add --no-cache --virtual .build-deps \
         postgresql-dev \
         libzip-dev \
     && docker-php-ext-install \
         pdo_pgsql \
         opcache \
-    && apk del \
-        postgresql-dev \
-        libzip-dev
+    && apk del .build-deps
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 

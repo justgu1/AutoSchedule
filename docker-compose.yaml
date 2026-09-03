@@ -21,6 +21,7 @@ services:
       APP_DEBUG: ${APP_DEBUG:-false}
       APP_TIMEZONE: ${APP_TIMEZONE:-America/Sao_Paulo}
 
+      DB_DRIVER: ${DB_DRIVER:-pgsql}
       DB_HOST: postgres
       DB_PORT: 5432
       DB_DATABASE: ${DB_DATABASE:-autoschedule}
