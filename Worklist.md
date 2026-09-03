@@ -43,9 +43,14 @@
 
 ### Dia 2 — Banco de dados e domínio
 
-- [ ] Definir modelo de dados
-- [ ] Definir relacionamentos
-- [ ] Definir índices e constraints
+- [x] Implementar bootstrap da aplicação PHP (`Application`, `config/app.php`)
+- [x] Corrigir duplicação da rota `/api` no Nginx
+- [x] Configurar live-reload do backend (PHP) em ambiente local
+- [x] Configurar live-reload do frontend (Vite) em ambiente local
+- [x] Isolar ambiente de desenvolvimento via `docker-compose.override.yml`
+- [x] Definir modelo de dados
+- [x] Definir relacionamentos
+- [x] Definir índices e constraints
 - [ ] Configurar banco de dados na aplicação
 - [ ] Criar migrations
 - [ ] Criar entidade de veículo
