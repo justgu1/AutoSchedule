@@ -1,0 +1,249 @@
+# AutoSchedule — Regras de Negócio
+
+## Usuários
+
+Existem três tipos de usuário:
+
+- `admin`
+- `seller`
+- `customer`
+
+### Admin
+
+Possui acesso global à aplicação.
+
+### Seller
+
+Pode estar associado a uma ou mais concessionárias. Seu acesso é limitado às concessionárias às quais está associado.
+
+### Customer
+
+Não precisa estar associado a uma concessionária. É identificado por nome, e-mail e telefone durante o agendamento.
+
+## Veículos
+
+Todo veículo pertence a uma única concessionária.
+
+Estados:
+
+- `available`
+- `sold`
+- `inactive`
+
+Veículos `sold` ou `inactive` não podem receber novos agendamentos.
+
+## Galeria
+
+Um veículo pode possuir várias imagens.
+
+As imagens são armazenadas no MinIO e referenciadas por `path`.
+
+A ordem é definida por `position`, sendo `0` a primeira imagem apresentada.
+
+## Disponibilidade
+
+Um horário somente está disponível quando:
+
+```text
+concessionária disponível
+        AND
+veículo disponível
+        AND
+horário dentro da disponibilidade do veículo
+        AND
+horário não bloqueado por exceção
+        AND
+não existe agendamento ativo no horário
+```
+
+Os horários disponíveis são definidos por data. Ao selecionar uma data, somente os horários válidos para aquele dia devem ser apresentados.
+
+## Exemplo
+
+Se a concessionária estiver disponível das 09:00 às 18:00 e o veículo das 10:00 às 15:00, com duração de 60 minutos, os horários possíveis são:
+
+```text
+10:00
+11:00
+12:00
+13:00
+14:00
+```
+
+O intervalo utiliza a convenção `[start, end)`.
+
+## Exceções
+
+Uma exceção pode alterar ou bloquear a disponibilidade de uma concessionária ou veículo em uma data específica.
+
+Exemplos:
+
+- feriado;
+- manutenção;
+- veículo indisponível;
+- horário especial;
+- fechamento excepcional.
+
+A exceção específica da data possui prioridade sobre a regra recorrente.
+
+## Agendamento
+
+Fluxo:
+
+```text
+visualizar veículo
+        ↓
+consultar datas disponíveis
+        ↓
+selecionar data
+        ↓
+consultar horários disponíveis
+        ↓
+selecionar horário
+        ↓
+informar nome, e-mail e telefone
+        ↓
+confirmar
+        ↓
+criar agendamento
+```
+
+A duração padrão é de 60 minutos.
+
+## Status
+
+```text
+pending
+   ↓
+confirmed
+   ├── completed
+   └── no_show
+
+pending
+   ↓
+cancelled
+```
+
+`pending` representa uma reserva temporária e possui `expires_at`.
+
+Após a expiração, o horário volta a ficar disponível.
+
+## Concorrência
+
+A aplicação verifica a disponibilidade antes da criação do agendamento.
+
+O PostgreSQL fornece a proteção final contra duas requisições concorrentes para o mesmo veículo e horário.
+
+Conflitos de concorrência devem resultar em `409 Conflict`.
+
+## Cliente
+
+O cliente informa:
+
+- nome;
+- e-mail;
+- telefone.
+
+Cada agendamento possui os dados do cliente informados no momento da solicitação.
+
+Um novo `customer` é criado caso ainda não exista.
+
+## Autenticação
+
+A senha é armazenada como hash no campo `password`.
+
+O hash deve utilizar um algoritmo apropriado para senhas, como Argon2id.
+
+`password_set_at` pode permanecer `NULL` enquanto a senha ainda não tiver sido definida pelo cliente.
+
+## Autorização
+
+A autorização é aplicada no backend.
+
+- `admin`: acesso global;
+- `seller`: acesso às concessionárias associadas;
+- `customer`: acesso aos próprios dados e agendamentos.
+
+Validações do frontend não são mecanismos de segurança.
+
+## Auditoria
+
+Operações relevantes podem gerar registros em `audit_logs`, por exemplo:
+
+```text
+user.created
+user.password_changed
+dealership.created
+dealership.updated
+dealership.deleted
+vehicle.created
+vehicle.updated
+vehicle.status_changed
+vehicle.deleted
+availability.created
+availability.updated
+availability.deleted
+appointment.created
+appointment.confirmed
+appointment.cancelled
+appointment.completed
+```
+
+Os registros de auditoria são somente de leitura para a aplicação.
+
+## Notificações
+
+O envio de e-mails deve ser assíncrono.
+
+Eventos iniciais:
+
+```text
+appointment.created
+appointment.confirmed
+appointment.cancelled
+```
+
+O agendamento pode notificar:
+
+- cliente;
+- vendedores responsáveis pela concessionária;
+- administrador.
+
+A falha no envio do e-mail não deve impedir a criação do agendamento.
+
+## Scheduler
+
+O scheduler PHP executa tarefas periódicas simples, como:
+
+- expirar agendamentos pendentes;
+- executar tarefas de manutenção;
+- limpar dados temporários quando necessário.
+
+## Worker
+
+O worker PHP executa tarefas assíncronas, como envio de e-mails.
+
+As tarefas devem ser idempotentes sempre que possível e possuir retry para falhas temporárias.
+
+## Busca
+
+A busca utiliza PostgreSQL Full Text Search e `pg_trgm`.
+
+Não é necessário utilizar Elasticsearch na primeira versão.
+
+## Imagens
+
+Arquivos enviados devem ser validados antes do armazenamento, considerando o conteúdo real e o MIME type.
+
+As imagens são armazenadas no MinIO e o PostgreSQL mantém somente suas referências.
+
+## Integridade
+
+As regras críticas devem ser protegidas também pelo banco de dados:
+
+- e-mail único;
+- foreign keys;
+- associação única entre seller e dealership;
+- posição única das imagens;
+- intervalos de disponibilidade válidos;
+- prevenção de agendamentos concorrentes.
