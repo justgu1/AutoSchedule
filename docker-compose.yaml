@@ -1,0 +1,115 @@
+services:
+  nginx:
+    build:
+      context: .
+      dockerfile: infra/docker/frontend/Dockerfile
+    container_name: autoschedule-nginx
+    ports:
+      - "${APP_PORT:-8080}:80"
+    depends_on:
+      - backend
+    networks:
+      - autoschedule
+
+  backend:
+    build:
+      context: .
+      dockerfile: infra/docker/backend/Dockerfile
+    container_name: autoschedule-backend
+    environment:
+      APP_ENV: ${APP_ENV:-local}
+
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_DATABASE:-autoschedule}
+      DB_USERNAME: ${DB_USERNAME:-pgsql}
+      DB_PASSWORD: ${DB_PASSWORD:-password}
+
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_BUCKET: ${S3_BUCKET:-autoschedule}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-admin}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-password}
+
+      TEMP_STORAGE_PATH: /var/www/html/storage/tmp
+
+    volumes: # Prefiro que tenhamos um backup dos uploads até o retorno 200 do s3.
+      - backend_tmp:/var/www/html/storage/tmp
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
+    networks:
+      - autoschedule
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: autoschedule-postgres
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-autoschedule}
+      POSTGRES_USER: ${DB_USERNAME:-pgsql}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DB_USERNAME:-pgsql} -d ${DB_DATABASE:-autoschedule}"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    networks:
+      - autoschedule
+
+  redis:
+    image: redis:8-alpine
+    container_name: autoschedule-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test:
+        ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - autoschedule
+
+  minio:
+    image: minio/minio:latest
+    container_name: autoschedule-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-password}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    networks:
+      - autoschedule
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  backend_tmp:
+
+networks:
+  autoschedule:
+    driver: bridge
