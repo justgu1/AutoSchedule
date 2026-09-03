@@ -2,12 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Tests\Http;
+namespace Tests\Infrastructure\Http;
 
-use App\Http\JsonResponse;
-use App\Http\Request;
-use App\Http\Response;
-use App\Http\Router;
+use App\Infrastructure\Http\HttpException;
+use App\Infrastructure\Http\JsonResponse;
+use App\Infrastructure\Http\Request;
+use App\Infrastructure\Http\Response;
+use App\Infrastructure\Http\Router;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -51,24 +52,30 @@ final class RouterTest extends TestCase
     }
 
     #[Test]
-    public function devolve_404_quando_nenhuma_rota_bate(): void
+    public function lanca_http_exception_404_quando_nenhuma_rota_bate(): void
     {
         $router = new Router();
 
-        $response = $router->dispatch(new Request(method: 'GET', path: '/api/inexistente'));
-
-        $this->assertSame(404, $response->status());
+        try {
+            $router->dispatch(new Request(method: 'GET', path: '/api/inexistente'));
+            $this->fail('Expected HttpException to be thrown.');
+        } catch (HttpException $exception) {
+            $this->assertSame(404, $exception->status());
+        }
     }
 
     #[Test]
-    public function devolve_405_quando_o_path_bate_mas_o_metodo_nao(): void
+    public function lanca_http_exception_405_quando_o_path_bate_mas_o_metodo_nao(): void
     {
         $router = new Router();
         $router->get('/api/ping', static fn (Request $request): Response => new JsonResponse(['pong' => true]));
 
-        $response = $router->dispatch(new Request(method: 'POST', path: '/api/ping'));
-
-        $this->assertSame(405, $response->status());
+        try {
+            $router->dispatch(new Request(method: 'POST', path: '/api/ping'));
+            $this->fail('Expected HttpException to be thrown.');
+        } catch (HttpException $exception) {
+            $this->assertSame(405, $exception->status());
+        }
     }
 
     #[Test]

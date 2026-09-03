@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http;
+namespace App\Infrastructure\Http;
 
 class Response
 {
@@ -31,6 +31,23 @@ class Response
     public function body(): string
     {
         return $this->body;
+    }
+
+    public static function success(mixed $data, int $status = 200): JsonResponse
+    {
+        return new JsonResponse(['data' => $data], $status);
+    }
+
+    /** @param array<string, string> $errors */
+    public static function error(string $message, int $status, array $errors = []): JsonResponse
+    {
+        $payload = ['message' => $message];
+
+        if ($errors !== []) {
+            $payload['errors'] = $errors;
+        }
+
+        return new JsonResponse($payload, $status);
     }
 
     public function withHeader(string $name, string $value): static
