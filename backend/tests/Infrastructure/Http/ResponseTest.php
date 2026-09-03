@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Tests\Http;
+namespace Tests\Infrastructure\Http;
 
-use App\Http\Response;
+use App\Infrastructure\Http\Response;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 

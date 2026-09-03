@@ -5,9 +5,9 @@ declare(strict_types=1);
 require dirname(__DIR__) . '/vendor/autoload.php';
 
 use App\Application;
-use App\Http\JsonResponse;
-use App\Http\Request;
-use App\Http\Router;
+use App\Infrastructure\Http\JsonResponse;
+use App\Infrastructure\Http\Request;
+use App\Infrastructure\Http\Router;
 
 $app = new Application();
 

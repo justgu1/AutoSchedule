@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Tests\Http;
+namespace Tests\Infrastructure\Http;
 
-use App\Http\JsonResponse;
-use App\Http\Request;
-use App\Http\Response;
-use App\Http\Router;
+use App\Infrastructure\Http\JsonResponse;
+use App\Infrastructure\Http\Request;
+use App\Infrastructure\Http\Response;
+use App\Infrastructure\Http\Router;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
