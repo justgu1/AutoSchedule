@@ -18,6 +18,8 @@ services:
     container_name: autoschedule-backend
     environment:
       APP_ENV: ${APP_ENV:-local}
+      APP_DEBUG: ${APP_DEBUG:-false}
+      APP_TIMEZONE: ${APP_TIMEZONE:-America/Sao_Paulo}
 
       DB_HOST: postgres
       DB_PORT: 5432
