@@ -80,9 +80,9 @@ final class Router
             return $response;
         }
 
-        return $this->pathMatchesAnyMethod($path)
-            ? new JsonResponse(['error' => 'Method Not Allowed'], 405)
-            : new JsonResponse(['error' => 'Not Found'], 404);
+        throw $this->pathMatchesAnyMethod($path)
+            ? HttpException::methodNotAllowed()
+            : HttpException::notFound();
     }
 
     private function pathMatchesAnyMethod(string $path): bool
