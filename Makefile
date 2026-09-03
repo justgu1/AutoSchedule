@@ -1,4 +1,4 @@
-.PHONY: setup up down restart build logs ps test migrate rollback
+.PHONY: setup up down restart build logs ps test migrate rollback seed
 
 setup:
 	@if [ -f .env ]; then \
@@ -90,3 +90,6 @@ migrate:
 
 rollback:
 	@docker compose exec backend php bin/migrate.php --rollback
+
+seed:
+	@docker compose exec backend php bin/seed.php
