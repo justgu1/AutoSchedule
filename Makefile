@@ -1,4 +1,4 @@
-.PHONY: setup up down restart build logs ps test
+.PHONY: setup up down restart build logs ps test migrate rollback
 
 setup:
 	@if [ -f .env ]; then \
@@ -84,3 +84,9 @@ ps:
 
 test:
 	@docker compose exec backend vendor/bin/phpunit
+
+migrate:
+	@docker compose exec backend php bin/migrate.php
+
+rollback:
+	@docker compose exec backend php bin/migrate.php --rollback
