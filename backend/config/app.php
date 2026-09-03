@@ -13,4 +13,13 @@ return [
     ),
 
     'timezone' => getenv('APP_TIMEZONE') ?: 'America/Sao_Paulo',
+
+    'database' => [
+        'driver' => getenv('DB_DRIVER') ?: 'pgsql',
+        'host' => getenv('DB_HOST') ?: '127.0.0.1',
+        'port' => (int) (getenv('DB_PORT') ?: 5432),
+        'database' => getenv('DB_DATABASE') ?: 'autoschedule',
+        'username' => getenv('DB_USERNAME') ?: 'pgsql',
+        'password' => getenv('DB_PASSWORD') ?: 'password',
+    ],
 ];
