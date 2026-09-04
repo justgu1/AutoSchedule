@@ -8,3 +8,4 @@ frontend/dist/
 backend/vendor/
 backend/.phpunit.cache/
 backend/.phpunit.result.cache
+backend/storage/keys/*.pem

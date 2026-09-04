@@ -1,4 +1,4 @@
-.PHONY: setup up down restart build logs ps test migrate rollback seed
+.PHONY: setup up down restart build logs ps test migrate rollback seed keys
 
 setup:
 	@if [ -f .env ]; then \
@@ -33,6 +33,8 @@ setup:
 	MINIO_ROOT_PASSWORD=$$(openssl rand -hex 24); \
 	sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=$$DB_PASSWORD/" .env; \
 	sed -i "s/^MINIO_ROOT_PASSWORD=.*/MINIO_ROOT_PASSWORD=$$MINIO_ROOT_PASSWORD/" .env
+
+	@$(MAKE) keys
 
 	@echo "==> Instalando dependências do frontend..."
 	@docker run --rm \
@@ -93,3 +95,14 @@ rollback:
 
 seed:
 	@docker compose exec backend php bin/seed.php
+
+keys:
+	@mkdir -p backend/storage/keys
+	@if [ -f backend/storage/keys/oauth-private.pem ]; then \
+		echo "==> Chaves RSA do JWT já existem em backend/storage/keys/ -- nada a fazer."; \
+	else \
+		echo "==> Gerando chaves RSA do JWT..."; \
+		openssl genrsa -out backend/storage/keys/oauth-private.pem 2048 2>/dev/null; \
+		openssl rsa -in backend/storage/keys/oauth-private.pem -pubout -out backend/storage/keys/oauth-public.pem 2>/dev/null; \
+		chmod 644 backend/storage/keys/oauth-private.pem; \
+	fi
