@@ -58,7 +58,7 @@ final class ValidatorTest extends TestCase
     }
 
     #[Test]
-    public function valida_min_e_max_pelo_tamanho_da_string(): void
+    public function rejeita_valor_abaixo_do_minimo(): void
     {
         try {
             Validator::validate(['password' => 'abc'], ['password' => 'min:8']);
@@ -66,17 +66,27 @@ final class ValidatorTest extends TestCase
         } catch (DomainException $exception) {
             $this->assertSame(['password' => 'The password field must be at least 8.'], $exception->errors());
         }
+    }
 
+    #[Test]
+    public function aceita_valor_dentro_do_min_e_max(): void
+    {
         $validated = Validator::validate(['password' => 'a-long-enough-password'], ['password' => 'min:8|max:64']);
+
         $this->assertSame(['password' => 'a-long-enough-password'], $validated);
     }
 
     #[Test]
-    public function valida_in_contra_uma_lista_de_valores(): void
+    public function aceita_valor_presente_na_lista_do_in(): void
     {
         $validated = Validator::validate(['role' => 'admin'], ['role' => 'required|in:admin,seller,customer']);
-        $this->assertSame(['role' => 'admin'], $validated);
 
+        $this->assertSame(['role' => 'admin'], $validated);
+    }
+
+    #[Test]
+    public function rejeita_valor_fora_da_lista_do_in(): void
+    {
         try {
             Validator::validate(['role' => 'superuser'], ['role' => 'in:admin,seller,customer']);
             $this->fail('Expected a DomainException to be thrown.');
