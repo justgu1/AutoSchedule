@@ -11,10 +11,10 @@ final class Validator
 {
     /**
      * @param array<string, mixed> $data
-     * @param array<string, string> $rules field => pipe-separated rules, e.g. "required|email"
-     * @return array<string, mixed> only the fields declared in $rules, as received (no coercion)
+     * @param array<string, string> $rules campo => regras separadas por "|", ex. "required|email"
+     * @return array<string, mixed> só os campos declarados em $rules, como recebidos (sem conversão)
      *
-     * @throws DomainException when any rule fails, with one message per field (first failure wins)
+     * @throws DomainException quando alguma regra falha, uma mensagem por campo (primeira falha vence)
      */
     public static function validate(array $data, array $rules): array
     {
@@ -56,8 +56,8 @@ final class Validator
 
     private static function passes(string $rule, mixed $value, ?string $parameter): bool
     {
-        // "required" is the only rule that must reject an absent value; every other
-        // rule is skipped when the field is empty, so optional fields stay optional.
+        // "required" é a única regra que rejeita valor ausente; toda outra regra
+        // é pulada quando o campo está vazio, então campo opcional continua opcional.
         if ($rule !== 'required' && ($value === null || $value === '')) {
             return true;
         }

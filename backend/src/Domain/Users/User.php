@@ -54,9 +54,10 @@ final class User
     }
 
     /**
-     * Returns a copy with PII scrubbed for LGPD "right to erasure" — id, password hash,
-     * role and timestamps are kept so history/audit trails referencing this user stay valid.
-     * Does not itself set deleted_at; the repository is responsible for the soft-delete.
+     * Devolve uma cópia com PII escrubada pro "direito ao esquecimento" da LGPD —
+     * id, hash de senha, role e timestamps são mantidos pra histórico/auditoria
+     * que referencia esse usuário continuar válido. Não seta deleted_at por
+     * conta própria; quem faz o soft-delete é o repositório.
      */
     public function anonymized(): self
     {

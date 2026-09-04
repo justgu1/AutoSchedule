@@ -45,9 +45,9 @@ final class PostgresOAuthClientRepository implements OAuthClientRepository
     }
 
     /**
-     * Parses a Postgres `text[]` value as returned by PDO_PGSQL, e.g. "{a,b,c}".
-     * Only handles plain, comma-free elements (grant type slugs, scopes, URIs) --
-     * not a general-purpose parser for quoted/escaped array literals.
+     * Faz o parse de um valor `text[]` do Postgres como o PDO_PGSQL devolve,
+     * ex. "{a,b,c}". Só lida com elemento simples, sem vírgula (slug de grant
+     * type, scope, URI) -- não é um parser genérico de literal com aspas/escape.
      *
      * @return list<string>
      */
