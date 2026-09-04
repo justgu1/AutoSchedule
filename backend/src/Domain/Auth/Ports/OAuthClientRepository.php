@@ -8,9 +8,6 @@ use App\Domain\Auth\OAuthClient;
 
 interface OAuthClientRepository
 {
-    /**
-     * Clients are seeded, not registered at runtime yet -- read-only on purpose
-     * (see the auth plan's "sem client dinâmico/admin UI" trade-off).
-     */
+    /** Client é seedado, não registrado em runtime ainda -- só leitura de propósito, sem insert/update/delete. */
     public function findByClientId(string $clientId): ?OAuthClient;
 }
