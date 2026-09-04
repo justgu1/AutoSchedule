@@ -34,11 +34,15 @@ final class MigrationRunnerTest extends TestCase
 
         $this->pdo->beginTransaction();
 
-        // Drops every table a real migration file creates, so run() can apply
-        // them again from scratch inside this test's transaction. Extend this
-        // list whenever a new migration adds a new table.
-        $this->pdo->exec('DROP TABLE IF EXISTS users CASCADE');
+        // Dropa toda tabela que uma migration real cria, pra run() poder
+        // aplicar tudo de novo do zero dentro da transação deste teste.
+        // Estender essa lista sempre que uma migration nova criar tabela.
+        // Ordem importa aqui: CASCADE numa tabela referenciada só dropa a
+        // *constraint* de FK na tabela dependente, não a tabela em si -- por
+        // isso toda tabela com FK ainda precisa do próprio DROP explícito.
+        $this->pdo->exec('DROP TABLE IF EXISTS oauth_refresh_tokens CASCADE');
         $this->pdo->exec('DROP TABLE IF EXISTS oauth_clients CASCADE');
+        $this->pdo->exec('DROP TABLE IF EXISTS users CASCADE');
 
         if ($this->pdo->query("SELECT to_regclass('public.migrations')")->fetchColumn() !== null) {
             $this->pdo->exec('DELETE FROM migrations');
