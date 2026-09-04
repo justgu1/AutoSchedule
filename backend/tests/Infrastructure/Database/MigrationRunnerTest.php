@@ -34,10 +34,14 @@ final class MigrationRunnerTest extends TestCase
 
         $this->pdo->beginTransaction();
 
+        // Drops every table a real migration file creates, so run() can apply
+        // them again from scratch inside this test's transaction. Extend this
+        // list whenever a new migration adds a new table.
         $this->pdo->exec('DROP TABLE IF EXISTS users CASCADE');
+        $this->pdo->exec('DROP TABLE IF EXISTS oauth_clients CASCADE');
 
         if ($this->pdo->query("SELECT to_regclass('public.migrations')")->fetchColumn() !== null) {
-            $this->pdo->exec('DELETE FROM migrations WHERE migration LIKE \'2026_09_03_000001%\'');
+            $this->pdo->exec('DELETE FROM migrations');
         }
 
         $this->runner = new MigrationRunner($this->pdo, dirname(__DIR__, 3) . '/database/migrations');
