@@ -11,8 +11,10 @@ use App\Infrastructure\Http\Pipeline;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
 use App\Infrastructure\Http\Router;
+use App\Infrastructure\Logging\Logger;
 
 $app = new Application();
+$logger = new Logger();
 
 $router = new Router();
 
@@ -25,10 +27,10 @@ $router->get('/api', static function (Request $request) use ($app): Response {
 });
 
 $pipeline = new Pipeline([
-    new LoggingMiddleware(),
+    new LoggingMiddleware(log: static fn (string $line): mixed => $logger->info($line)),
 ]);
 
-$exceptionHandler = new ExceptionHandler(debug: (bool) $app->config('debug'));
+$exceptionHandler = new ExceptionHandler(debug: (bool) $app->config('debug'), logger: $logger);
 
 try {
     $response = $pipeline->process(
