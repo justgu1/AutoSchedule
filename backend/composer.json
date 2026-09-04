@@ -3,7 +3,9 @@
     "description": "AutoSchedule backend",
     "type": "project",
     "require": {
-        "php": "^8.4"
+        "php": "^8.4",
+        "predis/predis": "^2.3",
+        "psr/log": "^3.0"
     },
     "autoload": {
         "psr-4": {

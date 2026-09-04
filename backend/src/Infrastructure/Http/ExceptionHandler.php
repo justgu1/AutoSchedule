@@ -6,11 +6,15 @@ namespace App\Infrastructure\Http;
 
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
+use App\Infrastructure\Logging\Logger;
+use Psr\Log\LoggerInterface;
 
 final class ExceptionHandler
 {
-    public function __construct(private readonly bool $debug = false)
-    {
+    public function __construct(
+        private readonly bool $debug = false,
+        private readonly LoggerInterface $logger = new Logger(),
+    ) {
     }
 
     public function handle(\Throwable $exception): Response
@@ -27,7 +31,7 @@ final class ExceptionHandler
             };
         }
 
-        error_log((string) $exception);
+        $this->logger->error((string) $exception);
 
         return Response::error(
             $this->debug ? $exception->getMessage() : 'Internal Server Error',
