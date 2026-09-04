@@ -34,7 +34,7 @@ final class User
         $now = new \DateTimeImmutable();
 
         return new self(
-            id: Uuid::v4(),
+            id: Uuid::v7(),
             name: $name,
             email: $email,
             phone: $phone,

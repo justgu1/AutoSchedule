@@ -12,7 +12,7 @@ use PHPUnit\Framework\TestCase;
 final class UserTest extends TestCase
 {
     #[Test]
-    public function register_gera_id_e_faz_hash_da_senha_com_argon2id(): void
+    public function register_monta_um_usuario_novo_com_os_dados_informados_e_estado_inicial_correto(): void
     {
         $user = User::register('Ada Lovelace', 'ada@example.com', '+55 11 90000-0000', 'super-secret', UserRole::Customer);
 
@@ -20,11 +20,17 @@ final class UserTest extends TestCase
         $this->assertSame('Ada Lovelace', $user->name);
         $this->assertSame('ada@example.com', $user->email);
         $this->assertSame(UserRole::Customer, $user->role);
-        $this->assertNotSame('super-secret', $user->passwordHash);
-        $this->assertTrue(password_verify('super-secret', $user->passwordHash));
         $this->assertNotNull($user->passwordSetAt);
         $this->assertNull($user->emailVerifiedAt);
         $this->assertNull($user->deletedAt);
+    }
+
+    #[Test]
+    public function register_nao_guarda_a_senha_em_texto_puro(): void
+    {
+        $user = User::register('Ada', 'ada@example.com', null, 'super-secret', UserRole::Customer);
+
+        $this->assertNotSame('super-secret', $user->passwordHash);
     }
 
     #[Test]

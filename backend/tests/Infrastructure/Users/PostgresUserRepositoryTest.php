@@ -41,20 +41,29 @@ final class PostgresUserRepositoryTest extends TestCase
     }
 
     #[Test]
-    public function insere_e_encontra_por_id_e_por_email(): void
+    public function insere_e_encontra_por_id(): void
     {
         $user = User::register('Ada Lovelace', 'ada@example.com', '+55 11 90000-0000', 'secret', UserRole::Seller);
         $this->repository->insert($user);
 
-        $byId = $this->repository->findById($user->id);
-        $byEmail = $this->repository->findByEmail('ada@example.com');
+        $found = $this->repository->findById($user->id);
 
-        $this->assertNotNull($byId);
-        $this->assertSame($user->id, $byId->id);
-        $this->assertSame('Ada Lovelace', $byId->name);
-        $this->assertSame(UserRole::Seller, $byId->role);
-        $this->assertNotNull($byEmail);
-        $this->assertSame($user->id, $byEmail->id);
+        $this->assertNotNull($found);
+        $this->assertSame($user->id, $found->id);
+        $this->assertSame('Ada Lovelace', $found->name);
+        $this->assertSame(UserRole::Seller, $found->role);
+    }
+
+    #[Test]
+    public function insere_e_encontra_por_email(): void
+    {
+        $user = User::register('Ada Lovelace', 'ada@example.com', '+55 11 90000-0000', 'secret', UserRole::Seller);
+        $this->repository->insert($user);
+
+        $found = $this->repository->findByEmail('ada@example.com');
+
+        $this->assertNotNull($found);
+        $this->assertSame($user->id, $found->id);
     }
 
     #[Test]
@@ -102,7 +111,7 @@ final class PostgresUserRepositoryTest extends TestCase
     }
 
     #[Test]
-    public function anonymize_and_soft_delete_escruba_pii_e_some_das_buscas(): void
+    public function anonymize_and_soft_delete_some_das_buscas(): void
     {
         $user = User::register('Ada Lovelace', 'ada@example.com', '+55 11 90000-0000', 'secret', UserRole::Customer);
         $this->repository->insert($user);
@@ -111,6 +120,15 @@ final class PostgresUserRepositoryTest extends TestCase
 
         $this->assertNull($this->repository->findById($user->id));
         $this->assertFalse($this->repository->existsByEmail('ada@example.com'));
+    }
+
+    #[Test]
+    public function anonymize_and_soft_delete_escruba_a_pii_na_linha_persistida(): void
+    {
+        $user = User::register('Ada Lovelace', 'ada@example.com', '+55 11 90000-0000', 'secret', UserRole::Customer);
+        $this->repository->insert($user);
+
+        $this->repository->anonymizeAndSoftDelete($user->id);
 
         $statement = $this->pdo->prepare('SELECT name, email, phone, deleted_at FROM users WHERE id = ?');
         $statement->execute([$user->id]);
