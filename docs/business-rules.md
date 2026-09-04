@@ -20,26 +20,6 @@ Pode estar associado a uma ou mais concessionárias. Seu acesso é limitado às 
 
 Não precisa estar associado a uma concessionária. É identificado por nome, e-mail e telefone durante o agendamento.
 
-## Autenticação
-
-Login: email+senha, sem PKCE/authorization code — API first-party, sem ganho real nesse handshake.
-
-Endpoint único, sem `grant_type`: o corpo decide.
-
-```text
-POST /api/oauth/token
-
-{ refresh_token }         -> renovação (outros campos presentes são ignorados)
-{ email, password }       -> login
-nenhum dos dois           -> 422
-```
-
-Resposta: `access_token` (JWT RS256, TTL curto), `refresh_token` (opaco, TTL longo, uso único — reuso revoga a família toda), `expires_in`, `scope`.
-
-`client_id` identifica a aplicação (hoje só `autoschedule-web`), não o usuário — `role` vem do JWT.
-
-`client_credentials` (M2M) reservado, sem consumidor hoje.
-
 ## Veículos
 
 Todo veículo pertence a uma única concessionária.
@@ -175,6 +155,24 @@ A senha é armazenada como hash no campo `password`.
 O hash deve utilizar um algoritmo apropriado para senhas, como Argon2id.
 
 `password_set_at` pode permanecer `NULL` enquanto a senha ainda não tiver sido definida pelo cliente.
+
+Login: email+senha, sem PKCE/authorization code — API first-party, sem ganho real nesse handshake.
+
+Endpoint único, sem `grant_type`: o corpo decide.
+
+```text
+POST /api/oauth/token
+
+{ refresh_token }         -> renovação (outros campos presentes são ignorados)
+{ email, password }       -> login
+nenhum dos dois           -> 422
+```
+
+Resposta: `access_token` (JWT RS256, TTL curto), `refresh_token` (opaco, TTL longo, uso único — reuso revoga a família toda), `expires_in`, `scope`.
+
+`client_id` identifica a aplicação (hoje só `autoschedule-web`), não o usuário — `role` vem do JWT.
+
+`client_credentials` (M2M) reservado, sem consumidor hoje.
 
 ## Autorização
 
