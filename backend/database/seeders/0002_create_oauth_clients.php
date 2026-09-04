@@ -13,14 +13,15 @@ return new class implements Seeder {
             ON CONFLICT (client_id) DO NOTHING
             SQL);
 
-        // Client público: sem secret, usado pelo SPA first-party (authorization_code + PKCE, headless).
+        // Client público: sem secret, usado pelo SPA first-party (login direto
+        // email+senha + refresh_token, sem redirect).
         $statement->execute([
             'client_id' => 'autoschedule-web',
             'name' => 'AutoSchedule Web',
             'type' => 'public',
             'secret_hash' => null,
-            'allowed_grant_types' => '{authorization_code,refresh_token}',
-            'redirect_uris' => '{urn:autoschedule:headless}',
+            'allowed_grant_types' => '{password,refresh_token}',
+            'redirect_uris' => null,
             'allowed_scopes' => '{profile:read,profile:write,users:read,users:write}',
         ]);
 

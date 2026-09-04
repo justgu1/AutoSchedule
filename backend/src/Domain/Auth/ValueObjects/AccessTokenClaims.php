@@ -2,15 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Auth;
+namespace App\Domain\Auth\ValueObjects;
 
 use App\Domain\Support\Uuid;
 use App\Domain\Users\UserRole;
 
-/**
- * Value Object: sem identidade própria, sem persistência/busca no banco --
- * existe só dentro do JWT enquanto ele for válido.
- */
 final class AccessTokenClaims
 {
     /**

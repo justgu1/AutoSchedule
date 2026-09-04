@@ -6,7 +6,7 @@ namespace App\Domain\Auth;
 
 enum GrantType: string
 {
-    case AuthorizationCode = 'authorization_code';
+    case Password = 'password';
     case RefreshToken = 'refresh_token';
     case ClientCredentials = 'client_credentials';
 }

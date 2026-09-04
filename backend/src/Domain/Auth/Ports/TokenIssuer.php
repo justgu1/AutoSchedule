@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Auth\Ports;
 
-use App\Domain\Auth\AccessTokenClaims;
+use App\Domain\Auth\ValueObjects\AccessTokenClaims;
 
 interface TokenIssuer
 {

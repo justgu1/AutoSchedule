@@ -47,7 +47,7 @@ final class PostgresOAuthClientRepositoryTest extends TestCase
             clientId: 'test-public-client',
             type: 'public',
             secretHash: null,
-            allowedGrantTypes: '{authorization_code,refresh_token}',
+            allowedGrantTypes: '{password,refresh_token}',
             redirectUris: '{urn:test:headless}',
             allowedScopes: '{profile:read,profile:write}',
         );
@@ -57,7 +57,7 @@ final class PostgresOAuthClientRepositoryTest extends TestCase
         $this->assertNotNull($client);
         $this->assertSame(ClientType::Public, $client->type);
         $this->assertNull($client->secretHash);
-        $this->assertSame([GrantType::AuthorizationCode, GrantType::RefreshToken], $client->allowedGrantTypes);
+        $this->assertSame([GrantType::Password, GrantType::RefreshToken], $client->allowedGrantTypes);
         $this->assertSame(['urn:test:headless'], $client->redirectUris);
         $this->assertSame(['profile:read', 'profile:write'], $client->allowedScopes);
     }

@@ -19,7 +19,7 @@ final class OAuthClientTest extends TestCase
             clientId: 'autoschedule-web',
             name: 'AutoSchedule Web',
             type: ClientType::Public,
-            allowedGrantTypes: [GrantType::AuthorizationCode, GrantType::RefreshToken],
+            allowedGrantTypes: [GrantType::Password, GrantType::RefreshToken],
             redirectUris: ['urn:autoschedule:headless'],
             allowedScopes: ['profile:read'],
         );
@@ -50,7 +50,7 @@ final class OAuthClientTest extends TestCase
             clientId: 'autoschedule-web',
             name: 'AutoSchedule Web',
             type: ClientType::Public,
-            allowedGrantTypes: [GrantType::AuthorizationCode],
+            allowedGrantTypes: [GrantType::Password],
             redirectUris: [],
             allowedScopes: [],
             plainSecret: 'should-be-ignored',
@@ -83,7 +83,7 @@ final class OAuthClientTest extends TestCase
             clientId: 'autoschedule-web',
             name: 'AutoSchedule Web',
             type: ClientType::Public,
-            allowedGrantTypes: [GrantType::AuthorizationCode],
+            allowedGrantTypes: [GrantType::Password],
             redirectUris: [],
             allowedScopes: [],
         );
@@ -98,12 +98,12 @@ final class OAuthClientTest extends TestCase
             clientId: 'autoschedule-web',
             name: 'AutoSchedule Web',
             type: ClientType::Public,
-            allowedGrantTypes: [GrantType::AuthorizationCode],
+            allowedGrantTypes: [GrantType::Password],
             redirectUris: [],
             allowedScopes: [],
         );
 
-        $this->assertTrue($client->supportsGrantType(GrantType::AuthorizationCode));
+        $this->assertTrue($client->supportsGrantType(GrantType::Password));
         $this->assertFalse($client->supportsGrantType(GrantType::ClientCredentials));
     }
 }
