@@ -8,7 +8,7 @@ use Psr\Log\AbstractLogger;
 
 final class Logger extends AbstractLogger
 {
-    /** @param resource|null $stream defaults to php://stderr, kept open for the life of the logger */
+    /** @param resource|null $stream padrão é php://stderr, mantido aberto pela vida toda do logger */
     public function __construct(private $stream = null)
     {
         $this->stream ??= fopen('php://stderr', 'a');

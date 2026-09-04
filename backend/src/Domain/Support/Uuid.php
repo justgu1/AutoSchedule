@@ -7,10 +7,11 @@ namespace App\Domain\Support;
 final class Uuid
 {
     /**
-     * Generates an RFC 9562 version 7 UUID: a 48-bit big-endian Unix millisecond
-     * timestamp followed by random bits. Time-ordered, so ids sort (and index) in
-     * insertion order — unlike v4, which is fully random. Used by entities that
-     * must have an id before persistence.
+     * Gera um UUID versão 7 (RFC 9562): timestamp Unix em milissegundos (48 bits,
+     * big-endian) seguido de bits aleatórios. Ordenável no tempo, então os ids
+     * ordenam (e indexam) na ordem de inserção — diferente do v4, que é
+     * totalmente aleatório. Usado por entidades que precisam ter um id antes
+     * de persistir.
      */
     public static function v7(): string
     {
