@@ -11,6 +11,5 @@ return [
     ],
 
     'access_token_ttl' => (int) (getenv('JWT_ACCESS_TOKEN_TTL') ?: 900),
-    'authorization_code_ttl' => (int) (getenv('OAUTH_AUTHORIZATION_CODE_TTL') ?: 60),
     'refresh_token_ttl' => (int) (getenv('OAUTH_REFRESH_TOKEN_TTL') ?: 1_209_600),
 ];
