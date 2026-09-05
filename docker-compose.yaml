@@ -45,6 +45,11 @@ services:
       SECURITY_HSTS_ENABLED: ${SECURITY_HSTS_ENABLED:-false}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
 
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      MAIL_FROM: ${MAIL_FROM:-noreply@autoschedule.local}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+
       S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
       S3_BUCKET: ${S3_BUCKET:-autoschedule}
       S3_REGION: ${S3_REGION:-us-east-1}
@@ -62,6 +67,8 @@ services:
       redis:
         condition: service_healthy
       minio:
+        condition: service_started
+      mailpit:
         condition: service_started
 
     networks:
@@ -118,6 +125,14 @@ services:
     ports:
       - "${MINIO_API_PORT:-9000}:9000"
       - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    networks:
+      - autoschedule
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: autoschedule-mailpit
+    ports:
+      - "${MAILPIT_UI_PORT:-8025}:8025"
     networks:
       - autoschedule
 

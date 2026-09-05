@@ -87,12 +87,25 @@ return static function (Router $router, Container $container, Application $app):
         description: 'Updates your name and/or phone.',
         accepts: ['name', 'phone'],
     );
+    $router->post(
+        '/api/password-reset',
+        [$userController, 'requestPasswordReset'],
+        serviceContext: true,
+        description: 'Sends a password reset link by email, if the address is registered.',
+        accepts: ['email'],
+        rateLimit: new RateLimitPolicy('auth', $authRateLimit['max_attempts'], $authRateLimit['window_seconds']),
+    );
+    // Pública (sem `roles`) -- aceita ou `current_password` (autenticado,
+    // troca a própria senha) ou `reset_token` (sem Bearer, veio do e-mail de
+    // reset). `serviceContext` é o que permite o segundo caminho mexer em
+    // `users` sem contexto de usuário nenhum.
     $router->put(
         '/api/me/password',
         [$userController, 'updatePassword'],
-        roles: $anyAuthenticatedRole,
-        description: 'Changes your password (requires the current one).',
-        accepts: ['current_password', 'password'],
+        serviceContext: true,
+        description: 'Changes your password (current_password when authenticated, or reset_token from the reset email).',
+        accepts: ['current_password', 'reset_token', 'password'],
+        rateLimit: new RateLimitPolicy('auth', $authRateLimit['max_attempts'], $authRateLimit['window_seconds']),
     );
     $router->delete(
         '/api/me',

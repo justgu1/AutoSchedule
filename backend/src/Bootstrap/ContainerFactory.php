@@ -8,18 +8,23 @@ use App\Application;
 use App\Domain\Audit\Ports\AuditLogger;
 use App\Domain\Auth\OAuthService;
 use App\Domain\Auth\Ports\OAuthClientRepository;
+use App\Domain\Auth\Ports\PasswordResetTokenRepository;
 use App\Domain\Auth\Ports\RefreshTokenRepository;
 use App\Domain\Auth\Ports\TokenIssuer;
+use App\Domain\Notifications\Ports\MailProvider;
 use App\Domain\Ports\DatabaseConnection;
 use App\Domain\Users\Ports\UserRepository;
 use App\Infrastructure\Audit\PostgresAuditLogger;
 use App\Infrastructure\Auth\Jwt\JwtTokenIssuer;
 use App\Infrastructure\Auth\Postgres\PostgresOAuthClientRepository;
+use App\Infrastructure\Auth\Postgres\PostgresPasswordResetTokenRepository;
 use App\Infrastructure\Auth\Postgres\PostgresRefreshTokenRepository;
 use App\Infrastructure\Container\Container;
 use App\Infrastructure\Database\PostgresConnection;
 use App\Infrastructure\Http\Controllers\OAuthController;
+use App\Infrastructure\Http\Controllers\UserController;
 use App\Infrastructure\Logging\Logger;
+use App\Infrastructure\Mail\SymfonyMailProvider;
 use App\Infrastructure\Pagination\PaginationPolicy;
 use App\Infrastructure\RateLimit\RateLimiter;
 use App\Infrastructure\RateLimit\RedisRateLimiter;
@@ -80,6 +85,15 @@ final class ContainerFactory
             AuditLogger::class,
             static fn (Container $c): AuditLogger => new PostgresAuditLogger($c->get(DatabaseConnection::class)->pdo(), new Logger()),
         );
+        $container->set(
+            PasswordResetTokenRepository::class,
+            static fn (Container $c): PasswordResetTokenRepository => new PostgresPasswordResetTokenRepository($c->get(DatabaseConnection::class)->pdo()),
+        );
+        $container->set(MailProvider::class, static function () use ($app): MailProvider {
+            $mail = $app->config('mail');
+
+            return new SymfonyMailProvider($mail['host'], $mail['port'], $mail['from']);
+        });
         $container->set(RedisConnection::class, static function () use ($app): RedisConnection {
             $config = $app->config('redis');
 
@@ -113,6 +127,21 @@ final class ContainerFactory
                 oauth: $c->get(OAuthService::class),
                 refreshTokenTtl: $app->config('auth')['refresh_token_ttl'],
                 cookieSecure: $app->config('security')['cookie_secure'],
+            );
+        });
+        $container->set(UserController::class, static function (Container $c) use ($app): UserController {
+            $mail = $app->config('mail');
+
+            return new UserController(
+                users: $c->get(UserRepository::class),
+                refreshTokens: $c->get(RefreshTokenRepository::class),
+                audit: $c->get(AuditLogger::class),
+                pagination: $c->get(PaginationPolicy::class),
+                passwordResetTokens: $c->get(PasswordResetTokenRepository::class),
+                mail: $c->get(MailProvider::class),
+                passwordResetTtl: $app->config('auth')['password_reset_ttl'],
+                frontendUrl: $mail['frontend_url'],
+                passwordResetTemplatePath: dirname(__DIR__, 2) . '/resources/mail/password-reset.html',
             );
         });
 

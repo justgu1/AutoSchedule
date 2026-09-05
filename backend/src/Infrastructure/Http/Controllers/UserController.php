@@ -6,15 +6,19 @@ namespace App\Infrastructure\Http\Controllers;
 
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
+use App\Domain\Auth\PasswordResetToken;
+use App\Domain\Auth\Ports\PasswordResetTokenRepository;
 use App\Domain\Auth\Ports\RefreshTokenRepository;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
+use App\Domain\Notifications\Ports\MailProvider;
 use App\Domain\Users\DTO\UserProfile;
 use App\Domain\Users\Ports\UserRepository;
 use App\Domain\Users\User;
 use App\Domain\Users\UserRole;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
+use App\Infrastructure\Mail\MailTemplate;
 use App\Infrastructure\Pagination\PaginationPolicy;
 use App\Infrastructure\Validation\Validator;
 
@@ -33,6 +37,11 @@ final class UserController
         private readonly RefreshTokenRepository $refreshTokens,
         private readonly AuditLogger $audit,
         private readonly PaginationPolicy $pagination,
+        private readonly PasswordResetTokenRepository $passwordResetTokens,
+        private readonly MailProvider $mail,
+        private readonly int $passwordResetTtl,
+        private readonly string $frontendUrl,
+        private readonly string $passwordResetTemplatePath,
     ) {
     }
 
@@ -132,11 +141,77 @@ final class UserController
         return Response::success(UserProfile::fromUser($user)->toArray());
     }
 
-    /** Só o próprio usuário -- não existe em /users/{id}, admin não reseta senha de ninguém. Exige a senha atual: token válido prova quem é o usuário, não que ele ainda sabe a senha. */
+    /**
+     * Sem `Bearer` nenhum, e-mail existindo ou não, sempre 200 -- não vaza se
+     * a conta existe, mesma regra do login.
+     */
+    public function requestPasswordReset(Request $request): Response
+    {
+        $data = Validator::validate($request->json(), ['email' => 'required|email']);
+        $user = $this->users->findByEmail($data['email']);
+
+        if ($user !== null) {
+            [$rawToken, $token] = PasswordResetToken::issue($user->id, $this->passwordResetTtl);
+            $this->passwordResetTokens->insert($token);
+
+            $html = MailTemplate::render($this->passwordResetTemplatePath, [
+                'RESET_LINK' => sprintf('%s/reset-password?token=%s', $this->frontendUrl, $rawToken),
+                'EXPIRES_MINUTES' => (string) intdiv($this->passwordResetTtl, 60),
+            ]);
+
+            $this->mail->send($user->email, 'Redefinir senha -- AutoSchedule', $html);
+        }
+
+        return Response::success(['message' => 'If the email exists, a reset link was sent.']);
+    }
+
+    /**
+     * O corpo decide, igual `POST /oauth/token`: `reset_token` presente ->
+     * esqueci-minha-senha (sem Bearer, prova de identidade é o token do
+     * e-mail); senão -> troca autenticada (`current_password`, token válido
+     * prova quem é o usuário, não que ele ainda sabe a senha).
+     */
     public function updatePassword(Request $request): Response
     {
+        $body = $request->json();
+
+        if (array_key_exists('reset_token', $body)) {
+            return $this->resetPassword($request, $body);
+        }
+
+        return $this->changeOwnPassword($request, $body);
+    }
+
+    /** @param array<string, mixed> $body */
+    private function resetPassword(Request $request, array $body): Response
+    {
+        $data = Validator::validate($body, [
+            'reset_token' => 'required',
+            'password' => 'required|min:8',
+        ]);
+
+        $token = $this->passwordResetTokens->findByRawToken($data['reset_token']);
+        $user = $token !== null ? $this->users->findById($token->userId) : null;
+
+        if ($token === null || $token->isUsed() || $token->isExpired() || $user === null) {
+            throw new DomainException('Invalid or expired reset token.', DomainErrorType::Unauthorized);
+        }
+
+        $this->applyNewPassword($user, $data['password'], 'reset', $request);
+        $this->passwordResetTokens->markUsed($token->id);
+        // Um reset bem-sucedido invalida qualquer outro link ainda pendente do
+        // mesmo usuário -- não deixa um link antigo ainda funcionando depois.
+        $this->passwordResetTokens->invalidateAllForUser($user->id);
+        $this->refreshTokens->revokeAllForUser($user->id);
+
+        return Response::success(['message' => 'Password updated.']);
+    }
+
+    /** @param array<string, mixed> $body */
+    private function changeOwnPassword(Request $request, array $body): Response
+    {
         $user = $this->requireUser($request);
-        $data = Validator::validate($request->json(), [
+        $data = Validator::validate($body, [
             'current_password' => 'required',
             'password' => 'required|min:8',
         ]);
@@ -145,10 +220,15 @@ final class UserController
             throw new DomainException('Current password is incorrect.', DomainErrorType::Unauthorized);
         }
 
-        $this->users->update($user->withNewPassword($data['password']));
-        $this->audit->record(AuditEvent::PasswordChanged, $user->id, $user->id, [], $request->ip(), $request->header('user-agent'));
+        $this->applyNewPassword($user, $data['password'], 'self', $request);
 
         return Response::success(['message' => 'Password updated.']);
+    }
+
+    private function applyNewPassword(User $user, string $password, string $via, Request $request): void
+    {
+        $this->users->update($user->withNewPassword($password));
+        $this->audit->record(AuditEvent::PasswordChanged, $user->id, $user->id, ['via' => $via], $request->ip(), $request->header('user-agent'));
     }
 
     /**
@@ -184,10 +264,26 @@ final class UserController
         return $user;
     }
 
-    /** `{id}` da rota (admin em /users/{id}) ou o próprio JWT (self em /me) -- quem chama não precisa saber qual dos dois é. */
+    /**
+     * `{id}` da rota (admin em /users/{id}) ou o próprio JWT (self em /me) --
+     * quem chama não precisa saber qual dos dois é. `/me/password` é pública
+     * (aceita o caminho de reset sem Bearer nenhum), então aqui não dá mais
+     * pra assumir que sempre existe claims -- vira 401 limpo, não erro solto.
+     */
     private function requireUser(Request $request): User
     {
-        $id = $request->param('id') ?? $request->attribute('auth')->subject;
+        $id = $request->param('id');
+
+        if ($id === null) {
+            $claims = $request->attribute('auth');
+
+            if ($claims === null) {
+                throw new DomainException('Authentication required.', DomainErrorType::Unauthorized);
+            }
+
+            $id = $claims->subject;
+        }
+
         $user = $this->users->findById($id);
 
         if ($user === null) {
