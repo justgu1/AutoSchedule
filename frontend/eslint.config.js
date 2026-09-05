@@ -14,9 +14,7 @@ export default tseslint.config(
     {
         languageOptions: {
             parserOptions: {
-                projectService: {
-                    allowDefaultProject: ['eslint.config.js', 'vite.config.ts'],
-                },
+                project: ['tsconfig.json', 'tsconfig.node.json', 'tsconfig.e2e.json'],
                 tsconfigRootDir: projectRoot,
             },
         },

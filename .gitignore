@@ -11,3 +11,7 @@ backend/.phpunit.result.cache
 backend/storage/keys/*.pem
 backend/.php-cs-fixer.cache
 backend/rector.rcs
+
+# Frontend E2E
+frontend/test-results/
+frontend/playwright-report/

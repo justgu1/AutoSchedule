@@ -1,4 +1,4 @@
-.PHONY: setup up down restart build logs ps test migrate rollback seed keys load-test static-analysis lint lint-fix rector rector-fix
+.PHONY: setup up down restart build logs ps test migrate rollback seed keys load-test static-analysis lint lint-fix rector rector-fix e2e
 
 setup:
 	@if [ -f .env ]; then \
@@ -115,6 +115,13 @@ seed:
 
 load-test:
 	@docker compose run --rm k6 run /scripts/api-load-test.js
+
+e2e:
+	@docker compose build nginx
+	@RATE_LIMIT_AUTH_MAX=1000 docker compose up -d nginx mailpit backend
+	@RATE_LIMIT_AUTH_MAX=1000 docker compose run --rm e2e
+	@echo "==> restaurando rate limit padrão do backend..."
+	@docker compose up -d backend
 
 keys:
 	@mkdir -p backend/storage/keys
