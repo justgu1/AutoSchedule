@@ -114,7 +114,7 @@ return static function (Router $router, Container $container, Application $app):
         '/api/users/{id}',
         [$usersController, 'update'],
         roles: ['admin'],
-        description: 'Updates another user\'s name, phone and/or role.',
+        description: 'Updates another user\'s name, phone and/or role. Fails if it would leave no admin.',
         accepts: ['name', 'phone', 'role'],
     );
     $router->delete(

@@ -83,7 +83,13 @@ final class UsersController
         $user = $user->withProfile($data['name'] ?? $user->name, $data['phone'] ?? $user->phone);
 
         if (array_key_exists('role', $data)) {
-            $user = $user->withRole(UserRole::from($data['role']));
+            $newRole = UserRole::from($data['role']);
+
+            if ($previousRole === UserRole::Admin && $newRole !== UserRole::Admin) {
+                $this->assertNotLastAdmin();
+            }
+
+            $user = $user->withRole($newRole);
         }
 
         $this->users->update($user);
@@ -107,13 +113,12 @@ final class UsersController
         return Response::success(UserProfile::fromUser($user)->toArray());
     }
 
-    /** Bloqueia apagar o último admin -- sem isso um admin sozinho consegue se auto-eliminar do sistema. */
     public function destroy(Request $request): Response
     {
         $user = $this->requireUser($request->param('id'));
 
-        if ($user->role === UserRole::Admin && $this->users->countByRole(UserRole::Admin) <= 1) {
-            throw new DomainException('Cannot delete the last remaining admin.', DomainErrorType::Conflict);
+        if ($user->role === UserRole::Admin) {
+            $this->assertNotLastAdmin();
         }
 
         $this->users->anonymizeAndSoftDelete($user->id);
@@ -139,5 +144,13 @@ final class UsersController
         }
 
         return $user;
+    }
+
+    /** Chamado só quando o usuário já é admin -- barra o passo que o tiraria do papel (delete ou troca de role) se ele for o único. */
+    private function assertNotLastAdmin(): void
+    {
+        if ($this->users->countByRole(UserRole::Admin) <= 1) {
+            throw new DomainException('Cannot remove the last remaining admin.', DomainErrorType::Conflict);
+        }
     }
 }
