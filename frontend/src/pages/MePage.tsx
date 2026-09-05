@@ -1,8 +1,9 @@
+import Button from '@mui/material/Button';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { useQuery } from '@tanstack/react-query';
-import { getMe } from '../lib/auth';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { becomeSeller, getMe } from '../lib/auth';
 
 const ROLE_LABEL: Record<string, string> = {
     admin: 'Administrador',
@@ -12,7 +13,12 @@ const ROLE_LABEL: Record<string, string> = {
 
 /** Confirmação do fluxo ponta a ponta: se chegou até aqui, o cookie de sessão prova quem é o usuário. */
 export function MePage() {
+    const queryClient = useQueryClient();
     const { data: me } = useQuery({ queryKey: ['me'], queryFn: getMe });
+    const becomeSellerMutation = useMutation({
+        mutationFn: becomeSeller,
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['me'] }),
+    });
 
     if (!me) {
         return null;
@@ -29,6 +35,16 @@ export function MePage() {
                 <Field label="Telefone" value={me.phone ?? '-'} />
                 <Field label="Tipo de conta" value={ROLE_LABEL[me.role] ?? me.role} />
             </Stack>
+            {me.role === 'customer' && (
+                <Button
+                    sx={{ mt: 2 }}
+                    variant="outlined"
+                    disabled={becomeSellerMutation.isPending}
+                    onClick={() => becomeSellerMutation.mutate()}
+                >
+                    Tornar-se vendedor
+                </Button>
+            )}
         </Paper>
     );
 }

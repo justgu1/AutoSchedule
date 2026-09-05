@@ -98,20 +98,17 @@ final class UserController
     }
 
     /**
-     * Self só troca name/phone; admin mexendo em outro id também troca role
-     * (com a trava do último admin). `roles` só entra na validação quando a
-     * rota tem `{id}` (admin) -- self nunca consegue mandar esse campo.
+     * Self troca name/phone e, no máximo, escala a própria role de `customer`
+     * pra `seller` (`User::isEligibleForSelfServiceRoleChange`) -- qualquer
+     * outra transição no caminho self é rejeitada. Admin mexendo em outro id
+     * troca pra qualquer role (com a trava do último admin).
      */
     public function update(Request $request): Response
     {
         $user = $this->requireUser($request);
         $managingAnotherUser = $request->param('id') !== null;
 
-        $rules = ['name' => 'max:255', 'phone' => 'max:20'];
-
-        if ($managingAnotherUser) {
-            $rules['role'] = 'in:admin,seller,customer';
-        }
+        $rules = ['name' => 'max:255', 'phone' => 'max:20', 'role' => 'in:admin,seller,customer'];
 
         $data = Validator::validate($request->json(), $rules);
         $previousRole = $user->role;
@@ -122,6 +119,14 @@ final class UserController
 
             if ($previousRole === UserRole::Admin && $newRole !== UserRole::Admin) {
                 $this->assertNotLastAdmin();
+            }
+
+            $user = $user->withRole($newRole);
+        } elseif (!$managingAnotherUser && array_key_exists('role', $data)) {
+            $newRole = UserRole::from($data['role']);
+
+            if (!$user->isEligibleForSelfServiceRoleChange($newRole)) {
+                throw new DomainException('Only customer accounts can self-upgrade to seller.', DomainErrorType::Forbidden);
             }
 
             $user = $user->withRole($newRole);

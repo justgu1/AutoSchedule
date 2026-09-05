@@ -86,6 +86,27 @@ final class UserTest extends TestCase
     }
 
     #[Test]
+    public function is_eligible_for_self_service_role_change_permite_so_customer_virando_seller(): void
+    {
+        $customer = User::register('Ada', 'ada@example.com', null, 'secret', UserRole::Customer);
+
+        $this->assertTrue($customer->isEligibleForSelfServiceRoleChange(UserRole::Seller));
+        $this->assertFalse($customer->isEligibleForSelfServiceRoleChange(UserRole::Admin));
+        $this->assertFalse($customer->isEligibleForSelfServiceRoleChange(UserRole::Customer));
+    }
+
+    #[Test]
+    public function is_eligible_for_self_service_role_change_rejeita_a_partir_de_seller_ou_admin(): void
+    {
+        $seller = User::register('Ada', 'ada@example.com', null, 'secret', UserRole::Seller);
+        $admin = User::register('Bob', 'bob@example.com', null, 'secret', UserRole::Admin);
+
+        $this->assertFalse($seller->isEligibleForSelfServiceRoleChange(UserRole::Customer));
+        $this->assertFalse($seller->isEligibleForSelfServiceRoleChange(UserRole::Admin));
+        $this->assertFalse($admin->isEligibleForSelfServiceRoleChange(UserRole::Seller));
+    }
+
+    #[Test]
     public function with_role_troca_o_role_mas_preserva_o_resto(): void
     {
         $user = User::register('Ada', 'ada@example.com', null, 'secret', UserRole::Customer);

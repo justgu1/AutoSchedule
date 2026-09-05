@@ -20,7 +20,7 @@ return new class implements Seeder {
             'name' => 'AutoSchedule Web',
             'type' => 'public',
             'secret_hash' => null,
-            'allowed_grant_types' => '{password,refresh_token}',
+            'allowed_grant_types' => '{password,refresh_token,google}',
             'redirect_uris' => null,
             'allowed_scopes' => '{profile:read,profile:write,users:read,users:write}',
         ]);

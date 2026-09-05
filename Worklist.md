@@ -78,7 +78,9 @@ Priorizado antes do domínio de veículo/agendamento porque o primeiro endpoint 
 - [x] Paginação em `GET /users`
 - [x] Suíte de teste de carga (k6)
 - [x] Telas de login, registro, esqueci/redefinir senha e perfil (`/me`) — 3 layouts (`PublicLayout`/`AuthLayout`/`AuthenticatedLayout`), componentizado (`FormTextField`/`SubmitButton`/`FormError`)
-- [ ] `client_credentials` (M2M) — adiado, sem consumidor real ainda
+- [x] `client_credentials` (M2M)
+- [x] Login social via Google (Identity Services, conta existente linka por e-mail, e-mail novo cria customer)
+- [x] Self-service: customer vira seller (`PATCH /me`)
 - [x] Security headers + CORS
 - [x] Cookies `HttpOnly`/`SameSite=Strict` + CSRF (double-submit `XSRF-TOKEN`)
 - [x] Registro público (`POST /api/register`, role selecionável seller/customer)
