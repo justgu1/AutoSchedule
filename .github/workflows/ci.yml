@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sobe postgres, redis, mailpit e backend
+        run: docker compose up -d postgres redis mailpit backend
+
+      # Imagem de produção do backend é buildada `--no-dev` -- os pacotes de
+      # qualidade (phpunit/phpstan/php-cs-fixer/rector) são require-dev, então
+      # entram aqui em cima da imagem já buildada, sem precisar de Dockerfile
+      # alternativo só pra CI.
+      - name: Instala dependências de dev do Composer
+        run: docker compose exec backend composer install
+
+      - name: Gera as chaves RSA do JWT
+        run: make keys
+
+      - name: Testes (PHPUnit)
+        run: make test
+
+      - name: Análise estática (PHPStan)
+        run: make static-analysis
+
+      - name: Lint (PHP-CS-Fixer)
+        run: make lint
+
+      - name: Rector (dry-run)
+        run: make rector
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instala dependências
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint (ESLint)
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Formatação (Prettier)
+        working-directory: frontend
+        run: npm run format
+
+      - name: Checagem de tipos (tsc)
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Gera as chaves RSA do JWT
+        run: make keys
+
+      # `make e2e` já é auto-contido: builda o nginx com o frontend atual,
+      # sobe a stack, relaxa o rate limit `auth` só durante o teste (workers
+      # em paralelo dividem o mesmo IP) e restaura o padrão no final.
+      - name: E2E (Playwright)
+        run: make e2e
+
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, e2e]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build + push (backend)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/backend/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/justgu1/autoschedule-backend:latest
+            ghcr.io/justgu1/autoschedule-backend:sha-${{ github.sha }}
+
+      - name: Build + push (nginx)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/frontend/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/justgu1/autoschedule-nginx:latest
+            ghcr.io/justgu1/autoschedule-nginx:sha-${{ github.sha }}
