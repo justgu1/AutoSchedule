@@ -186,11 +186,21 @@ Validações do frontend não são mecanismos de segurança.
 
 ## Auditoria
 
-Operações relevantes podem gerar registros em `audit_logs`, por exemplo:
+Operações relevantes geram registros em `audit_logs`. Implementados hoje:
 
 ```text
+auth.login.succeeded
+auth.login.failed
+auth.refresh_token.reused
 user.created
+user.profile_updated
 user.password_changed
+user.deleted
+```
+
+Planejados conforme os domínios abaixo forem implementados:
+
+```text
 dealership.created
 dealership.updated
 dealership.deleted
@@ -208,6 +218,19 @@ appointment.completed
 ```
 
 Os registros de auditoria são somente de leitura para a aplicação.
+
+## Rate limiting
+
+Toda rota passa por uma política de rate limit antes de qualquer outra verificação (sliding window, por usuário autenticado ou por IP):
+
+- `general` (padrão 1000/min): cobre a API como um todo, com headroom generoso sobre o pico esperado;
+- `auth` (padrão 5/min): só `POST /oauth/token`, proteção contra brute-force de login.
+
+Response com `429` inclui `Retry-After`. Falha do Redis não derruba a API — o rate limit fica temporariamente inativo (fail-open) em vez de bloquear todo o tráfego.
+
+## Paginação
+
+Endpoints de listagem aceitam `page`/`per_page` (`per_page` limitado por um máximo configurável) e respondem com `meta.total`/`meta.last_page` junto dos dados.
 
 ## Notificações
 

@@ -42,3 +42,7 @@ isolamento     -> independente, roda em qualquer ordem
 - nome do teste descreve comportamento, não implementação;
 - código em inglês; nomes de teste e comentários podem ficar em português;
 - `make test` roda a suíte.
+
+## Testes de carga
+
+`backend/load-tests/` (k6, via Docker) valida performance e o comportamento do rate limiting sob concorrência real — não substitui a suíte PHPUnit, que valida regra de negócio. `make load-test` roda a suíte; detalhes de cada cenário em `backend/load-tests/README.md`.

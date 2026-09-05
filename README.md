@@ -65,6 +65,7 @@ Acesse `http://localhost:8080`.
 | `make ps` | Verifica o status dos serviços |
 | `make logs` | Acompanha os logs |
 | `make test` | Roda os testes do backend |
+| `make load-test` | Roda a suíte de teste de carga (k6) |
 
 ### Live-reload (PHP + React)
 

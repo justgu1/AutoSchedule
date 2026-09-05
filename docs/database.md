@@ -156,10 +156,11 @@ Table appointments {
 
 Table audit_logs {
   id uuid [pk]
+  actor_id uuid
   user_id uuid
   event varchar(100) [not null]
   auditable_type varchar(100) [not null]
-  auditable_id uuid [not null]
+  auditable_id uuid
   old_values jsonb
   new_values jsonb
   ip_address inet
@@ -178,6 +179,7 @@ Ref: availability_exceptions.vehicle_id > vehicles.id
 Ref: appointments.vehicle_id > vehicles.id
 Ref: appointments.user_id > users.id
 Ref: audit_logs.user_id > users.id
+Ref: audit_logs.actor_id > users.id
 ```
 
 ## Galeria de veículos
@@ -197,6 +199,10 @@ A senha é armazenada somente como hash no campo `password`.
 `password_set_at` pode ser `NULL` enquanto a senha ainda não tiver sido definida pelo próprio cliente.
 
 A senha em texto puro nunca deve ser persistida ou registrada em logs.
+
+## Auditoria
+
+`user_id` é a conta afetada pela ação; `actor_id` é quem a executou. Numa ação sobre a própria conta os dois são o mesmo id; quando um admin age sobre outro usuário, divergem — sem essa separação não dava pra saber quem de fato agiu.
 
 ## Disponibilidade
 
