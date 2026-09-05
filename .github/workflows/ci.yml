@@ -68,9 +68,11 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-  testes:
+  # PHPUnit precisa só de Postgres/Redis/Mailpit como dado -- GitHub cuida
+  # disso nativo via `services:`, sem Docker/docker-compose no meio (mais
+  # rápido, sem porta pra colidir com mais nada).
+  phpunit:
     runs-on: ubuntu-latest
-    needs: [backend, frontend]
     services:
       postgres:
         image: postgres:17-alpine
@@ -111,8 +113,6 @@ jobs:
       - name: Gera as chaves RSA do JWT
         run: make keys
 
-      # Container do Postgres sobe vazio -- migrations/seeders aplicam o schema
-      # antes do PHPUnit (RLS, repositórios reais) e do E2E precisarem dele.
       - name: Migrations + seeders
         working-directory: backend
         env:
@@ -127,17 +127,56 @@ jobs:
           MAIL_HOST: 127.0.0.1
         run: vendor/bin/phpunit
 
-      # `make e2e` builda o nginx com o frontend atual, sobe a stack completa
-      # (fora dos services acima) e roda o Playwright.
+  # E2E precisa da app inteira rodando (nginx + backend containerizados, não
+  # só dado) -- isso não dá pra ser um `services:` do GitHub (não builda
+  # Dockerfile), por isso é docker-compose aqui, num job separado do PHPUnit
+  # pra nenhum dos dois competir por porta com o outro.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Gera as chaves RSA do JWT
+        run: make keys
+
+      - name: Sobe a stack (migrations, seeders, deps do Playwright)
+        run: make e2e-setup
+
       - name: E2E
-        run: make e2e
+        run: RATE_LIMIT_AUTH_MAX=1000 docker compose run --rm e2e npx playwright test
+
+      - name: Restaura o rate limit padrão do backend
+        if: always()
+        run: docker compose up -d backend
+
+  load-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Gera as chaves RSA do JWT
+        run: make keys
+
+      - name: Sobe a stack
+        run: docker compose up -d nginx mailpit backend
+
+      # Imagem é buildada `--no-dev`, e o bind-mount local (docker-compose.override.yml)
+      # deixa o checkout do runner (sem vendor/, é gitignored) por cima disso -- precisa
+      # instalar aqui dentro antes de rodar qualquer bin/*.php.
+      - name: Instala dependências do Composer
+        run: docker compose exec backend composer install --no-interaction --prefer-dist
+
+      # k6 loga como o admin/client seedados -- sem isso o "setup: login
+      # succeeded" falha de cara (banco sobe vazio num runner novo).
+      - name: Migrations + seeders
+        run: docker compose exec backend php bin/migrate.php && docker compose exec backend php bin/seed.php
 
       - name: Load test (k6)
         run: make load-test
 
   build-and-push:
     runs-on: ubuntu-latest
-    needs: [testes]
+    needs: [phpunit, e2e, load-test]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       contents: read
