@@ -12,13 +12,13 @@ use App\Domain\Users\UserRole;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 
-final class JwtTokenIssuer implements TokenIssuer
+final readonly class JwtTokenIssuer implements TokenIssuer
 {
     public function __construct(
-        private readonly string $privateKeyPem,
-        private readonly string $publicKeyPem,
-        private readonly string $issuer,
-        private readonly string $audience,
+        private string $privateKeyPem,
+        private string $publicKeyPem,
+        private string $issuer,
+        private string $audience,
     ) {
     }
 
@@ -31,11 +31,11 @@ final class JwtTokenIssuer implements TokenIssuer
             'client_id' => $claims->clientId,
             'scope' => implode(' ', $claims->scopes),
             'jti' => $claims->jti,
-            'iat' => (new \DateTimeImmutable())->getTimestamp(),
+            'iat' => new \DateTimeImmutable()->getTimestamp(),
             'exp' => $claims->expiresAt->getTimestamp(),
         ];
 
-        if ($claims->role !== null) {
+        if ($claims->role instanceof \App\Domain\Users\UserRole) {
             $payload['role'] = $claims->role->value;
         }
 
@@ -68,7 +68,7 @@ final class JwtTokenIssuer implements TokenIssuer
             role: isset($decoded->role) ? UserRole::from($decoded->role) : null,
             scopes: isset($decoded->scope) && $decoded->scope !== '' ? explode(' ', $decoded->scope) : [],
             jti: $decoded->jti,
-            expiresAt: (new \DateTimeImmutable())->setTimestamp((int) $decoded->exp),
+            expiresAt: new \DateTimeImmutable()->setTimestamp((int) $decoded->exp),
         );
     }
 }

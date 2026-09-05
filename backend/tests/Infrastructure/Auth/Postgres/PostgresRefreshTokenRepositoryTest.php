@@ -24,14 +24,14 @@ final class PostgresRefreshTokenRepositoryTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->pdo = (new PostgresConnection(
+        $this->pdo = new PostgresConnection(
             driver: getenv('DB_DRIVER') ?: 'pgsql',
             host: getenv('DB_HOST') ?: '127.0.0.1',
             port: (int) (getenv('DB_PORT') ?: 5432),
             database: getenv('DB_DATABASE') ?: 'autoschedule',
             username: getenv('DB_USERNAME') ?: 'pgsql',
             password: getenv('DB_PASSWORD') ?: 'password',
-        ))->pdo();
+        )->pdo();
 
         $this->pdo->beginTransaction();
         $this->repository = new PostgresRefreshTokenRepository($this->pdo);

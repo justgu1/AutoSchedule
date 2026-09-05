@@ -6,14 +6,14 @@ namespace App\Domain\Users\DTO;
 
 use App\Domain\Users\User;
 
-final class UserProfile
+final readonly class UserProfile
 {
     public function __construct(
-        public readonly string $id,
-        public readonly string $name,
-        public readonly string $email,
-        public readonly ?string $phone,
-        public readonly string $role,
+        public string $id,
+        public string $name,
+        public string $email,
+        public ?string $phone,
+        public string $role,
     ) {
     }
 

@@ -10,9 +10,9 @@ use App\Domain\Auth\OAuthClient;
 use App\Domain\Auth\Ports\OAuthClientRepository;
 use App\Infrastructure\Database\PostgresArray;
 
-final class PostgresOAuthClientRepository implements OAuthClientRepository
+final readonly class PostgresOAuthClientRepository implements OAuthClientRepository
 {
-    public function __construct(private readonly \PDO $pdo)
+    public function __construct(private \PDO $pdo)
     {
     }
 
@@ -22,11 +22,11 @@ final class PostgresOAuthClientRepository implements OAuthClientRepository
         $statement->execute(['client_id' => $clientId]);
         $row = $statement->fetch();
 
-        return $row === false ? null : self::fromRow($row);
+        return $row === false ? null : $this->fromRow($row);
     }
 
     /** @param array<string, mixed> $row */
-    private static function fromRow(array $row): OAuthClient
+    private function fromRow(array $row): OAuthClient
     {
         return new OAuthClient(
             id: $row['id'],
@@ -35,7 +35,7 @@ final class PostgresOAuthClientRepository implements OAuthClientRepository
             type: ClientType::from($row['type']),
             secretHash: $row['secret_hash'],
             allowedGrantTypes: array_map(
-                static fn (string $value): GrantType => GrantType::from($value),
+                GrantType::from(...),
                 PostgresArray::fromText($row['allowed_grant_types']),
             ),
             redirectUris: PostgresArray::fromText($row['redirect_uris']),

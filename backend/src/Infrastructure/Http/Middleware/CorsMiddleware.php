@@ -15,10 +15,10 @@ use App\Infrastructure\Http\Response;
  * cookie; por isso a origem nunca pode ser `*` (o próprio spec de CORS proíbe
  * as duas coisas juntas), só a allowlist exata.
  */
-final class CorsMiddleware implements Middleware
+final readonly class CorsMiddleware implements Middleware
 {
     /** @param list<string> $allowedOrigins */
-    public function __construct(private readonly array $allowedOrigins)
+    public function __construct(private array $allowedOrigins)
     {
     }
 

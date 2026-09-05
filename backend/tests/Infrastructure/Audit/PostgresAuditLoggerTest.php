@@ -49,7 +49,7 @@ final class PostgresAuditLoggerTest extends TestCase
         $logger->record(AuditEvent::LoginFailed, null, null, ['email' => 'ada@example.com'], '203.0.113.9', 'phpunit-agent');
 
         $row = $this->connection->pdo()
-            ->query("SELECT event, auditable_type, ip_address, user_agent, new_values FROM audit_logs ORDER BY created_at DESC LIMIT 1")
+            ->query('SELECT event, auditable_type, ip_address, user_agent, new_values FROM audit_logs ORDER BY created_at DESC LIMIT 1')
             ->fetch();
 
         $this->assertSame(AuditEvent::LoginFailed->value, $row['event']);

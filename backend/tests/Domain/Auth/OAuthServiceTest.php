@@ -375,10 +375,10 @@ final class OAuthServiceTest extends TestCase
     }
 }
 
-final class InMemoryOAuthClientRepository implements OAuthClientRepository
+final readonly class InMemoryOAuthClientRepository implements OAuthClientRepository
 {
     /** @param list<OAuthClient> $clients */
-    public function __construct(private readonly array $clients)
+    public function __construct(private array $clients)
     {
     }
 
@@ -424,7 +424,7 @@ final class InMemoryUserRepository implements UserRepository
 
     public function existsByEmail(string $email): bool
     {
-        return $this->findByEmail($email) !== null;
+        return $this->findByEmail($email) instanceof \App\Domain\Users\User;
     }
 
     public function insert(User $user): void

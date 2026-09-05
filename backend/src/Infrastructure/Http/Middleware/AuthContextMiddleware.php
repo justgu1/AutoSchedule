@@ -24,12 +24,12 @@ use App\Infrastructure\Http\Router;
  * necessário pra autenticação em si). Nenhum dos dois casos: segue direto,
  * sem transação (rota pública comum, ou o RoleMiddleware barra depois).
  */
-final class AuthContextMiddleware implements Middleware
+final readonly class AuthContextMiddleware implements Middleware
 {
     public function __construct(
-        private readonly TokenIssuer $tokens,
-        private readonly DatabaseConnection $connection,
-        private readonly Router $router,
+        private TokenIssuer $tokens,
+        private DatabaseConnection $connection,
+        private Router $router,
     ) {
     }
 

@@ -5,7 +5,10 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "tsc && vite build"
+        "build": "tsc && vite build",
+        "lint": "eslint .",
+        "format": "prettier --check .",
+        "format:fix": "prettier --write ."
     },
     "dependencies": {
         "@emotion/react": "latest",
@@ -17,10 +20,19 @@
         "react-router-dom": "^7.18.3"
     },
     "devDependencies": {
+        "@axe-core/playwright": "^4.13.0",
+        "@eslint/js": "^10.0.1",
+        "@playwright/test": "^1.63.0",
+        "@types/node": "^26.4.1",
         "@types/react": "latest",
         "@types/react-dom": "latest",
         "@vitejs/plugin-react": "latest",
+        "eslint": "^10.10.0",
+        "eslint-config-prettier": "^10.1.8",
+        "eslint-plugin-react-hooks": "^7.1.1",
+        "prettier": "^3.9.6",
         "typescript": "5.9.3",
+        "typescript-eslint": "^8.69.0",
         "vite": "latest"
     }
 }

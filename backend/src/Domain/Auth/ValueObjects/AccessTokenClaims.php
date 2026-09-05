@@ -7,7 +7,7 @@ namespace App\Domain\Auth\ValueObjects;
 use App\Domain\Support\Uuid;
 use App\Domain\Users\UserRole;
 
-final class AccessTokenClaims
+final readonly class AccessTokenClaims
 {
     /**
      * @param list<string> $scopes
@@ -15,12 +15,12 @@ final class AccessTokenClaims
      * @param ?UserRole $role ausente (null) em token M2M -- não tem usuário
      */
     public function __construct(
-        public readonly string $subject,
-        public readonly string $clientId,
-        public readonly ?UserRole $role,
-        public readonly array $scopes,
-        public readonly string $jti,
-        public readonly \DateTimeImmutable $expiresAt,
+        public string $subject,
+        public string $clientId,
+        public ?UserRole $role,
+        public array $scopes,
+        public string $jti,
+        public \DateTimeImmutable $expiresAt,
     ) {
     }
 
@@ -43,7 +43,7 @@ final class AccessTokenClaims
             role: $role,
             scopes: $scopes,
             jti: Uuid::v7(),
-            expiresAt: (new \DateTimeImmutable())->modify("+{$ttlSeconds} seconds"),
+            expiresAt: new \DateTimeImmutable()->modify("+{$ttlSeconds} seconds"),
         );
     }
 

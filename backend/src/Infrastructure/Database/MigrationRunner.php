@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Database;
 
-final class MigrationRunner
+final readonly class MigrationRunner
 {
     public function __construct(
-        private readonly \PDO $pdo,
-        private readonly string $migrationsPath,
+        private \PDO $pdo,
+        private string $migrationsPath,
     ) {
     }
 

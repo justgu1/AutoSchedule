@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace App\Domain\Auth\DTO;
 
-final class TokenPair
+final readonly class TokenPair
 {
     public function __construct(
-        public readonly string $accessToken,
-        public readonly int $expiresIn,
+        public string $accessToken,
+        public int $expiresIn,
         /** @var list<string> */
-        public readonly array $scopes,
-        public readonly ?string $refreshToken = null,
+        public array $scopes,
+        public ?string $refreshToken = null,
     ) {
     }
 }

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Http;
 
-final class Pipeline
+final readonly class Pipeline
 {
     /** @param list<Middleware> $middleware */
-    public function __construct(private readonly array $middleware = [])
+    public function __construct(private array $middleware = [])
     {
     }
 

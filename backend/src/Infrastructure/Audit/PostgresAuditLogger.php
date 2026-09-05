@@ -8,11 +8,11 @@ use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
 use Psr\Log\LoggerInterface;
 
-final class PostgresAuditLogger implements AuditLogger
+final readonly class PostgresAuditLogger implements AuditLogger
 {
     public function __construct(
-        private readonly \PDO $pdo,
-        private readonly LoggerInterface $logger,
+        private \PDO $pdo,
+        private LoggerInterface $logger,
     ) {
     }
 

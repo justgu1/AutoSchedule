@@ -16,7 +16,14 @@ export function HomePage() {
                 <Button component={RouterLink} to="/login" variant="contained">
                     Entrar
                 </Button>
-                <Button component={RouterLink} to="/register" variant="outlined">
+                {/* primary.dark em vez do padrão -- outlined com o azul default do MUI (#1976d2)
+                    fica em 4.4:1 contra o fundo cinza claro do layout, abaixo do mínimo AA (4.5:1). */}
+                <Button
+                    component={RouterLink}
+                    to="/register"
+                    variant="outlined"
+                    sx={{ color: 'primary.dark', borderColor: 'primary.dark' }}
+                >
                     Cadastrar
                 </Button>
             </Stack>

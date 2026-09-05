@@ -8,9 +8,9 @@ use App\Domain\Users\Ports\UserRepository;
 use App\Domain\Users\User;
 use App\Domain\Users\UserRole;
 
-final class PostgresUserRepository implements UserRepository
+final readonly class PostgresUserRepository implements UserRepository
 {
-    public function __construct(private readonly \PDO $pdo)
+    public function __construct(private \PDO $pdo)
     {
     }
 
@@ -39,7 +39,7 @@ final class PostgresUserRepository implements UserRepository
             VALUES (:id, :name, :email, :phone, :password, :role, :password_set_at, :email_verified_at, :created_at, :updated_at)
             SQL);
 
-        $statement->execute(self::toParams($user));
+        $statement->execute($this->toParams($user));
     }
 
     public function update(User $user): void
@@ -52,7 +52,7 @@ final class PostgresUserRepository implements UserRepository
             WHERE id = :id
             SQL);
 
-        $params = self::toParams($user);
+        $params = $this->toParams($user);
         unset($params['created_at']);
         $statement->execute($params);
     }
@@ -61,7 +61,7 @@ final class PostgresUserRepository implements UserRepository
     {
         $user = $this->findById($id);
 
-        if ($user === null) {
+        if (!$user instanceof \App\Domain\Users\User) {
             return;
         }
 
@@ -89,7 +89,7 @@ final class PostgresUserRepository implements UserRepository
         $statement->bindValue('offset', $offset, \PDO::PARAM_INT);
         $statement->execute();
 
-        return array_map(self::fromRow(...), $statement->fetchAll());
+        return array_map($this->fromRow(...), $statement->fetchAll());
     }
 
     public function count(): int
@@ -111,11 +111,11 @@ final class PostgresUserRepository implements UserRepository
         $statement->execute(['value' => $value]);
         $row = $statement->fetch();
 
-        return $row === false ? null : self::fromRow($row);
+        return $row === false ? null : $this->fromRow($row);
     }
 
     /** @param array<string, mixed> $row */
-    private static function fromRow(array $row): User
+    private function fromRow(array $row): User
     {
         return new User(
             id: $row['id'],
@@ -124,21 +124,21 @@ final class PostgresUserRepository implements UserRepository
             phone: $row['phone'],
             passwordHash: $row['password'],
             role: UserRole::from($row['role']),
-            passwordSetAt: self::toDateTime($row['password_set_at']),
-            emailVerifiedAt: self::toDateTime($row['email_verified_at']),
+            passwordSetAt: $this->toDateTime($row['password_set_at']),
+            emailVerifiedAt: $this->toDateTime($row['email_verified_at']),
             createdAt: new \DateTimeImmutable($row['created_at']),
             updatedAt: new \DateTimeImmutable($row['updated_at']),
-            deletedAt: self::toDateTime($row['deleted_at']),
+            deletedAt: $this->toDateTime($row['deleted_at']),
         );
     }
 
-    private static function toDateTime(?string $value): ?\DateTimeImmutable
+    private function toDateTime(?string $value): ?\DateTimeImmutable
     {
         return $value === null ? null : new \DateTimeImmutable($value);
     }
 
     /** @return array<string, mixed> */
-    private static function toParams(User $user): array
+    private function toParams(User $user): array
     {
         return [
             'id' => $user->id,

@@ -11,9 +11,9 @@ use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
 use App\Infrastructure\Http\Router;
 
-final class RoleMiddleware implements Middleware
+final readonly class RoleMiddleware implements Middleware
 {
-    public function __construct(private readonly Router $router)
+    public function __construct(private Router $router)
     {
     }
 

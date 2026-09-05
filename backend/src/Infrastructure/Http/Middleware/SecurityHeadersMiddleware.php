@@ -8,9 +8,9 @@ use App\Infrastructure\Http\Middleware;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
 
-final class SecurityHeadersMiddleware implements Middleware
+final readonly class SecurityHeadersMiddleware implements Middleware
 {
-    public function __construct(private readonly bool $hstsEnabled = false)
+    public function __construct(private bool $hstsEnabled = false)
     {
     }
 
@@ -26,7 +26,7 @@ final class SecurityHeadersMiddleware implements Middleware
         // Atrás de env porque não tem TLS no ambiente local -- HSTS com TLS
         // desligado quebra o acesso via http:// (browser passa a exigir https).
         if ($this->hstsEnabled) {
-            $response = $response->withHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+            return $response->withHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
         }
 
         return $response;

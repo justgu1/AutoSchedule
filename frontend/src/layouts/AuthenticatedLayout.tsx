@@ -31,10 +31,14 @@ export function AuthenticatedLayout() {
         return <Navigate to="/login" replace />;
     }
 
-    async function handleLogout() {
-        await logout();
-        queryClient.removeQueries({ queryKey: ['me'] });
-        navigate('/login', { replace: true });
+    function handleLogout() {
+        // Mesmo se a requisição falhar (ex: rede), ainda limpa o estado local -- não trava o usuário logado visualmente.
+        void logout()
+            .catch(() => undefined)
+            .finally(() => {
+                queryClient.removeQueries({ queryKey: ['me'] });
+                void navigate('/login', { replace: true });
+            });
     }
 
     return (

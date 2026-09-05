@@ -66,6 +66,10 @@ Acesse `http://localhost:8080`.
 | `make logs` | Acompanha os logs |
 | `make test` | Roda os testes do backend |
 | `make load-test` | Roda a suíte de teste de carga (k6) |
+| `make e2e` | Roda a suíte E2E (Playwright) contra o build real |
+| `make static-analysis` | PHPStan (backend) |
+| `make lint` / `make lint-fix` | PHP-CS-Fixer (backend) -- checa / aplica |
+| `make rector` / `make rector-fix` | Rector (backend) -- checa / aplica |
 
 ### Live-reload (PHP + React)
 
@@ -94,6 +98,7 @@ curl http://localhost:8080/health
 - [Regras de negócio](docs/business-rules.md)
 - [Banco de dados](docs/database.md)
 - [Testes](docs/testing.md)
+- [Catálogo regra → teste](docs/test-catalog.md)
 - [Worklist do sprint](Worklist.md)
 
 ## Processo seletivo

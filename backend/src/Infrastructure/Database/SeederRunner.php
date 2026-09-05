@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Database;
 
-final class SeederRunner
+final readonly class SeederRunner
 {
     public function __construct(
-        private readonly \PDO $pdo,
-        private readonly string $seedersPath,
+        private \PDO $pdo,
+        private string $seedersPath,
     ) {
     }
 

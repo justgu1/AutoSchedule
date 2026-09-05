@@ -6,20 +6,20 @@ namespace App\Domain\Users;
 
 use App\Domain\Support\Uuid;
 
-final class User
+final readonly class User
 {
     public function __construct(
-        public readonly string $id,
-        public readonly string $name,
-        public readonly string $email,
-        public readonly ?string $phone,
-        public readonly string $passwordHash,
-        public readonly UserRole $role,
-        public readonly ?\DateTimeImmutable $passwordSetAt,
-        public readonly ?\DateTimeImmutable $emailVerifiedAt,
-        public readonly \DateTimeImmutable $createdAt,
-        public readonly \DateTimeImmutable $updatedAt,
-        public readonly ?\DateTimeImmutable $deletedAt,
+        public string $id,
+        public string $name,
+        public string $email,
+        public ?string $phone,
+        public string $passwordHash,
+        public UserRole $role,
+        public ?\DateTimeImmutable $passwordSetAt,
+        public ?\DateTimeImmutable $emailVerifiedAt,
+        public \DateTimeImmutable $createdAt,
+        public \DateTimeImmutable $updatedAt,
+        public ?\DateTimeImmutable $deletedAt,
     ) {
     }
 

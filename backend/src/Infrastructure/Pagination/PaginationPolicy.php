@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Pagination;
 
-final class PaginationPolicy
+final readonly class PaginationPolicy
 {
     public function __construct(
-        public readonly int $defaultPerPage,
-        public readonly int $maxPerPage,
+        public int $defaultPerPage,
+        public int $maxPerPage,
     ) {
     }
 

@@ -18,11 +18,11 @@ use App\Infrastructure\Http\Response;
  * script, outro serviço) não depende de credencial ambiente nenhuma, então
  * CSRF não se aplica a ele.
  */
-final class CsrfMiddleware implements Middleware
+final readonly class CsrfMiddleware implements Middleware
 {
     private const array SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
 
-    public function __construct(private readonly bool $cookieSecure = false)
+    public function __construct(private bool $cookieSecure = false)
     {
     }
 
@@ -44,7 +44,7 @@ final class CsrfMiddleware implements Middleware
         // Sem o cookie ainda (primeira visita, ou acabou de logar nesse mesmo
         // request) -- emite um novo, pronto pra próxima mutação já ter o quê comparar.
         if ($request->cookie('XSRF-TOKEN') === null) {
-            $response = $response->withCookie(
+            return $response->withCookie(
                 'XSRF-TOKEN',
                 bin2hex(random_bytes(32)),
                 httpOnly: false,

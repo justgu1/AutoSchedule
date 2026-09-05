@@ -19,14 +19,14 @@ use Psr\Log\LoggerInterface;
  * transação ou tocar no Postgres. Cabeçalhos seguem o rascunho IETF de
  * RateLimit Header Fields (mesmo formato que a Cloudflare adota hoje).
  */
-final class RateLimitMiddleware implements Middleware
+final readonly class RateLimitMiddleware implements Middleware
 {
     public function __construct(
-        private readonly RateLimiter $limiter,
-        private readonly Router $router,
-        private readonly RateLimitPolicy $defaultPolicy,
-        private readonly TokenIssuer $tokens,
-        private readonly LoggerInterface $logger,
+        private RateLimiter $limiter,
+        private Router $router,
+        private RateLimitPolicy $defaultPolicy,
+        private TokenIssuer $tokens,
+        private LoggerInterface $logger,
     ) {
     }
 

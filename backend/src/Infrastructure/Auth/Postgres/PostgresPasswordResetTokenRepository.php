@@ -7,9 +7,9 @@ namespace App\Infrastructure\Auth\Postgres;
 use App\Domain\Auth\PasswordResetToken;
 use App\Domain\Auth\Ports\PasswordResetTokenRepository;
 
-final class PostgresPasswordResetTokenRepository implements PasswordResetTokenRepository
+final readonly class PostgresPasswordResetTokenRepository implements PasswordResetTokenRepository
 {
-    public function __construct(private readonly \PDO $pdo)
+    public function __construct(private \PDO $pdo)
     {
     }
 
@@ -34,7 +34,7 @@ final class PostgresPasswordResetTokenRepository implements PasswordResetTokenRe
         $statement->execute(['token_hash' => hash('sha256', $rawToken)]);
         $row = $statement->fetch();
 
-        return $row === false ? null : self::fromRow($row);
+        return $row === false ? null : $this->fromRow($row);
     }
 
     public function markUsed(string $id): void
@@ -53,7 +53,7 @@ final class PostgresPasswordResetTokenRepository implements PasswordResetTokenRe
     }
 
     /** @param array<string, mixed> $row */
-    private static function fromRow(array $row): PasswordResetToken
+    private function fromRow(array $row): PasswordResetToken
     {
         return new PasswordResetToken(
             id: $row['id'],

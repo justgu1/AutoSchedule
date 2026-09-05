@@ -30,18 +30,18 @@ use App\Infrastructure\Validation\Validator;
  * JWT quando não (self) -- o resto do método não precisa saber qual dos
  * dois é.
  */
-final class UserController
+final readonly class UserController
 {
     public function __construct(
-        private readonly UserRepository $users,
-        private readonly RefreshTokenRepository $refreshTokens,
-        private readonly AuditLogger $audit,
-        private readonly PaginationPolicy $pagination,
-        private readonly PasswordResetTokenRepository $passwordResetTokens,
-        private readonly MailProvider $mail,
-        private readonly int $passwordResetTtl,
-        private readonly string $frontendUrl,
-        private readonly string $passwordResetTemplatePath,
+        private UserRepository $users,
+        private RefreshTokenRepository $refreshTokens,
+        private AuditLogger $audit,
+        private PaginationPolicy $pagination,
+        private PasswordResetTokenRepository $passwordResetTokens,
+        private MailProvider $mail,
+        private int $passwordResetTtl,
+        private string $frontendUrl,
+        private string $passwordResetTemplatePath,
     ) {
     }
 
@@ -155,7 +155,7 @@ final class UserController
         $data = Validator::validate($request->json(), ['email' => 'required|email']);
         $user = $this->users->findByEmail($data['email']);
 
-        if ($user !== null) {
+        if ($user instanceof \App\Domain\Users\User) {
             [$rawToken, $token] = PasswordResetToken::issue($user->id, $this->passwordResetTtl);
             $this->passwordResetTokens->insert($token);
 
@@ -196,9 +196,9 @@ final class UserController
         ]);
 
         $token = $this->passwordResetTokens->findByRawToken($data['reset_token']);
-        $user = $token !== null ? $this->users->findById($token->userId) : null;
+        $user = $token instanceof \App\Domain\Auth\PasswordResetToken ? $this->users->findById($token->userId) : null;
 
-        if ($token === null || $token->isUsed() || $token->isExpired() || $user === null) {
+        if (!$token instanceof \App\Domain\Auth\PasswordResetToken || $token->isUsed() || $token->isExpired() || !$user instanceof \App\Domain\Users\User) {
             throw new DomainException('Invalid or expired reset token.', DomainErrorType::Unauthorized);
         }
 
@@ -291,7 +291,7 @@ final class UserController
 
         $user = $this->users->findById($id);
 
-        if ($user === null) {
+        if (!$user instanceof \App\Domain\Users\User) {
             throw new DomainException('User not found.', DomainErrorType::NotFound);
         }
 

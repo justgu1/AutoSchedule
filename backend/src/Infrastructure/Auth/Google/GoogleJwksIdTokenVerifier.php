@@ -18,16 +18,16 @@ use Firebase\JWT\JWT;
  * tokens da própria aplicação). O JWKS do Google roda em cache no Redis (as
  * chaves trocam raramente, não vale buscar a cada login).
  */
-final class GoogleJwksIdTokenVerifier implements GoogleIdTokenVerifier
+final readonly class GoogleJwksIdTokenVerifier implements GoogleIdTokenVerifier
 {
-    private const JWKS_URL = 'https://www.googleapis.com/oauth2/v3/certs';
-    private const CACHE_KEY = 'google:jwks';
-    private const CACHE_TTL_SECONDS = 3600;
-    private const ALLOWED_ISSUERS = ['accounts.google.com', 'https://accounts.google.com'];
+    private const string JWKS_URL = 'https://www.googleapis.com/oauth2/v3/certs';
+    private const string CACHE_KEY = 'google:jwks';
+    private const int CACHE_TTL_SECONDS = 3600;
+    private const array ALLOWED_ISSUERS = ['accounts.google.com', 'https://accounts.google.com'];
 
     public function __construct(
-        private readonly string $clientId,
-        private readonly RedisConnection $redis,
+        private string $clientId,
+        private RedisConnection $redis,
     ) {
     }
 

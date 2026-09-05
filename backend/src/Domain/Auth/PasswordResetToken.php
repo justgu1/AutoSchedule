@@ -6,14 +6,14 @@ namespace App\Domain\Auth;
 
 use App\Domain\Support\Uuid;
 
-final class PasswordResetToken
+final readonly class PasswordResetToken
 {
     public function __construct(
-        public readonly string $id,
-        public readonly string $userId,
-        public readonly string $tokenHash,
-        public readonly \DateTimeImmutable $expiresAt,
-        public readonly ?\DateTimeImmutable $usedAt,
+        public string $id,
+        public string $userId,
+        public string $tokenHash,
+        public \DateTimeImmutable $expiresAt,
+        public ?\DateTimeImmutable $usedAt,
     ) {
     }
 
@@ -31,7 +31,7 @@ final class PasswordResetToken
             id: Uuid::v7(),
             userId: $userId,
             tokenHash: hash('sha256', $rawToken),
-            expiresAt: (new \DateTimeImmutable())->modify("+{$ttlSeconds} seconds"),
+            expiresAt: new \DateTimeImmutable()->modify("+{$ttlSeconds} seconds"),
             usedAt: null,
         );
 
@@ -45,6 +45,6 @@ final class PasswordResetToken
 
     public function isUsed(): bool
     {
-        return $this->usedAt !== null;
+        return $this->usedAt instanceof \DateTimeImmutable;
     }
 }

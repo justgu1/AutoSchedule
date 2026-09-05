@@ -13,9 +13,9 @@ use App\Infrastructure\Redis\RedisConnection;
  * leitura da janela anterior são um script Lua só -- atômico no Redis, sem
  * round-trip extra nem race entre requests concorrentes na mesma key.
  */
-final class RedisRateLimiter implements RateLimiter
+final readonly class RedisRateLimiter implements RateLimiter
 {
-    private const SCRIPT = <<<'LUA'
+    private const string SCRIPT = <<<'LUA'
         local current = redis.call('INCR', KEYS[1])
         if current == 1 then
             redis.call('EXPIRE', KEYS[1], ARGV[1] * 2)
@@ -24,7 +24,7 @@ final class RedisRateLimiter implements RateLimiter
         return {current, previous}
         LUA;
 
-    public function __construct(private readonly RedisConnection $connection)
+    public function __construct(private RedisConnection $connection)
     {
     }
 

@@ -123,10 +123,10 @@ Priorizado antes do domínio de veículo/agendamento porque o primeiro endpoint 
 - [ ] Revisar regras de negócio
 - [ ] Revisar API
 - [ ] Revisar banco de dados
-- [ ] Ampliar cobertura de testes
-- [ ] Configurar análise estática
-- [ ] Configurar lint e formatação
-- [ ] Revisar acessibilidade
+- [x] Ampliar cobertura de testes (suíte E2E com Playwright: login, registro, reset de senha via Mailpit real, logout, self-upgrade, teclado)
+- [x] Configurar análise estática (PHPStan nível 10, PHP-CS-Fixer, Rector no backend; ESLint type-aware + Prettier no frontend)
+- [x] Configurar lint e formatação (mesma entrega acima)
+- [x] Revisar acessibilidade (WCAG 2.1 AA via axe-core + navegação por teclado -- achou e corrigiu contraste insuficiente no botão "Cadastrar")
 - [ ] Revisar experiência do usuário
 - [ ] Validar fluxo completo
 - [ ] Corrigir problemas encontrados
@@ -176,3 +176,7 @@ Priorizado antes do domínio de veículo/agendamento porque o primeiro endpoint 
 - [ ] Criar primeiro release
 - [ ] Criar tag da versão
 - [ ] Validar aplicação após o release
+
+## Pendente ainda dentro do sprint
+
+- [ ] **Migrar pra SSR** (Next.js/Remix ou equivalente), depois do pipeline (Dia 5-7) -- hoje o frontend é SPA 100% client-rendered (`frontend/src/main.tsx` monta tudo via `createRoot`), então um browser com JavaScript desligado (texto puro, "reader-only", Lynx) não vê conteúdo nenhum, só o `<noscript>` de aviso em `index.html`. SSR resolve isso de verdade -- entrega HTML já renderizado no primeiro request, funcional mesmo sem JS.

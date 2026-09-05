@@ -27,28 +27,28 @@ final class RlsPolicyTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->admin = (new PostgresConnection(
+        $this->admin = new PostgresConnection(
             driver: getenv('DB_DRIVER') ?: 'pgsql',
             host: getenv('DB_HOST') ?: '127.0.0.1',
             port: (int) (getenv('DB_PORT') ?: 5432),
             database: getenv('DB_DATABASE') ?: 'autoschedule',
             username: getenv('DB_USERNAME') ?: 'pgsql',
             password: getenv('DB_PASSWORD') ?: 'password',
-        ))->pdo();
+        )->pdo();
 
         $this->customer = User::register('Customer RLS', 'rls-customer@example.com', null, 'secret', UserRole::Customer);
         $this->otherCustomer = User::register('Other Customer RLS', 'rls-other@example.com', null, 'secret', UserRole::Customer);
         $this->insertUser($this->customer);
         $this->insertUser($this->otherCustomer);
 
-        $this->rls = (new PostgresConnection(
+        $this->rls = new PostgresConnection(
             driver: getenv('DB_DRIVER') ?: 'pgsql',
             host: getenv('DB_HOST') ?: '127.0.0.1',
             port: (int) (getenv('DB_PORT') ?: 5432),
             database: getenv('DB_DATABASE') ?: 'autoschedule',
             username: getenv('DB_APP_USERNAME') ?: 'autoschedule_app',
             password: getenv('DB_APP_PASSWORD') ?: 'changeme',
-        ))->pdo();
+        )->pdo();
     }
 
     protected function tearDown(): void

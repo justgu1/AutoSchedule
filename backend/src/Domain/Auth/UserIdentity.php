@@ -7,15 +7,15 @@ namespace App\Domain\Auth;
 use App\Domain\Support\Uuid;
 
 /** Vincula uma conta a um provedor externo (hoje só Google) -- um usuário pode ter mais de uma identidade linkada. */
-final class UserIdentity
+final readonly class UserIdentity
 {
     public function __construct(
-        public readonly string $id,
-        public readonly string $userId,
-        public readonly string $provider,
-        public readonly string $providerUserId,
-        public readonly string $email,
-        public readonly \DateTimeImmutable $createdAt,
+        public string $id,
+        public string $userId,
+        public string $provider,
+        public string $providerUserId,
+        public string $email,
+        public \DateTimeImmutable $createdAt,
     ) {
     }
 
