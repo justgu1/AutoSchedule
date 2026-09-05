@@ -1,0 +1,212 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, opcache
+          coverage: none
+
+      - name: Instala dependências do Composer
+        working-directory: backend
+        run: composer install --no-interaction --prefer-dist
+
+      - name: PHPStan
+        working-directory: backend
+        run: vendor/bin/phpstan analyse --no-progress
+
+      - name: Rector
+        working-directory: backend
+        run: vendor/bin/rector process --dry-run
+
+      - name: PHP-CS-Fixer
+        working-directory: backend
+        run: vendor/bin/php-cs-fixer fix --dry-run --diff
+
+      - name: Build
+        run: docker build -f infra/docker/backend/Dockerfile -t autoschedule-backend:ci .
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instala dependências
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Format
+        working-directory: frontend
+        run: npm run format
+
+      - name: Tsc
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  # PHPUnit precisa só de Postgres/Redis/Mailpit como dado -- GitHub cuida
+  # disso nativo via `services:`, sem Docker/docker-compose no meio (mais
+  # rápido, sem porta pra colidir com mais nada).
+  phpunit:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: autoschedule
+          POSTGRES_USER: pgsql
+          POSTGRES_PASSWORD: password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U pgsql -d autoschedule"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      mailpit:
+        image: axllent/mailpit:latest
+        ports: ['1025:1025', '8025:8025']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, opcache
+          coverage: none
+
+      - name: Instala dependências do Composer
+        working-directory: backend
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Gera as chaves RSA do JWT
+        run: make keys
+
+      - name: Migrations + seeders
+        working-directory: backend
+        env:
+          DB_HOST: 127.0.0.1
+        run: php bin/migrate.php && php bin/seed.php
+
+      - name: PHPUnit
+        working-directory: backend
+        env:
+          DB_HOST: 127.0.0.1
+          REDIS_HOST: 127.0.0.1
+          MAIL_HOST: 127.0.0.1
+        run: vendor/bin/phpunit
+
+  # E2E precisa da app inteira rodando (nginx + backend containerizados, não
+  # só dado) -- isso não dá pra ser um `services:` do GitHub (não builda
+  # Dockerfile), por isso é docker-compose aqui, num job separado do PHPUnit
+  # pra nenhum dos dois competir por porta com o outro.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Gera as chaves RSA do JWT
+        run: make keys
+
+      - name: Sobe a stack (migrations, seeders, deps do Playwright)
+        run: make e2e-setup
+
+      - name: E2E
+        run: RATE_LIMIT_AUTH_MAX=1000 docker compose run --rm e2e npx playwright test
+
+      - name: Restaura o rate limit padrão do backend
+        if: always()
+        run: docker compose up -d backend
+
+  load-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Gera as chaves RSA do JWT
+        run: make keys
+
+      - name: Sobe a stack
+        run: docker compose up -d nginx mailpit backend
+
+      # Imagem é buildada `--no-dev`, e o bind-mount local (docker-compose.override.yml)
+      # deixa o checkout do runner (sem vendor/, é gitignored) por cima disso -- precisa
+      # instalar aqui dentro antes de rodar qualquer bin/*.php.
+      - name: Instala dependências do Composer
+        run: docker compose exec backend composer install --no-interaction --prefer-dist
+
+      # k6 loga como o admin/client seedados -- sem isso o "setup: login
+      # succeeded" falha de cara (banco sobe vazio num runner novo).
+      - name: Migrations + seeders
+        run: docker compose exec backend php bin/migrate.php && docker compose exec backend php bin/seed.php
+
+      - name: Load test (k6)
+        run: make load-test
+
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: [phpunit, e2e, load-test]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build + push (backend)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/backend/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/justgu1/autoschedule-backend:latest
+            ghcr.io/justgu1/autoschedule-backend:sha-${{ github.sha }}
+
+      - name: Build + push (nginx)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/frontend/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/justgu1/autoschedule-nginx:latest
+            ghcr.io/justgu1/autoschedule-nginx:sha-${{ github.sha }}

@@ -156,12 +156,13 @@ services:
   # E2E (Playwright) -- mesmo padrão do k6: profile próprio, nunca sobe com
   # `docker compose up`, só via `make e2e`. Roda contra o nginx (build real),
   # não o dev server -- é o que representa produção.
+  # Sem `command:` fixo -- `make e2e-setup`/`make e2e` decidem o quê rodar
+  # (npm ci, depois playwright test) via `docker compose run --rm e2e <comando>`.
   e2e:
     image: mcr.microsoft.com/playwright:v1.63.0-noble
     container_name: autoschedule-e2e
     profiles: ["e2e"]
     working_dir: /app
-    command: sh -c "npm ci && npx playwright test"
     environment:
       BASE_URL: http://nginx
       MAILPIT_URL: http://mailpit:8025

@@ -13,11 +13,10 @@ final readonly class SymfonyMailProvider implements MailProvider
 {
     private Mailer $mailer;
 
-    public function __construct(string $host, int $port, private string $from)
+    /** @param string $dsn DSN completo do Symfony Mailer -- `smtp://host:port` (Mailpit, sem auth) ou `smtps://user:pass@host:port` (SMTP real, TLS implícito) */
+    public function __construct(string $dsn, private string $from)
     {
-        // Sem auth/TLS -- Mailpit (dev) não exige nenhum dos dois. Um SMTP
-        // real de produção troca isso só via env, sem mudar código.
-        $this->mailer = new Mailer(Transport::fromDsn("smtp://{$host}:{$port}"));
+        $this->mailer = new Mailer(Transport::fromDsn($dsn));
     }
 
     public function send(string $to, string $subject, string $htmlBody): void

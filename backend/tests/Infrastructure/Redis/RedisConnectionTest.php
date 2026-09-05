@@ -46,6 +46,30 @@ final class RedisConnectionTest extends TestCase
         }
     }
 
+    #[Test]
+    public function passa_username_e_senha_pro_client_quando_informados(): void
+    {
+        $connection = new RedisConnection(
+            host: getenv('REDIS_HOST') ?: '127.0.0.1',
+            port: (int) (getenv('REDIS_PORT') ?: 6379),
+            username: 'someuser',
+            password: 'somepass',
+        );
+        $parameters = $this->parametersOf($connection);
+
+        $this->assertSame('someuser', $parameters['username'] ?? null);
+        $this->assertSame('somepass', $parameters['password'] ?? null);
+    }
+
+    #[Test]
+    public function nao_seta_username_nem_senha_quando_nao_informados(): void
+    {
+        $parameters = $this->parametersOf($this->makeConnection());
+
+        $this->assertArrayNotHasKey('username', $parameters);
+        $this->assertArrayNotHasKey('password', $parameters);
+    }
+
     private function makeConnection(string $prefix = 'autoschedule'): RedisConnection
     {
         return new RedisConnection(
@@ -53,5 +77,16 @@ final class RedisConnectionTest extends TestCase
             port: (int) (getenv('REDIS_PORT') ?: 6379),
             prefix: $prefix,
         );
+    }
+
+    private function parametersOf(RedisConnection $connection): array
+    {
+        $nodeConnection = $connection->client()->getConnection();
+        \assert($nodeConnection instanceof \Predis\Connection\NodeConnectionInterface);
+
+        $parameters = $nodeConnection->getParameters();
+        \assert($parameters instanceof \Predis\Connection\Parameters);
+
+        return $parameters->toArray();
     }
 }
