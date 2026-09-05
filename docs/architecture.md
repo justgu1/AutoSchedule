@@ -152,7 +152,7 @@ As regras de negócio permanecem na aplicação e as regras de integridade são 
 
 ## Redis
 
-O Redis está disponível na infraestrutura e pode ser utilizado para:
+O Redis é utilizado hoje para rate limiting (sliding window counter via script Lua atômico, ver `docs/business-rules.md`) e pode ser utilizado futuramente para:
 
 - cache;
 - filas;
@@ -246,10 +246,13 @@ Administradores possuem acesso global e clientes somente aos próprios dados.
 
 ## RLS
 
-PostgreSQL Row-Level Security pode ser utilizado como camada adicional de proteção:
+PostgreSQL Row-Level Security pode ser utilizado como camada adicional de proteção. Pipeline de middlewares implementado:
 
 ```text
 HTTP Request
+     │
+     ▼
+Rate Limiting (Redis)
      │
      ▼
 Authentication
@@ -266,6 +269,8 @@ RLS
      ▼
 PostgreSQL
 ```
+
+Rate limiting roda antes de qualquer outro middleware -- tráfego abusivo é barrado sem custo de transação no Postgres.
 
 RLS não substitui a autorização da aplicação.
 

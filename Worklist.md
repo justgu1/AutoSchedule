@@ -51,30 +51,49 @@
 - [x] Definir modelo de dados
 - [x] Definir relacionamentos
 - [x] Definir índices e constraints
-- [ ] Configurar banco de dados na aplicação
-- [ ] Criar migrations
+- [x] Configurar banco de dados na aplicação
+- [x] Criar migrations (`users`, `oauth_clients`, `oauth_refresh_tokens`, RLS/role de app, `audit_logs`)
 - [ ] Criar entidade de veículo
 - [ ] Criar entidade de cliente
 - [ ] Criar entidade de agendamento
-- [ ] Implementar persistência
-- [ ] Criar dados iniciais para desenvolvimento
+- [x] Implementar persistência (`users`, `oauth_clients`, `oauth_refresh_tokens`, `audit_logs` — veículo/agendamento pendente)
+- [x] Criar dados iniciais para desenvolvimento (seeders: admin + oauth clients)
 - [ ] Implementar regras de disponibilidade
-- [ ] Validar modelo e persistência
+- [ ] Validar modelo e persistência (validado só pro escopo de usuário/auth acima)
+
+### Entregue além do escopo original — fundação de autenticação e API
+
+Priorizado antes do domínio de veículo/agendamento porque o primeiro endpoint real do projeto precisava fixar o padrão de autenticação, autorização e segurança que o resto do sistema (concessionárias, veículos, agendamentos) vai seguir depois.
+
+- [x] Router, pipeline de middlewares, container de injeção de dependência
+- [x] Tratamento central de exceções, validação, fundação de logging e Redis
+- [x] Sistema de migrations e seeders
+- [x] Domínio de usuário (`User`, `UserRole`, self-service `/me`, CRUD admin `/users`)
+- [x] Registro de OAuth clients, emissão de JWT (RS256)
+- [x] Autenticação: endpoint único `POST /oauth/token` (login/refresh pelo formato do body, sem `grant_type`), refresh token opaco com rotação e reuse-detection
+- [x] `AuthContextMiddleware` + `RoleMiddleware`: claims por request, roles declarados por rota
+- [x] Row-Level Security em `users`, role de banco restrita (`autoschedule_app`, `NOSUPERUSER NOBYPASSRLS`)
+- [x] Audit log (`audit_logs`, `actor_id` separado de `user_id`) nos fluxos de auth e nas rotas de usuário
+- [x] Rate limiting (Redis, sliding window, policies `general`/`auth`, fail-open)
+- [x] Paginação em `GET /users`
+- [x] Suíte de teste de carga (k6)
+- [ ] `client_credentials` (M2M) — adiado, sem consumidor real ainda
+- [ ] Security headers + CORS — adiado, sem frontend real chamando a API ainda
 
 ### Dia 3 — API e regras de negócio
 
-- [ ] Definir contratos da API
-- [ ] Implementar API REST
+- [x] Definir contratos da API (`GET /api` funciona como catálogo: lista endpoint, método, descrição e campos aceitos por role)
+- [ ] Implementar API REST (feito para usuário/auth; pendente pro domínio de veículo/agendamento)
 - [ ] Implementar endpoint de detalhes do veículo
 - [ ] Implementar endpoint de datas disponíveis
 - [ ] Implementar endpoint de horários disponíveis
 - [ ] Implementar endpoint de criação de agendamento
-- [ ] Implementar validações
+- [x] Implementar validações (`Validator`, aplicado em toda rota de usuário/auth)
 - [ ] Impedir conflitos de agendamento
-- [ ] Implementar tratamento de erros
-- [ ] Padronizar respostas da API
-- [ ] Criar testes unitários
-- [ ] Criar testes de integração
+- [x] Implementar tratamento de erros (`ExceptionHandler` central, `DomainException` tipado)
+- [x] Padronizar respostas da API (`Response::success/error/paginated`)
+- [x] Criar testes unitários (escopo de usuário/auth)
+- [x] Criar testes de integração (escopo de usuário/auth; Postgres/Redis reais via docker-compose)
 
 ### Dia 4 — Aplicação frontend
 
