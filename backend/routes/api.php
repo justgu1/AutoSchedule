@@ -65,6 +65,12 @@ return static function (Router $router, Container $container, Application $app):
     );
 
     $anyAuthenticatedRole = array_map(static fn (UserRole $role): string => $role->value, UserRole::cases());
+    $router->post(
+        '/api/logout',
+        [$oauthController, 'logout'],
+        roles: $anyAuthenticatedRole,
+        description: 'Revokes the current refresh token family and clears auth cookies.',
+    );
     $userController = $container->get(UserController::class);
     $router->post(
         '/api/register',

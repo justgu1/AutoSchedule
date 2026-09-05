@@ -80,6 +80,20 @@ final class OAuthController
         ));
     }
 
+    /** Lê o refresh token do cookie (SPA não manda no corpo) -- sem cookie, não tem o quê revogar, mas ainda limpa os cookies do client. */
+    public function logout(Request $request): Response
+    {
+        $rawRefreshToken = $request->cookie('refresh_token');
+
+        if ($rawRefreshToken !== null) {
+            $this->oauth->logout($rawRefreshToken);
+        }
+
+        return Response::success(['message' => 'Logged out.'])
+            ->withCookie('access_token', '', maxAge: -1, secure: $this->cookieSecure)
+            ->withCookie('refresh_token', '', maxAge: -1, secure: $this->cookieSecure);
+    }
+
     /**
      * O corpo JSON continua com os tokens (curl/Postman/scripts não mudam
      * nada) -- os cookies HttpOnly são só pra quem tem browser no meio (a

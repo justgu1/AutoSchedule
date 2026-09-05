@@ -84,7 +84,7 @@ class Response
         return $clone;
     }
 
-    /** $maxAge em segundos; 0 = cookie de sessão (some ao fechar o browser). */
+    /** $maxAge em segundos; 0 = cookie de sessão (some ao fechar o browser); negativo = apaga o cookie (logout). */
     public function withCookie(
         string $name,
         string $value,
@@ -114,8 +114,14 @@ class Response
         }
 
         foreach ($this->cookies as $name => $cookie) {
+            $expires = match (true) {
+                $cookie['maxAge'] > 0 => time() + $cookie['maxAge'],
+                $cookie['maxAge'] < 0 => time() - 3600,
+                default => 0,
+            };
+
             setcookie($name, $cookie['value'], [
-                'expires' => $cookie['maxAge'] > 0 ? time() + $cookie['maxAge'] : 0,
+                'expires' => $expires,
                 'path' => '/',
                 'httponly' => $cookie['httpOnly'],
                 'samesite' => $cookie['sameSite'],
