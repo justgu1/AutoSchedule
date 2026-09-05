@@ -82,7 +82,7 @@ export function RegisterPage() {
                         labelId="register-role-label"
                         label="Tipo de conta"
                         value={form.role}
-                        onChange={(event) => set('role', event.target.value as RegisterInput['role'])}
+                        onChange={(event) => set('role', event.target.value)}
                     >
                         <MenuItem value="seller">Vendedor</MenuItem>
                         <MenuItem value="customer">Cliente</MenuItem>

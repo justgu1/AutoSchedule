@@ -20,6 +20,13 @@ function readCookie(name: string): string | null {
 
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
+/** Formato de toda resposta da API -- `fetch().json()` não é tipado, esse é o único ponto que confia nisso. */
+interface ApiEnvelope {
+    data?: unknown;
+    message?: string;
+    errors?: Record<string, string>;
+}
+
 /**
  * `credentials: 'include'` manda o cookie de sessão; `X-CSRF-Token` é lido do
  * cookie `XSRF-TOKEN` (não HttpOnly, por isso o JS consegue ler) e ecoado de
@@ -48,7 +55,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
         credentials: 'include',
     });
 
-    const payload = await response.json().catch(() => null);
+    const payload = (await response.json().catch(() => null)) as ApiEnvelope | null;
 
     if (!response.ok) {
         throw new ApiError(payload?.message ?? 'Request failed.', response.status, payload?.errors);

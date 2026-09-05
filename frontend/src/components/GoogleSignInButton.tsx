@@ -32,7 +32,11 @@ interface GoogleSignInButtonProps {
 export function GoogleSignInButton({ onCredential }: GoogleSignInButtonProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const onCredentialRef = useRef(onCredential);
-    onCredentialRef.current = onCredential;
+
+    // Mantém a ref sincronizada fora do render (regra do react-hooks: nunca mutar ref durante render).
+    useEffect(() => {
+        onCredentialRef.current = onCredential;
+    });
 
     useEffect(() => {
         if (!GOOGLE_CLIENT_ID) {
