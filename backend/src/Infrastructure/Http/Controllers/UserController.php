@@ -41,6 +41,9 @@ final class UserController
 
         $user = $user->withProfile($data['name'] ?? $user->name, $data['phone'] ?? $user->phone);
         $this->users->update($user);
+        // Só o nome dos campos alterados, nunca o valor -- audit_logs não é
+        // outro lugar pra duplicar PII que já mora em users.
+        $this->audit->record(AuditEvent::ProfileUpdated, $user->id, $user->id, ['fields' => array_keys($data)], $request->ip(), $request->header('user-agent'));
 
         return Response::success(UserProfile::fromUser($user)->toArray());
     }
@@ -59,7 +62,7 @@ final class UserController
         }
 
         $this->users->update($user->withNewPassword($data['password']));
-        $this->audit->record(AuditEvent::PasswordChanged, $user->id, [], $request->ip(), $request->header('user-agent'));
+        $this->audit->record(AuditEvent::PasswordChanged, $user->id, $user->id, [], $request->ip(), $request->header('user-agent'));
 
         return Response::success(['message' => 'Password updated.']);
     }
@@ -75,7 +78,7 @@ final class UserController
 
         $this->users->anonymizeAndSoftDelete($userId);
         $this->refreshTokens->revokeAllForUser($userId);
-        $this->audit->record(AuditEvent::AccountDeleted, $userId, [], $request->ip(), $request->header('user-agent'));
+        $this->audit->record(AuditEvent::AccountDeleted, $userId, $userId, [], $request->ip(), $request->header('user-agent'));
 
         return Response::success(['message' => 'Account deleted.']);
     }

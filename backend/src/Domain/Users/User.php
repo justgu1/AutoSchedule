@@ -91,6 +91,24 @@ final class User
         );
     }
 
+    /** Devolve uma cópia com role trocado -- usado pelo CRUD admin (/users), nunca pelo self-service. */
+    public function withRole(UserRole $role): self
+    {
+        return new self(
+            id: $this->id,
+            name: $this->name,
+            email: $this->email,
+            phone: $this->phone,
+            passwordHash: $this->passwordHash,
+            role: $role,
+            passwordSetAt: $this->passwordSetAt,
+            emailVerifiedAt: $this->emailVerifiedAt,
+            createdAt: $this->createdAt,
+            updatedAt: new \DateTimeImmutable(),
+            deletedAt: $this->deletedAt,
+        );
+    }
+
     /**
      * Devolve uma cópia com PII escrubada pro "direito ao esquecimento" da LGPD —
      * id, hash de senha, role e timestamps são mantidos pra histórico/auditoria
@@ -102,7 +120,10 @@ final class User
         return new self(
             id: $this->id,
             name: 'Deleted user',
-            email: sprintf('deleted-%s@anonymized.local', substr($this->id, 0, 8)),
+            // Id inteiro, não um prefixo -- os primeiros 8 hex de um UUIDv7 só
+            // mudam a cada ~65s (são os bits mais altos do timestamp em ms), então
+            // um prefixo curto colide fácil entre exclusões próximas no tempo.
+            email: sprintf('deleted-%s@anonymized.local', $this->id),
             phone: null,
             passwordHash: $this->passwordHash,
             role: $this->role,

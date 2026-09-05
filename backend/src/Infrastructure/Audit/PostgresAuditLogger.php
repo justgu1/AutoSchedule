@@ -17,18 +17,19 @@ final class PostgresAuditLogger implements AuditLogger
     }
 
     /** @param array<string, mixed> $context */
-    public function record(AuditEvent $event, ?string $userId, array $context, string $ipAddress, ?string $userAgent): void
+    public function record(AuditEvent $event, ?string $actorId, ?string $targetUserId, array $context, string $ipAddress, ?string $userAgent): void
     {
         try {
             $statement = $this->pdo->prepare(<<<'SQL'
-                INSERT INTO audit_logs (user_id, event, auditable_type, auditable_id, new_values, ip_address, user_agent)
-                VALUES (:user_id, :event, 'User', :auditable_id, :new_values, :ip_address, :user_agent)
+                INSERT INTO audit_logs (actor_id, user_id, event, auditable_type, auditable_id, new_values, ip_address, user_agent)
+                VALUES (:actor_id, :user_id, :event, 'User', :auditable_id, :new_values, :ip_address, :user_agent)
                 SQL);
 
             $statement->execute([
-                'user_id' => $userId,
+                'actor_id' => $actorId,
+                'user_id' => $targetUserId,
                 'event' => $event->value,
-                'auditable_id' => $userId,
+                'auditable_id' => $targetUserId,
                 'new_values' => json_encode($context, JSON_THROW_ON_ERROR),
                 'ip_address' => $ipAddress,
                 'user_agent' => $userAgent,

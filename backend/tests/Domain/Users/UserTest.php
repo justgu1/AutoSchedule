@@ -84,4 +84,17 @@ final class UserTest extends TestCase
         $this->assertTrue($updated->verifyPassword('new-password'));
         $this->assertFalse($updated->verifyPassword('old-password'));
     }
+
+    #[Test]
+    public function with_role_troca_o_role_mas_preserva_o_resto(): void
+    {
+        $user = User::register('Ada', 'ada@example.com', null, 'secret', UserRole::Customer);
+
+        $updated = $user->withRole(UserRole::Admin);
+
+        $this->assertSame(UserRole::Admin, $updated->role);
+        $this->assertSame($user->id, $updated->id);
+        $this->assertSame($user->name, $updated->name);
+        $this->assertSame($user->passwordHash, $updated->passwordHash);
+    }
 }

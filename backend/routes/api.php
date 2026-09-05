@@ -9,6 +9,7 @@ use App\Domain\Users\UserRole;
 use App\Infrastructure\Container\Container;
 use App\Infrastructure\Http\Controllers\OAuthController;
 use App\Infrastructure\Http\Controllers\UserController;
+use App\Infrastructure\Http\Controllers\UsersController;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
 use App\Infrastructure\Http\Router;
@@ -87,5 +88,39 @@ return static function (Router $router, Container $container, Application $app):
         [$userController, 'destroy'],
         roles: $anyAuthenticatedRole,
         description: 'Deletes your account (anonymizes PII and soft-deletes it, per LGPD).',
+    );
+
+    $usersController = $container->get(UsersController::class);
+    $router->get(
+        '/api/users',
+        [$usersController, 'index'],
+        roles: ['admin'],
+        description: 'Lists every user.',
+    );
+    $router->get(
+        '/api/users/{id}',
+        [$usersController, 'show'],
+        roles: ['admin'],
+        description: 'Returns a single user.',
+    );
+    $router->post(
+        '/api/users',
+        [$usersController, 'store'],
+        roles: ['admin'],
+        description: 'Creates a user.',
+        accepts: ['name', 'email', 'phone', 'password', 'role'],
+    );
+    $router->patch(
+        '/api/users/{id}',
+        [$usersController, 'update'],
+        roles: ['admin'],
+        description: 'Updates another user\'s name, phone and/or role.',
+        accepts: ['name', 'phone', 'role'],
+    );
+    $router->delete(
+        '/api/users/{id}',
+        [$usersController, 'destroy'],
+        roles: ['admin'],
+        description: 'Deletes a user (anonymizes PII and soft-deletes it, per LGPD). Fails if it is the last admin.',
     );
 };

@@ -56,6 +56,9 @@ final class OAuthServiceTest extends TestCase
         $this->assertNotSame('', $tokenPair->accessToken);
         $this->assertNotNull($tokenPair->refreshToken);
         $this->assertSame([AuditEvent::LoginSucceeded], $this->audit->events);
+        // Actor e target são a mesma pessoa: quem logou é quem "sofreu" o evento.
+        $this->assertSame($this->customer->id, $this->audit->calls[0]['actorId']);
+        $this->assertSame($this->customer->id, $this->audit->calls[0]['targetUserId']);
     }
 
     #[Test]
@@ -68,6 +71,10 @@ final class OAuthServiceTest extends TestCase
             $this->assertSame(DomainErrorType::Unauthorized, $exception->type());
             $this->assertSame('Invalid credentials.', $exception->getMessage());
             $this->assertSame([AuditEvent::LoginFailed], $this->audit->events);
+            // Identidade não provada (senha errada) -- sem actor, mas o alvo é
+            // conhecido porque o email existe.
+            $this->assertNull($this->audit->calls[0]['actorId']);
+            $this->assertSame($this->customer->id, $this->audit->calls[0]['targetUserId']);
         }
     }
 
@@ -79,6 +86,9 @@ final class OAuthServiceTest extends TestCase
             $this->fail('Expected a DomainException to be thrown.');
         } catch (DomainException $exception) {
             $this->assertSame('Invalid credentials.', $exception->getMessage());
+            // Nem o email existe -- nem actor nem target pra apontar.
+            $this->assertNull($this->audit->calls[0]['actorId']);
+            $this->assertNull($this->audit->calls[0]['targetUserId']);
         }
     }
 
@@ -135,6 +145,11 @@ final class OAuthServiceTest extends TestCase
         }
 
         $this->assertContains(AuditEvent::RefreshTokenReused, $this->audit->events);
+        $reuseCall = $this->audit->calls[array_search(AuditEvent::RefreshTokenReused, $this->audit->events, true)];
+        // Quem reusou o token não provou identidade nenhuma -- sem actor. O
+        // alvo é o dono da família de tokens, não quem reusou.
+        $this->assertNull($reuseCall['actorId']);
+        $this->assertSame($this->customer->id, $reuseCall['targetUserId']);
 
         $this->expectException(DomainException::class);
         $service->refresh('autoschedule-web', $rotated->refreshToken, '127.0.0.1', 'phpunit');
@@ -220,6 +235,16 @@ final class InMemoryUserRepository implements UserRepository
     {
         unset($this->byId[$id]);
     }
+
+    public function findAll(): array
+    {
+        return array_values($this->byId);
+    }
+
+    public function countByRole(UserRole $role): int
+    {
+        return count(array_filter($this->byId, static fn (User $user): bool => $user->role === $role));
+    }
 }
 
 final class InMemoryRefreshTokenRepository implements RefreshTokenRepository
@@ -303,10 +328,14 @@ final class FakeAuditLogger implements AuditLogger
     /** @var list<AuditEvent> */
     public array $events = [];
 
+    /** @var list<array{event: AuditEvent, actorId: ?string, targetUserId: ?string}> */
+    public array $calls = [];
+
     /** @param array<string, mixed> $context */
-    public function record(AuditEvent $event, ?string $userId, array $context, string $ipAddress, ?string $userAgent): void
+    public function record(AuditEvent $event, ?string $actorId, ?string $targetUserId, array $context, string $ipAddress, ?string $userAgent): void
     {
         $this->events[] = $event;
+        $this->calls[] = ['event' => $event, 'actorId' => $actorId, 'targetUserId' => $targetUserId];
     }
 }
 

@@ -39,7 +39,9 @@ final class OAuthService
         $user = $this->users->findByEmail($email);
 
         if ($user === null || !$user->verifyPassword($password)) {
-            $this->audit->record(AuditEvent::LoginFailed, null, ['email' => $email], $ipAddress, $userAgent);
+            // Identidade não provada -- sem actor. $user?->id como alvo quando o
+            // email existe (senha errada), null quando nem a conta existe.
+            $this->audit->record(AuditEvent::LoginFailed, null, $user?->id, ['email' => $email], $ipAddress, $userAgent);
 
             // De propósito, a mesma mensagem/status pra "email não existe" e "senha
             // errada" -- não pode vazar se a conta existe ou não.
@@ -47,7 +49,7 @@ final class OAuthService
         }
 
         $tokenPair = $this->issueTokenPair($client, $user->id, $user->role, $client->allowedScopes);
-        $this->audit->record(AuditEvent::LoginSucceeded, $user->id, [], $ipAddress, $userAgent);
+        $this->audit->record(AuditEvent::LoginSucceeded, $user->id, $user->id, [], $ipAddress, $userAgent);
 
         return $tokenPair;
     }
@@ -65,7 +67,9 @@ final class OAuthService
             // Reuso de um token já rotacionado: pode ter sido roubado, então
             // queima a família inteira -- todo descendente para de funcionar.
             $this->refreshTokens->revokeFamily($current->familyId);
-            $this->audit->record(AuditEvent::RefreshTokenReused, $current->userId, [], $ipAddress, $userAgent);
+            // Ninguém provou identidade pra fazer esse request -- é o dono do
+            // token roubado que sofre, não quem o usou (esse é o desconhecido).
+            $this->audit->record(AuditEvent::RefreshTokenReused, null, $current->userId, [], $ipAddress, $userAgent);
 
             throw new DomainException('Invalid or expired refresh token.', DomainErrorType::Unauthorized);
         }

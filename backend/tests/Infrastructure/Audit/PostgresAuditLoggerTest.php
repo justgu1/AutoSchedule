@@ -21,13 +21,17 @@ final class PostgresAuditLoggerTest extends TestCase
 
     protected function setUp(): void
     {
+        // Role padrão (não autoschedule_app): a fixture de users pro teste de
+        // actor/target precisa de INSERT sem passar pelo RLS, que exige
+        // app.current_user_role='admin' via SET LOCAL -- PostgresAuditLogger em
+        // si não lida com RLS, só grava em audit_logs.
         $this->connection = new PostgresConnection(
             driver: getenv('DB_DRIVER') ?: 'pgsql',
             host: getenv('DB_HOST') ?: '127.0.0.1',
             port: (int) (getenv('DB_PORT') ?: 5432),
             database: getenv('DB_DATABASE') ?: 'autoschedule',
-            username: getenv('DB_APP_USERNAME') ?: 'autoschedule_app',
-            password: getenv('DB_APP_PASSWORD') ?: 'changeme',
+            username: getenv('DB_USERNAME') ?: 'pgsql',
+            password: getenv('DB_PASSWORD') ?: 'password',
         );
         $this->connection->pdo()->beginTransaction();
     }
@@ -42,7 +46,7 @@ final class PostgresAuditLoggerTest extends TestCase
     {
         $logger = new PostgresAuditLogger($this->connection->pdo(), new NullLogger());
 
-        $logger->record(AuditEvent::LoginFailed, null, ['email' => 'ada@example.com'], '203.0.113.9', 'phpunit-agent');
+        $logger->record(AuditEvent::LoginFailed, null, null, ['email' => 'ada@example.com'], '203.0.113.9', 'phpunit-agent');
 
         $row = $this->connection->pdo()
             ->query("SELECT event, auditable_type, ip_address, user_agent, new_values FROM audit_logs ORDER BY created_at DESC LIMIT 1")
@@ -56,6 +60,23 @@ final class PostgresAuditLoggerTest extends TestCase
     }
 
     #[Test]
+    public function grava_actor_e_target_separados_quando_um_admin_age_sobre_outro_usuario(): void
+    {
+        $admin = $this->insertUser('admin@example.com');
+        $target = $this->insertUser('target@example.com');
+        $logger = new PostgresAuditLogger($this->connection->pdo(), new NullLogger());
+
+        $logger->record(AuditEvent::UserCreated, $admin, $target, ['role' => 'seller'], '203.0.113.9', 'phpunit-agent');
+
+        $row = $this->connection->pdo()
+            ->query('SELECT actor_id, user_id FROM audit_logs ORDER BY created_at DESC LIMIT 1')
+            ->fetch();
+
+        $this->assertSame($admin, $row['actor_id']);
+        $this->assertSame($target, $row['user_id']);
+    }
+
+    #[Test]
     public function falha_ao_gravar_nao_propaga_excecao(): void
     {
         // PDO quebrado (host inexistente) força o catch a acionar -- é o
@@ -63,9 +84,19 @@ final class PostgresAuditLoggerTest extends TestCase
         $brokenPdo = new \PDO('sqlite::memory:');
         $logger = new PostgresAuditLogger($brokenPdo, new NullLogger());
 
-        $logger->record(AuditEvent::LoginSucceeded, null, [], '127.0.0.1', null);
+        $logger->record(AuditEvent::LoginSucceeded, null, null, [], '127.0.0.1', null);
 
         $this->addToAssertionCount(1);
+    }
+
+    private function insertUser(string $email): string
+    {
+        $statement = $this->connection->pdo()->prepare(<<<'SQL'
+            INSERT INTO users (name, email, password, role) VALUES ('Test User', :email, 'hash', 'customer') RETURNING id
+            SQL);
+        $statement->execute(['email' => $email]);
+
+        return $statement->fetchColumn();
     }
 }
 

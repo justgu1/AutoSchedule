@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Users\Ports;
 
 use App\Domain\Users\User;
+use App\Domain\Users\UserRole;
 
 interface UserRepository
 {
@@ -20,4 +21,10 @@ interface UserRepository
 
     /** Anonymizes PII and soft-deletes the row (LGPD right to erasure). No-op if the user doesn't exist. */
     public function anonymizeAndSoftDelete(string $id): void;
+
+    /** @return list<User> */
+    public function findAll(): array;
+
+    /** Usado pra bloquear DELETE do último admin restante (409 Conflict). */
+    public function countByRole(UserRole $role): int;
 }
