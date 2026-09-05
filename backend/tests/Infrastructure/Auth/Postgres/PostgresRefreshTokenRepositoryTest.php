@@ -101,6 +101,20 @@ final class PostgresRefreshTokenRepositoryTest extends TestCase
         $this->assertTrue($this->isRevoked($second->id));
     }
 
+    #[Test]
+    public function revoke_all_for_user_revoga_todo_token_ativo_do_usuario_em_qualquer_familia(): void
+    {
+        [, $tokenA] = RefreshToken::issue($this->clientId, $this->userId, [], 1_209_600);
+        [, $tokenB] = RefreshToken::issue($this->clientId, $this->userId, [], 1_209_600);
+        $this->repository->insert($tokenA);
+        $this->repository->insert($tokenB);
+
+        $this->repository->revokeAllForUser($this->userId);
+
+        $this->assertTrue($this->isRevoked($tokenA->id));
+        $this->assertTrue($this->isRevoked($tokenB->id));
+    }
+
     private function isRevoked(string $refreshTokenId): bool
     {
         $statement = $this->pdo->prepare('SELECT revoked_at FROM oauth_refresh_tokens WHERE id = ?');

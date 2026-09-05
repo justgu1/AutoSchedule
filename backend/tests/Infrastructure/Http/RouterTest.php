@@ -113,4 +113,26 @@ final class RouterTest extends TestCase
 
         $this->assertSame([], $router->requiredRoles('GET', '/api/inexistente'));
     }
+
+    #[Test]
+    public function catalog_lista_toda_rota_registrada_com_path_methods_description_accepts_e_roles(): void
+    {
+        $router = new Router();
+        $router->get('/api/ping', static fn (Request $request): Response => new JsonResponse([]), description: 'Health check.');
+        $router->post(
+            '/api/users',
+            static fn (Request $request): Response => new JsonResponse([]),
+            roles: ['admin'],
+            description: 'Creates a user.',
+            accepts: ['name', 'email'],
+        );
+
+        $this->assertSame(
+            [
+                ['path' => '/api/ping', 'methods' => ['GET'], 'description' => 'Health check.', 'accepts' => [], 'roles' => []],
+                ['path' => '/api/users', 'methods' => ['POST'], 'description' => 'Creates a user.', 'accepts' => ['name', 'email'], 'roles' => ['admin']],
+            ],
+            $router->catalog(),
+        );
+    }
 }

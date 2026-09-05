@@ -277,6 +277,25 @@ final class InMemoryRefreshTokenRepository implements RefreshTokenRepository
             }
         }
     }
+
+    public function revokeAllForUser(string $userId): void
+    {
+        foreach ($this->byHash as $hash => $token) {
+            if ($token->userId === $userId && !$token->isRevoked()) {
+                $this->byHash[$hash] = new RefreshToken(
+                    $token->id,
+                    $token->tokenHash,
+                    $token->familyId,
+                    $token->oauthClientId,
+                    $token->userId,
+                    $token->scopes,
+                    $token->expiresAt,
+                    new \DateTimeImmutable(),
+                    $token->replacedById,
+                );
+            }
+        }
+    }
 }
 
 final class FakeAuditLogger implements AuditLogger
