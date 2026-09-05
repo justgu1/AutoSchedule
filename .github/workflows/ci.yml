@@ -7,14 +7,70 @@ on:
     branches: [main]
 
 jobs:
-  # PHP nativo no runner (sem Docker) + services do próprio GitHub Actions pro
-  # que a suíte precisa de verdade (RLS/migrations reais no Postgres, rate
-  # limiting real no Redis, reset de senha real no Mailpit -- não são mocks,
-  # é decisão arquitetural do projeto). Mais rápido que subir o docker-compose
-  # inteiro só pra isso, e evita o bind-mount/ownership do compose local (que
-  # é pensado pra live-reload de dev, não pra CI).
   backend:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, opcache
+          coverage: none
+
+      - name: Instala dependências do Composer
+        working-directory: backend
+        run: composer install --no-interaction --prefer-dist
+
+      - name: PHPStan
+        working-directory: backend
+        run: vendor/bin/phpstan analyse --no-progress
+
+      - name: Rector
+        working-directory: backend
+        run: vendor/bin/rector process --dry-run
+
+      - name: PHP-CS-Fixer
+        working-directory: backend
+        run: vendor/bin/php-cs-fixer fix --dry-run --diff
+
+      - name: Build
+        run: docker build -f infra/docker/backend/Dockerfile -t autoschedule-backend:ci .
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instala dependências
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Format
+        working-directory: frontend
+        run: npm run format
+
+      - name: Tsc
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  testes:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
     services:
       postgres:
         image: postgres:17-alpine
@@ -55,17 +111,15 @@ jobs:
       - name: Gera as chaves RSA do JWT
         run: make keys
 
-      # Container do Postgres sobe vazio (sem tabela, sem role autoschedule_app)
-      # -- os testes de integração (RLS, repositórios reais) esperam o schema já
-      # aplicado, igual qualquer ambiente real (local roda isso uma vez via
-      # `make migrate`/`make seed`; aqui roda toda vez, é idempotente).
+      # Container do Postgres sobe vazio -- migrations/seeders aplicam o schema
+      # antes do PHPUnit (RLS, repositórios reais) e do E2E precisarem dele.
       - name: Migrations + seeders
         working-directory: backend
         env:
           DB_HOST: 127.0.0.1
         run: php bin/migrate.php && php bin/seed.php
 
-      - name: Testes (PHPUnit)
+      - name: PHPUnit
         working-directory: backend
         env:
           DB_HOST: 127.0.0.1
@@ -73,67 +127,17 @@ jobs:
           MAIL_HOST: 127.0.0.1
         run: vendor/bin/phpunit
 
-      - name: Análise estática (PHPStan)
-        working-directory: backend
-        run: vendor/bin/phpstan analyse --no-progress
-
-      - name: Lint (PHP-CS-Fixer)
-        working-directory: backend
-        run: vendor/bin/php-cs-fixer fix --dry-run --diff
-
-      - name: Rector (dry-run)
-        working-directory: backend
-        run: vendor/bin/rector process --dry-run
-
-  frontend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Instala dependências
-        working-directory: frontend
-        run: npm ci
-
-      - name: Lint (ESLint)
-        working-directory: frontend
-        run: npm run lint
-
-      - name: Formatação (Prettier)
-        working-directory: frontend
-        run: npm run format
-
-      - name: Checagem de tipos (tsc)
-        working-directory: frontend
-        run: npx tsc --noEmit
-
-      - name: Build
-        working-directory: frontend
-        run: npm run build
-
-  e2e:
-    runs-on: ubuntu-latest
-    needs: [backend, frontend]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Gera as chaves RSA do JWT
-        run: make keys
-
-      # `make e2e` já é auto-contido: builda o nginx com o frontend atual,
-      # sobe a stack, relaxa o rate limit `auth` só durante o teste (workers
-      # em paralelo dividem o mesmo IP) e restaura o padrão no final.
-      - name: E2E (Playwright)
+      # `make e2e` builda o nginx com o frontend atual, sobe a stack completa
+      # (fora dos services acima) e roda o Playwright.
+      - name: E2E
         run: make e2e
+
+      - name: Load test (k6)
+        run: make load-test
 
   build-and-push:
     runs-on: ubuntu-latest
-    needs: [backend, frontend, e2e]
+    needs: [testes]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       contents: read

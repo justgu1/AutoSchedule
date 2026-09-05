@@ -338,14 +338,16 @@ A busca por proximidade pode ser realizada pelo PostgreSQL. PostGIS pode ser adi
 ├── frontend/
 │   └── src/
 ├── infra/
-│   ├── docker/
-│   │   ├── backend/
-│   │   │   └── Dockerfile
-│   │   ├── frontend/
-│   │   │   └── Dockerfile
-│   │   └── nginx/
-│   │       └── nginx.conf
-│   └── k8s/
+│   └── docker/
+│       ├── backend/
+│       │   └── Dockerfile
+│       ├── frontend/
+│       │   └── Dockerfile
+│       └── nginx/
+│           └── default.conf.template
+├── k8s/
+├── .github/
+│   └── workflows/
 ├── docker-compose.yaml
 ├── Makefile
 ├── README.md
