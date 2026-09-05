@@ -104,12 +104,18 @@ final class ContainerFactory
         $container->set(MailProvider::class, static function () use ($app): MailProvider {
             $mail = $app->config('mail');
 
-            return new SymfonyMailProvider($mail['host'], $mail['port'], $mail['from']);
+            return new SymfonyMailProvider($mail['dsn'], $mail['from']);
         });
         $container->set(RedisConnection::class, static function () use ($app): RedisConnection {
             $config = $app->config('redis');
 
-            return new RedisConnection(host: $config['host'], port: $config['port'], prefix: $config['prefix']);
+            return new RedisConnection(
+                host: $config['host'],
+                port: $config['port'],
+                prefix: $config['prefix'],
+                username: $config['username'],
+                password: $config['password'],
+            );
         });
         $container->set(
             RateLimiter::class,
