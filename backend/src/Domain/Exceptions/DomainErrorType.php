@@ -10,4 +10,5 @@ enum DomainErrorType
     case Validation;
     case Conflict;
     case Unauthorized;
+    case Forbidden;
 }

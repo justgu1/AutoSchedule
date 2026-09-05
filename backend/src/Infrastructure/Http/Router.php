@@ -7,36 +7,42 @@ namespace App\Infrastructure\Http;
 final class Router
 {
     /**
-     * @var array<string, list<array{pattern: string, paramNames: list<string>, handler: callable}>>
+     * @var array<string, list<array{pattern: string, paramNames: list<string>, handler: callable, roles: list<string>}>>
      */
     private array $routes = [];
 
-    public function get(string $path, callable $handler): void
+    /** @param list<string> $roles vazio = pública; qualquer outro valor = role exigida pelo RoleMiddleware */
+    public function get(string $path, callable $handler, array $roles = []): void
     {
-        $this->add(HttpMethod::Get, $path, $handler);
+        $this->add(HttpMethod::Get, $path, $handler, $roles);
     }
 
-    public function post(string $path, callable $handler): void
+    /** @param list<string> $roles */
+    public function post(string $path, callable $handler, array $roles = []): void
     {
-        $this->add(HttpMethod::Post, $path, $handler);
+        $this->add(HttpMethod::Post, $path, $handler, $roles);
     }
 
-    public function put(string $path, callable $handler): void
+    /** @param list<string> $roles */
+    public function put(string $path, callable $handler, array $roles = []): void
     {
-        $this->add(HttpMethod::Put, $path, $handler);
+        $this->add(HttpMethod::Put, $path, $handler, $roles);
     }
 
-    public function patch(string $path, callable $handler): void
+    /** @param list<string> $roles */
+    public function patch(string $path, callable $handler, array $roles = []): void
     {
-        $this->add(HttpMethod::Patch, $path, $handler);
+        $this->add(HttpMethod::Patch, $path, $handler, $roles);
     }
 
-    public function delete(string $path, callable $handler): void
+    /** @param list<string> $roles */
+    public function delete(string $path, callable $handler, array $roles = []): void
     {
-        $this->add(HttpMethod::Delete, $path, $handler);
+        $this->add(HttpMethod::Delete, $path, $handler, $roles);
     }
 
-    public function add(HttpMethod|string $method, string $path, callable $handler): void
+    /** @param list<string> $roles */
+    public function add(HttpMethod|string $method, string $path, callable $handler, array $roles = []): void
     {
         $method = $this->resolveMethod($method);
 
@@ -46,7 +52,27 @@ final class Router
             'pattern' => $pattern,
             'paramNames' => $paramNames,
             'handler' => $handler,
+            'roles' => $roles,
         ];
+    }
+
+    /**
+     * Roles exigidos pela rota que bate com $method+$path, sem despachar de
+     * verdade -- usado pelo RoleMiddleware pra checar antes do handler rodar.
+     * Rota inexistente devolve [] (o 404 de verdade é responsabilidade do
+     * dispatch(), não daqui).
+     *
+     * @return list<string>
+     */
+    public function requiredRoles(string $method, string $path): array
+    {
+        foreach ($this->routes[strtoupper($method)] ?? [] as $route) {
+            if ($this->match($route, $path) !== null) {
+                return $route['roles'];
+            }
+        }
+
+        return [];
     }
 
     private function resolveMethod(HttpMethod|string $method): HttpMethod

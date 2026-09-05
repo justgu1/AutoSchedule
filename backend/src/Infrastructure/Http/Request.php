@@ -12,6 +12,7 @@ final class Request
      * @param array<string, string> $headers
      * @param array<string, string> $query
      * @param array<string, string> $params
+     * @param array<string, mixed> $attributes
      */
     public function __construct(
         private readonly string $method,
@@ -20,6 +21,8 @@ final class Request
         private readonly array $query = [],
         private readonly string $body = '',
         private array $params = [],
+        private readonly string $ip = '',
+        private array $attributes = [],
     ) {
         // Normaliza aqui, sai sempre normalizado.
         $this->path = self::normalizePath($path);
@@ -39,6 +42,7 @@ final class Request
             headers: self::resolveHeaders(),
             query: $_GET,
             body: $rawBody ?? '',
+            ip: (string) ($_SERVER['REMOTE_ADDR'] ?? ''),
         );
     }
 
@@ -91,6 +95,24 @@ final class Request
     {
         $clone = clone $this;
         $clone->params = $params;
+
+        return $clone;
+    }
+
+    public function ip(): string
+    {
+        return $this->ip;
+    }
+
+    public function attribute(string $key, mixed $default = null): mixed
+    {
+        return $this->attributes[$key] ?? $default;
+    }
+
+    public function withAttribute(string $key, mixed $value): self
+    {
+        $clone = clone $this;
+        $clone->attributes[$key] = $value;
 
         return $clone;
     }

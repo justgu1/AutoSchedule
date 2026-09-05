@@ -70,6 +70,16 @@ final class ExceptionHandlerTest extends TestCase
     }
 
     #[Test]
+    public function domain_exception_forbidden_vira_403(): void
+    {
+        $handler = new ExceptionHandler();
+
+        $response = $handler->handle(new DomainException('Not allowed for this role.', DomainErrorType::Forbidden));
+
+        $this->assertSame(403, $response->status());
+    }
+
+    #[Test]
     public function json_exception_vira_422_com_mensagem_generica(): void
     {
         $handler = new ExceptionHandler();
