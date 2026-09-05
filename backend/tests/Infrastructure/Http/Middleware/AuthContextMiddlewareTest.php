@@ -86,6 +86,47 @@ final class AuthContextMiddlewareTest extends TestCase
     }
 
     #[Test]
+    public function sem_header_authorization_cai_pro_cookie_access_token(): void
+    {
+        $claims = AccessTokenClaims::issue('11111111-1111-4111-8111-111111111111', 'autoschedule-web', UserRole::Customer, [], 900);
+        $middleware = new AuthContextMiddleware(new FakeTokenIssuer(['valid-token' => $claims]), $this->connection, new Router());
+
+        $middleware->handle(
+            new Request(method: 'GET', path: '/api/me', cookies: ['access_token' => 'valid-token']),
+            function (Request $request) use ($claims): Response {
+                $this->assertSame($claims, $request->attribute('auth'));
+
+                return new JsonResponse(['ok' => true]);
+            },
+        );
+    }
+
+    #[Test]
+    public function header_authorization_tem_prioridade_sobre_o_cookie(): void
+    {
+        $headerClaims = AccessTokenClaims::issue('11111111-1111-4111-8111-111111111111', 'autoschedule-web', UserRole::Admin, [], 900);
+        $middleware = new AuthContextMiddleware(
+            new FakeTokenIssuer(['header-token' => $headerClaims]),
+            $this->connection,
+            new Router(),
+        );
+
+        $middleware->handle(
+            new Request(
+                method: 'GET',
+                path: '/api/me',
+                headers: ['authorization' => 'Bearer header-token'],
+                cookies: ['access_token' => 'cookie-token-que-nao-existe-no-fake'],
+            ),
+            function (Request $request) use ($headerClaims): Response {
+                $this->assertSame($headerClaims, $request->attribute('auth'));
+
+                return new JsonResponse(['ok' => true]);
+            },
+        );
+    }
+
+    #[Test]
     public function com_bearer_invalido_lanca_excecao_e_nao_chama_next(): void
     {
         $middleware = new AuthContextMiddleware(new FakeTokenIssuer(), $this->connection, new Router());

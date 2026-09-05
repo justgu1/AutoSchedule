@@ -82,4 +82,35 @@ final class ResponseTest extends TestCase
 
         $this->assertSame(1, json_decode($response->body(), true)['meta']['last_page']);
     }
+
+    #[Test]
+    public function with_cookie_devolve_uma_nova_instancia_sem_mutar_a_original(): void
+    {
+        $response = new Response();
+        $comCookie = $response->withCookie('access_token', 'abc123', maxAge: 900);
+
+        $this->assertSame([], $response->cookies());
+        $this->assertSame(
+            ['value' => 'abc123', 'maxAge' => 900, 'httpOnly' => true, 'sameSite' => 'Strict', 'secure' => false],
+            $comCookie->cookies()['access_token'],
+        );
+    }
+
+    #[Test]
+    public function with_cookie_aceita_max_age_negativo_pra_apagar_no_logout(): void
+    {
+        $response = (new Response())->withCookie('access_token', '', maxAge: -1);
+
+        $this->assertSame(-1, $response->cookies()['access_token']['maxAge']);
+    }
+
+    #[Test]
+    public function with_cookie_aceita_httponly_e_secure_configuraveis(): void
+    {
+        $response = (new Response())->withCookie('XSRF-TOKEN', 'xyz', httpOnly: false, secure: true);
+
+        $cookie = $response->cookies()['XSRF-TOKEN'];
+        $this->assertFalse($cookie['httpOnly']);
+        $this->assertTrue($cookie['secure']);
+    }
 }

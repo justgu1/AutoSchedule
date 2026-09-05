@@ -155,6 +155,26 @@ final class OAuthServiceTest extends TestCase
         $service->refresh('autoschedule-web', $rotated->refreshToken, '127.0.0.1', 'phpunit');
     }
 
+    #[Test]
+    public function logout_revoga_o_refresh_token_e_o_reuso_subsequente_falha(): void
+    {
+        $service = $this->makeService();
+        $original = $service->loginWithPassword('autoschedule-web', 'ada@example.com', 'correct-password', '127.0.0.1', 'phpunit');
+
+        $service->logout($original->refreshToken);
+
+        $this->expectException(DomainException::class);
+        $service->refresh('autoschedule-web', $original->refreshToken, '127.0.0.1', 'phpunit');
+    }
+
+    #[Test]
+    public function logout_com_token_inexistente_nao_lanca_excecao(): void
+    {
+        $this->makeService()->logout('token-que-nunca-existiu');
+
+        $this->addToAssertionCount(1);
+    }
+
     private function makeService(): OAuthService
     {
         return new OAuthService(

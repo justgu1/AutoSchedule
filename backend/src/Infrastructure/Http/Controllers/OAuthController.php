@@ -14,8 +14,11 @@ use App\Infrastructure\Validation\Validator;
 
 final class OAuthController
 {
-    public function __construct(private readonly OAuthService $oauth)
-    {
+    public function __construct(
+        private readonly OAuthService $oauth,
+        private readonly int $refreshTokenTtl,
+        private readonly bool $cookieSecure,
+    ) {
     }
 
     /**
@@ -77,14 +80,51 @@ final class OAuthController
         ));
     }
 
+    /** Lê o refresh token do cookie (SPA não manda no corpo) -- sem cookie, não tem o quê revogar, mas ainda limpa os cookies do client. */
+    public function logout(Request $request): Response
+    {
+        $rawRefreshToken = $request->cookie('refresh_token');
+
+        if ($rawRefreshToken !== null) {
+            $this->oauth->logout($rawRefreshToken);
+        }
+
+        return Response::success(['message' => 'Logged out.'])
+            ->withCookie('access_token', '', maxAge: -1, secure: $this->cookieSecure)
+            ->withCookie('refresh_token', '', maxAge: -1, secure: $this->cookieSecure);
+    }
+
+    /**
+     * O corpo JSON continua com os tokens (curl/Postman/scripts não mudam
+     * nada) -- os cookies HttpOnly são só pra quem tem browser no meio (a
+     * SPA nunca lê o token do corpo, confia só no cookie).
+     */
     private function tokenResponse(TokenPair $tokenPair): Response
     {
-        return Response::success([
+        $response = Response::success([
             'access_token' => $tokenPair->accessToken,
             'token_type' => 'Bearer',
             'expires_in' => $tokenPair->expiresIn,
             'refresh_token' => $tokenPair->refreshToken,
             'scope' => implode(' ', $tokenPair->scopes),
         ]);
+
+        $response = $response->withCookie(
+            'access_token',
+            $tokenPair->accessToken,
+            maxAge: $tokenPair->expiresIn,
+            secure: $this->cookieSecure,
+        );
+
+        if ($tokenPair->refreshToken !== null) {
+            $response = $response->withCookie(
+                'refresh_token',
+                $tokenPair->refreshToken,
+                maxAge: $this->refreshTokenTtl,
+                secure: $this->cookieSecure,
+            );
+        }
+
+        return $response;
     }
 }

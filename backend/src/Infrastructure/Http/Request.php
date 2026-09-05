@@ -13,6 +13,7 @@ final class Request
      * @param array<string, string> $query
      * @param array<string, string> $params
      * @param array<string, mixed> $attributes
+     * @param array<string, string> $cookies
      */
     public function __construct(
         private readonly string $method,
@@ -23,6 +24,7 @@ final class Request
         private array $params = [],
         private readonly string $ip = '',
         private array $attributes = [],
+        private readonly array $cookies = [],
     ) {
         // Normaliza aqui, sai sempre normalizado.
         $this->path = self::normalizePath($path);
@@ -43,6 +45,7 @@ final class Request
             query: $_GET,
             body: $rawBody ?? '',
             ip: (string) ($_SERVER['REMOTE_ADDR'] ?? ''),
+            cookies: $_COOKIE,
         );
     }
 
@@ -102,6 +105,11 @@ final class Request
     public function ip(): string
     {
         return $this->ip;
+    }
+
+    public function cookie(string $name, ?string $default = null): ?string
+    {
+        return $this->cookies[$name] ?? $default;
     }
 
     public function attribute(string $key, mixed $default = null): mixed

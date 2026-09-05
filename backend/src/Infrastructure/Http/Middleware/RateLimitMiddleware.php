@@ -59,17 +59,18 @@ final class RateLimitMiddleware implements Middleware
             ->withHeader('RateLimit-Policy', $policyHeader);
     }
 
-    /** Por usuário quando o Bearer decodifica (mesmo IP, contas diferentes não competem pela mesma cota); por IP caso contrário. */
+    /** Por usuário quando o access token (header ou cookie) decodifica (mesmo IP, contas diferentes não competem pela mesma cota); por IP caso contrário. */
     private function identify(Request $request): string
     {
         $header = $request->header('authorization');
+        $token = $header !== null && str_starts_with($header, 'Bearer ') ? substr($header, 7) : $request->cookie('access_token');
 
-        if ($header !== null && str_starts_with($header, 'Bearer ')) {
+        if ($token !== null) {
             try {
-                return 'user:' . $this->tokens->decodeAccessToken(substr($header, 7))->subject;
+                return 'user:' . $this->tokens->decodeAccessToken($token)->subject;
             } catch (\Throwable) {
                 // Token inválido -- a validação de verdade é do AuthContextMiddleware,
-                // aqui só cai pro IP como qualquer request sem Bearer.
+                // aqui só cai pro IP como qualquer request sem token.
             }
         }
 

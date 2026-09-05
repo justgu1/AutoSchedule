@@ -98,6 +98,16 @@ final class OAuthService
         return new TokenPair($accessToken, $this->accessTokenTtl, $current->scopes, $rawNext);
     }
 
+    /** Sempre "sucesso" do ponto de vista do client -- token já inválido/inexistente não é erro, só não tem mais nada a revogar. */
+    public function logout(string $rawRefreshToken): void
+    {
+        $current = $this->refreshTokens->findByRawToken($rawRefreshToken);
+
+        if ($current !== null) {
+            $this->refreshTokens->revokeFamily($current->familyId);
+        }
+    }
+
     /** @param list<string> $scopes */
     private function issueTokenPair(OAuthClient $client, string $userId, UserRole $role, array $scopes): TokenPair
     {

@@ -9,7 +9,6 @@ use App\Domain\Users\UserRole;
 use App\Infrastructure\Container\Container;
 use App\Infrastructure\Http\Controllers\OAuthController;
 use App\Infrastructure\Http\Controllers\UserController;
-use App\Infrastructure\Http\Controllers\UsersController;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
 use App\Infrastructure\Http\Router;
@@ -66,7 +65,21 @@ return static function (Router $router, Container $container, Application $app):
     );
 
     $anyAuthenticatedRole = array_map(static fn (UserRole $role): string => $role->value, UserRole::cases());
+    $router->post(
+        '/api/logout',
+        [$oauthController, 'logout'],
+        roles: $anyAuthenticatedRole,
+        description: 'Revokes the current refresh token family and clears auth cookies.',
+    );
     $userController = $container->get(UserController::class);
+    $router->post(
+        '/api/register',
+        [$userController, 'register'],
+        serviceContext: true,
+        description: 'Creates a seller or customer account.',
+        accepts: ['name', 'email', 'phone', 'password', 'role'],
+        rateLimit: new RateLimitPolicy('auth', $authRateLimit['max_attempts'], $authRateLimit['window_seconds']),
+    );
     $router->get(
         '/api/me',
         [$userController, 'show'],
@@ -80,12 +93,25 @@ return static function (Router $router, Container $container, Application $app):
         description: 'Updates your name and/or phone.',
         accepts: ['name', 'phone'],
     );
+    $router->post(
+        '/api/password-reset',
+        [$userController, 'requestPasswordReset'],
+        serviceContext: true,
+        description: 'Sends a password reset link by email, if the address is registered.',
+        accepts: ['email'],
+        rateLimit: new RateLimitPolicy('auth', $authRateLimit['max_attempts'], $authRateLimit['window_seconds']),
+    );
+    // Pública (sem `roles`) -- aceita ou `current_password` (autenticado,
+    // troca a própria senha) ou `reset_token` (sem Bearer, veio do e-mail de
+    // reset). `serviceContext` é o que permite o segundo caminho mexer em
+    // `users` sem contexto de usuário nenhum.
     $router->put(
         '/api/me/password',
         [$userController, 'updatePassword'],
-        roles: $anyAuthenticatedRole,
-        description: 'Changes your password (requires the current one).',
-        accepts: ['current_password', 'password'],
+        serviceContext: true,
+        description: 'Changes your password (current_password when authenticated, or reset_token from the reset email).',
+        accepts: ['current_password', 'reset_token', 'password'],
+        rateLimit: new RateLimitPolicy('auth', $authRateLimit['max_attempts'], $authRateLimit['window_seconds']),
     );
     $router->delete(
         '/api/me',
@@ -94,36 +120,35 @@ return static function (Router $router, Container $container, Application $app):
         description: 'Deletes your account (anonymizes PII and soft-deletes it, per LGPD).',
     );
 
-    $usersController = $container->get(UsersController::class);
     $router->get(
         '/api/users',
-        [$usersController, 'index'],
+        [$userController, 'index'],
         roles: ['admin'],
         description: 'Lists users, paginated (query: page, per_page).',
     );
     $router->get(
         '/api/users/{id}',
-        [$usersController, 'show'],
+        [$userController, 'show'],
         roles: ['admin'],
         description: 'Returns a single user.',
     );
     $router->post(
         '/api/users',
-        [$usersController, 'store'],
+        [$userController, 'store'],
         roles: ['admin'],
         description: 'Creates a user.',
         accepts: ['name', 'email', 'phone', 'password', 'role'],
     );
     $router->patch(
         '/api/users/{id}',
-        [$usersController, 'update'],
+        [$userController, 'update'],
         roles: ['admin'],
         description: 'Updates another user\'s name, phone and/or role. Fails if it would leave no admin.',
         accepts: ['name', 'phone', 'role'],
     );
     $router->delete(
         '/api/users/{id}',
-        [$usersController, 'destroy'],
+        [$userController, 'destroy'],
         roles: ['admin'],
         description: 'Deletes a user (anonymizes PII and soft-deletes it, per LGPD). Fails if it is the last admin.',
     );

@@ -106,6 +106,27 @@ final class RateLimitMiddlewareTest extends TestCase
     }
 
     #[Test]
+    public function chave_usa_o_id_do_usuario_quando_o_cookie_access_token_decodifica(): void
+    {
+        $claims = AccessTokenClaims::issue('11111111-1111-4111-8111-111111111111', 'autoschedule-web', UserRole::Customer, [], 900);
+        $limiter = new FakeRateLimiter(new RateLimitResult(allowed: true, remaining: 999, resetSeconds: 60));
+        $middleware = new RateLimitMiddleware(
+            $limiter,
+            new Router(),
+            new RateLimitPolicy('general', 1000, 60),
+            new FakeTokenIssuer(['valid-token' => $claims]),
+            new NullLogger(),
+        );
+
+        $middleware->handle(
+            new Request(method: 'GET', path: '/api/me', cookies: ['access_token' => 'valid-token']),
+            static fn (Request $request): Response => new JsonResponse([]),
+        );
+
+        $this->assertSame('general:user:11111111-1111-4111-8111-111111111111', $limiter->lastKey);
+    }
+
+    #[Test]
     public function chave_cai_pro_ip_quando_nao_ha_bearer(): void
     {
         $limiter = new FakeRateLimiter(new RateLimitResult(allowed: true, remaining: 999, resetSeconds: 60));

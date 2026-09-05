@@ -102,15 +102,43 @@ final class RlsPolicyTest extends TestCase
         $this->assertSame([], $ids);
     }
 
+    #[Test]
+    public function contexto_de_servico_consegue_inserir(): void
+    {
+        $newUser = User::register('Registered RLS', 'rls-registered@example.com', null, 'secret', UserRole::Customer);
+
+        $this->rls->beginTransaction();
+        $this->rls->exec("SET LOCAL app.is_service_context = 'true'");
+        $this->insertUser($newUser, $this->rls);
+        $this->rls->rollBack();
+
+        $this->addToAssertionCount(1);
+    }
+
+    #[Test]
+    public function sem_contexto_setado_insert_falha(): void
+    {
+        $newUser = User::register('Blocked RLS', 'rls-blocked@example.com', null, 'secret', UserRole::Customer);
+
+        $this->rls->beginTransaction();
+
+        try {
+            $this->expectException(\PDOException::class);
+            $this->insertUser($newUser, $this->rls);
+        } finally {
+            $this->rls->rollBack();
+        }
+    }
+
     private function setContext(string $userId, string $role): void
     {
         $this->rls->exec('SET LOCAL app.current_user_id = ' . $this->rls->quote($userId));
         $this->rls->exec('SET LOCAL app.current_user_role = ' . $this->rls->quote($role));
     }
 
-    private function insertUser(User $user): void
+    private function insertUser(User $user, ?\PDO $pdo = null): void
     {
-        $statement = $this->admin->prepare(<<<'SQL'
+        $statement = ($pdo ?? $this->admin)->prepare(<<<'SQL'
             INSERT INTO users (id, name, email, phone, password, role, password_set_at, created_at, updated_at)
             VALUES (:id, :name, :email, :phone, :password, :role, :password_set_at, :created_at, :updated_at)
             SQL);

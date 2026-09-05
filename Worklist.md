@@ -77,8 +77,13 @@ Priorizado antes do domínio de veículo/agendamento porque o primeiro endpoint 
 - [x] Rate limiting (Redis, sliding window, policies `general`/`auth`, fail-open)
 - [x] Paginação em `GET /users`
 - [x] Suíte de teste de carga (k6)
+- [x] Telas de login, registro, esqueci/redefinir senha e perfil (`/me`) — 3 layouts (`PublicLayout`/`AuthLayout`/`AuthenticatedLayout`), componentizado (`FormTextField`/`SubmitButton`/`FormError`)
 - [ ] `client_credentials` (M2M) — adiado, sem consumidor real ainda
-- [ ] Security headers + CORS — adiado, sem frontend real chamando a API ainda
+- [x] Security headers + CORS
+- [x] Cookies `HttpOnly`/`SameSite=Strict` + CSRF (double-submit `XSRF-TOKEN`)
+- [x] Registro público (`POST /api/register`, role selecionável seller/customer)
+- [x] Reset de senha por e-mail (Mailpit + `symfony/mailer`, template HTML próprio)
+- [x] Logout (`POST /api/logout`, revoga refresh token e limpa cookies)
 
 ### Dia 3 — API e regras de negócio
 
