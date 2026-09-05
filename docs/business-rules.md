@@ -176,6 +176,43 @@ Mutação autenticada por cookie exige o header `X-CSRF-Token` batendo com o coo
 
 `client_credentials` (M2M) reservado, sem consumidor hoje.
 
+### Registro
+
+```text
+POST /api/register
+
+{ name, email, phone?, password, role }   -> role in (seller, customer) -- nunca admin
+```
+
+Público, sem autenticação. `admin` só é criado via `POST /api/users` (admin autenticado) — nunca uma opção auto-selecionável no registro público.
+
+### Logout
+
+```text
+POST /api/logout
+```
+
+Lê o `refresh_token` do cookie, revoga a família inteira (mesmo mecanismo do reuso detectado), limpa os cookies `access_token`/`refresh_token`. Sem cookie de refresh, ainda limpa os cookies do lado do client — não é erro, só não tem mais nada a revogar.
+
+### Reset de senha
+
+```text
+POST /api/password-reset
+
+{ email }   -> sempre 200 (não vaza se a conta existe); se existir, manda e-mail (Mailpit em dev) com link de redefinição
+```
+
+O link termina no mesmo endpoint de troca de senha que já existe (`PUT /me/password`), sem endpoint duplicado — o corpo decide qual dos dois caminhos:
+
+```text
+PUT /me/password
+
+{ reset_token, password }            -> sem Bearer, valida o token (existe, não expirado, não usado)
+{ current_password, password }       -> autenticado, valida a senha atual
+```
+
+Qualquer um dos dois caminhos revoga todos os refresh tokens do usuário e audita `user.password_changed` com `context.via` (`reset` ou `self`).
+
 ## Autorização
 
 A autorização é aplicada no backend.
@@ -226,7 +263,7 @@ Os registros de auditoria são somente de leitura para a aplicação.
 Toda rota passa por uma política de rate limit antes de qualquer outra verificação (sliding window, por usuário autenticado ou por IP):
 
 - `general` (padrão 1000/min): cobre a API como um todo, com headroom generoso sobre o pico esperado;
-- `auth` (padrão 5/min): só `POST /oauth/token`, proteção contra brute-force de login.
+- `auth` (padrão 5/min): `POST /oauth/token`, `POST /api/register`, `POST /api/password-reset` e `PUT /me/password` — proteção contra brute-force de login/registro/reset.
 
 Response com `429` inclui `Retry-After`. Falha do Redis não derruba a API — o rate limit fica temporariamente inativo (fail-open) em vez de bloquear todo o tráfego.
 
