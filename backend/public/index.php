@@ -5,6 +5,7 @@ declare(strict_types=1);
 require dirname(__DIR__) . '/vendor/autoload.php';
 
 use App\Application;
+use App\Bootstrap\ContainerFactory;
 use App\Infrastructure\Http\ExceptionHandler;
 use App\Infrastructure\Http\Middleware\LoggingMiddleware;
 use App\Infrastructure\Http\Pipeline;
@@ -15,16 +16,10 @@ use App\Infrastructure\Logging\Logger;
 
 $app = new Application();
 $logger = new Logger();
+$container = ContainerFactory::build($app);
 
 $router = new Router();
-
-$router->get('/api', static function (Request $request) use ($app): Response {
-    return Response::success([
-        'message' => 'AutoSchedule API',
-        'timezone' => $app->config('timezone'),
-        'debug' => $app->config('debug'),
-    ]);
-});
+(require dirname(__DIR__) . '/routes/api.php')($router, $container, $app);
 
 $pipeline = new Pipeline([
     new LoggingMiddleware(log: static fn (string $line): mixed => $logger->info($line)),
@@ -32,12 +27,23 @@ $pipeline = new Pipeline([
 
 $exceptionHandler = new ExceptionHandler(debug: (bool) $app->config('debug'), logger: $logger);
 
+// O dispatch do router fica embrulhado aqui dentro, no destino do pipeline,
+// não em volta do pipeline inteiro -- assim todo middleware ainda roda sua
+// metade "depois" (ex: LoggingMiddleware logando o status real) mesmo quando
+// o handler lançou exceção.
+$destination = static function (Request $request) use ($router, $exceptionHandler): Response {
+    try {
+        return $router->dispatch($request);
+    } catch (\Throwable $exception) {
+        return $exceptionHandler->handle($exception);
+    }
+};
+
 try {
-    $response = $pipeline->process(
-        Request::fromGlobals(),
-        static fn (Request $request): Response => $router->dispatch($request),
-    );
+    $response = $pipeline->process(Request::fromGlobals(), $destination);
 } catch (\Throwable $exception) {
+    // Rede de segurança só: um bug dentro de um middleware em si, não dentro
+    // de um route handler.
     $response = $exceptionHandler->handle($exception);
 }
 

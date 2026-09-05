@@ -60,6 +60,27 @@ final class ExceptionHandlerTest extends TestCase
     }
 
     #[Test]
+    public function domain_exception_unauthorized_vira_401(): void
+    {
+        $handler = new ExceptionHandler();
+
+        $response = $handler->handle(new DomainException('Invalid credentials.', DomainErrorType::Unauthorized));
+
+        $this->assertSame(401, $response->status());
+    }
+
+    #[Test]
+    public function json_exception_vira_422_com_mensagem_generica(): void
+    {
+        $handler = new ExceptionHandler();
+
+        $response = $handler->handle(new \JsonException('Syntax error'));
+
+        $this->assertSame(422, $response->status());
+        $this->assertSame('{"message":"Malformed JSON body."}', $response->body());
+    }
+
+    #[Test]
     public function excecao_nao_mapeada_vira_500_generico_quando_debug_desligado(): void
     {
         $handler = new ExceptionHandler(debug: false);

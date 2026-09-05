@@ -23,11 +23,16 @@ final class ExceptionHandler
             return Response::error($exception->getMessage(), $exception->status());
         }
 
+        if ($exception instanceof \JsonException) {
+            return Response::error('Malformed JSON body.', 422);
+        }
+
         if ($exception instanceof DomainException) {
             return match ($exception->type()) {
                 DomainErrorType::NotFound => Response::error($exception->getMessage(), 404),
                 DomainErrorType::Validation => Response::error($exception->getMessage(), 422, $exception->errors()),
                 DomainErrorType::Conflict => Response::error($exception->getMessage(), 409),
+                DomainErrorType::Unauthorized => Response::error($exception->getMessage(), 401),
             };
         }
 
