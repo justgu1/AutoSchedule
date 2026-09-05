@@ -10,9 +10,9 @@ use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
 use App\Infrastructure\Database\PostgresArray;
 
-final class PostgresRefreshTokenRepository implements RefreshTokenRepository
+final readonly class PostgresRefreshTokenRepository implements RefreshTokenRepository
 {
-    public function __construct(private readonly \PDO $pdo)
+    public function __construct(private \PDO $pdo)
     {
     }
 
@@ -40,7 +40,7 @@ final class PostgresRefreshTokenRepository implements RefreshTokenRepository
         $statement->execute(['token_hash' => hash('sha256', $rawToken)]);
         $row = $statement->fetch();
 
-        return $row === false ? null : self::fromRow($row);
+        return $row === false ? null : $this->fromRow($row);
     }
 
     public function rotate(RefreshToken $current, RefreshToken $next): void
@@ -88,7 +88,7 @@ final class PostgresRefreshTokenRepository implements RefreshTokenRepository
     }
 
     /** @param array<string, mixed> $row */
-    private static function fromRow(array $row): RefreshToken
+    private function fromRow(array $row): RefreshToken
     {
         return new RefreshToken(
             id: $row['id'],

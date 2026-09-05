@@ -9,3 +9,5 @@ backend/vendor/
 backend/.phpunit.cache/
 backend/.phpunit.result.cache
 backend/storage/keys/*.pem
+backend/.php-cs-fixer.cache
+backend/rector.rcs

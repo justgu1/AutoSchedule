@@ -7,9 +7,9 @@ namespace App\Infrastructure\Auth\Postgres;
 use App\Domain\Auth\Ports\UserIdentityRepository;
 use App\Domain\Auth\UserIdentity;
 
-final class PostgresUserIdentityRepository implements UserIdentityRepository
+final readonly class PostgresUserIdentityRepository implements UserIdentityRepository
 {
-    public function __construct(private readonly \PDO $pdo)
+    public function __construct(private \PDO $pdo)
     {
     }
 
@@ -21,7 +21,7 @@ final class PostgresUserIdentityRepository implements UserIdentityRepository
         $statement->execute(['provider' => $provider, 'provider_user_id' => $providerUserId]);
         $row = $statement->fetch();
 
-        return $row === false ? null : self::fromRow($row);
+        return $row === false ? null : $this->fromRow($row);
     }
 
     public function insert(UserIdentity $identity): void
@@ -41,7 +41,7 @@ final class PostgresUserIdentityRepository implements UserIdentityRepository
     }
 
     /** @param array<string, mixed> $row */
-    private static function fromRow(array $row): UserIdentity
+    private function fromRow(array $row): UserIdentity
     {
         return new UserIdentity(
             id: $row['id'],

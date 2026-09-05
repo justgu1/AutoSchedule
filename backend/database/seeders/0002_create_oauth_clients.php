@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Infrastructure\Database\Seeder;
 
-return new class implements Seeder {
+return new class () implements Seeder {
     public function run(\PDO $pdo): void
     {
         $statement = $pdo->prepare(<<<'SQL'

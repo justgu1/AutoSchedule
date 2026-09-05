@@ -97,12 +97,10 @@ final class ContainerFactory
             UserIdentityRepository::class,
             static fn (Container $c): UserIdentityRepository => new PostgresUserIdentityRepository($c->get(DatabaseConnection::class)->pdo()),
         );
-        $container->set(GoogleIdTokenVerifier::class, static function (Container $c) use ($app): GoogleIdTokenVerifier {
-            return new GoogleJwksIdTokenVerifier(
-                clientId: $app->config('google')['client_id'],
-                redis: $c->get(RedisConnection::class),
-            );
-        });
+        $container->set(GoogleIdTokenVerifier::class, static fn (Container $c): GoogleIdTokenVerifier => new GoogleJwksIdTokenVerifier(
+            clientId: $app->config('google')['client_id'],
+            redis: $c->get(RedisConnection::class),
+        ));
         $container->set(MailProvider::class, static function () use ($app): MailProvider {
             $mail = $app->config('mail');
 
@@ -138,13 +136,11 @@ final class ContainerFactory
                 refreshTokenTtl: $auth['refresh_token_ttl'],
             );
         });
-        $container->set(OAuthController::class, static function (Container $c) use ($app): OAuthController {
-            return new OAuthController(
-                oauth: $c->get(OAuthService::class),
-                refreshTokenTtl: $app->config('auth')['refresh_token_ttl'],
-                cookieSecure: $app->config('security')['cookie_secure'],
-            );
-        });
+        $container->set(OAuthController::class, static fn (Container $c): OAuthController => new OAuthController(
+            oauth: $c->get(OAuthService::class),
+            refreshTokenTtl: $app->config('auth')['refresh_token_ttl'],
+            cookieSecure: $app->config('security')['cookie_secure'],
+        ));
         $container->set(UserController::class, static function (Container $c) use ($app): UserController {
             $mail = $app->config('mail');
 

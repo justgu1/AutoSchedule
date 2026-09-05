@@ -24,18 +24,18 @@ use App\Domain\Users\UserRole;
  * client_credentials (M2M, sem usuário, sem refresh token) e o login social
  * via Google (conta existente por e-mail linka, e-mail novo cria customer).
  */
-final class OAuthService
+final readonly class OAuthService
 {
     public function __construct(
-        private readonly OAuthClientRepository $clients,
-        private readonly UserRepository $users,
-        private readonly RefreshTokenRepository $refreshTokens,
-        private readonly UserIdentityRepository $identities,
-        private readonly TokenIssuer $tokens,
-        private readonly GoogleIdTokenVerifier $googleVerifier,
-        private readonly AuditLogger $audit,
-        private readonly int $accessTokenTtl,
-        private readonly int $refreshTokenTtl,
+        private OAuthClientRepository $clients,
+        private UserRepository $users,
+        private RefreshTokenRepository $refreshTokens,
+        private UserIdentityRepository $identities,
+        private TokenIssuer $tokens,
+        private GoogleIdTokenVerifier $googleVerifier,
+        private AuditLogger $audit,
+        private int $accessTokenTtl,
+        private int $refreshTokenTtl,
     ) {
     }
 
@@ -44,7 +44,7 @@ final class OAuthService
         $client = $this->requireClient($clientId, GrantType::Password);
         $user = $this->users->findByEmail($email);
 
-        if ($user === null || !$user->verifyPassword($password)) {
+        if (!$user instanceof \App\Domain\Users\User || !$user->verifyPassword($password)) {
             // Identidade não provada -- sem actor. $user?->id como alvo quando o
             // email existe (senha errada), null quando nem a conta existe.
             $this->audit->record(AuditEvent::LoginFailed, null, $user?->id, ['email' => $email], $ipAddress, $userAgent);
@@ -65,7 +65,7 @@ final class OAuthService
         $client = $this->requireClient($clientId, GrantType::RefreshToken);
         $current = $this->refreshTokens->findByRawToken($rawRefreshToken);
 
-        if ($current === null || $current->oauthClientId !== $client->id) {
+        if (!$current instanceof \App\Domain\Auth\RefreshToken || $current->oauthClientId !== $client->id) {
             throw new DomainException('Invalid or expired refresh token.', DomainErrorType::Unauthorized);
         }
 
@@ -86,7 +86,7 @@ final class OAuthService
 
         $user = $current->userId !== null ? $this->users->findById($current->userId) : null;
 
-        if ($current->userId !== null && $user === null) {
+        if ($current->userId !== null && !$user instanceof \App\Domain\Users\User) {
             throw new DomainException('Invalid or expired refresh token.', DomainErrorType::Unauthorized);
         }
 
@@ -123,10 +123,10 @@ final class OAuthService
 
         $identity = $this->identities->findByProvider('google', $claims->subject);
 
-        if ($identity !== null) {
+        if ($identity instanceof \App\Domain\Auth\UserIdentity) {
             $user = $this->users->findById($identity->userId);
 
-            if ($user === null) {
+            if (!$user instanceof \App\Domain\Users\User) {
                 throw new DomainException('Invalid Google credential.', DomainErrorType::Unauthorized);
             }
 
@@ -137,7 +137,7 @@ final class OAuthService
 
         $existingByEmail = $this->users->findByEmail($claims->email);
 
-        if ($existingByEmail !== null) {
+        if ($existingByEmail instanceof \App\Domain\Users\User) {
             $this->identities->insert(UserIdentity::link($existingByEmail->id, 'google', $claims->subject, $claims->email));
             $this->audit->record(AuditEvent::LoginSucceeded, $existingByEmail->id, $existingByEmail->id, ['via' => 'google', 'linked' => true], $ipAddress, $userAgent);
 
@@ -185,7 +185,7 @@ final class OAuthService
     {
         $current = $this->refreshTokens->findByRawToken($rawRefreshToken);
 
-        if ($current !== null) {
+        if ($current instanceof \App\Domain\Auth\RefreshToken) {
             $this->refreshTokens->revokeFamily($current->familyId);
         }
     }
@@ -207,7 +207,7 @@ final class OAuthService
     {
         $client = $this->clients->findByClientId($clientId);
 
-        if ($client === null || !$client->supportsGrantType($grantType)) {
+        if (!$client instanceof \App\Domain\Auth\OAuthClient || !$client->supportsGrantType($grantType)) {
             throw new DomainException('Invalid client.', DomainErrorType::Unauthorized);
         }
 

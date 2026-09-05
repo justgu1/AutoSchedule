@@ -10,7 +10,7 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Teste de integração: conecta no Postgres real do docker-compose 
+ * Teste de integração: conecta no Postgres real do docker-compose
  * e roda as migrations reais de backend/database/migrations/
  * Cada teste roda dentro de uma transação
  * desfeita no tearDown — Postgres suporta DDL transacional, então as
@@ -23,14 +23,14 @@ final class MigrationRunnerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->pdo = (new PostgresConnection(
+        $this->pdo = new PostgresConnection(
             driver: getenv('DB_DRIVER') ?: 'pgsql',
             host: getenv('DB_HOST') ?: '127.0.0.1',
             port: (int) (getenv('DB_PORT') ?: 5432),
             database: getenv('DB_DATABASE') ?: 'autoschedule',
             username: getenv('DB_USERNAME') ?: 'pgsql',
             password: getenv('DB_PASSWORD') ?: 'password',
-        ))->pdo();
+        )->pdo();
 
         $this->pdo->beginTransaction();
 

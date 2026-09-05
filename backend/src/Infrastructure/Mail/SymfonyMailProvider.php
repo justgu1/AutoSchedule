@@ -9,11 +9,11 @@ use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Mailer\Transport;
 use Symfony\Component\Mime\Email;
 
-final class SymfonyMailProvider implements MailProvider
+final readonly class SymfonyMailProvider implements MailProvider
 {
-    private readonly Mailer $mailer;
+    private Mailer $mailer;
 
-    public function __construct(string $host, int $port, private readonly string $from)
+    public function __construct(string $host, int $port, private string $from)
     {
         // Sem auth/TLS -- Mailpit (dev) não exige nenhum dos dois. Um SMTP
         // real de produção troca isso só via env, sem mudar código.
@@ -22,7 +22,7 @@ final class SymfonyMailProvider implements MailProvider
 
     public function send(string $to, string $subject, string $htmlBody): void
     {
-        $email = (new Email())
+        $email = new Email()
             ->from($this->from)
             ->to($to)
             ->subject($subject)

@@ -6,22 +6,22 @@ namespace App\Domain\Auth;
 
 use App\Domain\Support\Uuid;
 
-final class RefreshToken
+final readonly class RefreshToken
 {
     /**
      * @param list<string> $scopes
      * @param ?string $userId ausente pra um futuro refresh token M2M (nenhum é emitido hoje)
      */
     public function __construct(
-        public readonly string $id,
-        public readonly string $tokenHash,
-        public readonly string $familyId,
-        public readonly string $oauthClientId,
-        public readonly ?string $userId,
-        public readonly array $scopes,
-        public readonly \DateTimeImmutable $expiresAt,
-        public readonly ?\DateTimeImmutable $revokedAt,
-        public readonly ?string $replacedById,
+        public string $id,
+        public string $tokenHash,
+        public string $familyId,
+        public string $oauthClientId,
+        public ?string $userId,
+        public array $scopes,
+        public \DateTimeImmutable $expiresAt,
+        public ?\DateTimeImmutable $revokedAt,
+        public ?string $replacedById,
     ) {
     }
 
@@ -56,7 +56,7 @@ final class RefreshToken
 
     public function isRevoked(): bool
     {
-        return $this->revokedAt !== null;
+        return $this->revokedAt instanceof \DateTimeImmutable;
     }
 
     /**
@@ -74,7 +74,7 @@ final class RefreshToken
             oauthClientId: $oauthClientId,
             userId: $userId,
             scopes: $scopes,
-            expiresAt: (new \DateTimeImmutable())->modify("+{$ttlSeconds} seconds"),
+            expiresAt: new \DateTimeImmutable()->modify("+{$ttlSeconds} seconds"),
             revokedAt: null,
             replacedById: null,
         );

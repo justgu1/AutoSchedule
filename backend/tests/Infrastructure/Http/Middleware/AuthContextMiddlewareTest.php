@@ -172,10 +172,10 @@ final class AuthContextMiddlewareTest extends TestCase
     }
 }
 
-final class FakeTokenIssuer implements TokenIssuer
+final readonly class FakeTokenIssuer implements TokenIssuer
 {
     /** @param array<string, AccessTokenClaims> $tokens */
-    public function __construct(private readonly array $tokens = [])
+    public function __construct(private array $tokens = [])
     {
     }
 

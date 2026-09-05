@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Infrastructure\Database\Migration;
 
-return new class implements Migration {
+return new class () implements Migration {
     public function up(\PDO $pdo): void
     {
         // Sem RLS -- mesmo padrão de oauth_refresh_tokens/password_reset_tokens:

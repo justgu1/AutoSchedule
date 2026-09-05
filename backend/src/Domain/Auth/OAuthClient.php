@@ -6,7 +6,7 @@ namespace App\Domain\Auth;
 
 use App\Domain\Support\Uuid;
 
-final class OAuthClient
+final readonly class OAuthClient
 {
     /**
      * @param list<GrantType> $allowedGrantTypes
@@ -14,16 +14,16 @@ final class OAuthClient
      * @param list<string> $allowedScopes
      */
     public function __construct(
-        public readonly string $id,
-        public readonly string $clientId,
-        public readonly string $name,
-        public readonly ClientType $type,
-        public readonly ?string $secretHash,
-        public readonly array $allowedGrantTypes,
-        public readonly array $redirectUris,
-        public readonly array $allowedScopes,
-        public readonly \DateTimeImmutable $createdAt,
-        public readonly \DateTimeImmutable $updatedAt,
+        public string $id,
+        public string $clientId,
+        public string $name,
+        public ClientType $type,
+        public ?string $secretHash,
+        public array $allowedGrantTypes,
+        public array $redirectUris,
+        public array $allowedScopes,
+        public \DateTimeImmutable $createdAt,
+        public \DateTimeImmutable $updatedAt,
     ) {
     }
 

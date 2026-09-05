@@ -12,12 +12,12 @@ use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
 use App\Infrastructure\Validation\Validator;
 
-final class OAuthController
+final readonly class OAuthController
 {
     public function __construct(
-        private readonly OAuthService $oauth,
-        private readonly int $refreshTokenTtl,
-        private readonly bool $cookieSecure,
+        private OAuthService $oauth,
+        private int $refreshTokenTtl,
+        private bool $cookieSecure,
     ) {
     }
 
@@ -166,7 +166,7 @@ final class OAuthController
         );
 
         if ($tokenPair->refreshToken !== null) {
-            $response = $response->withCookie(
+            return $response->withCookie(
                 'refresh_token',
                 $tokenPair->refreshToken,
                 maxAge: $this->refreshTokenTtl,

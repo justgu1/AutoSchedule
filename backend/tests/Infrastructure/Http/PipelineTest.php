@@ -32,24 +32,22 @@ final class PipelineTest extends TestCase
     {
         $order = new \ArrayObject();
 
-        $tracking = static function (string $name) use ($order): Middleware {
-            return new class($name, $order) implements Middleware {
-                public function __construct(
-                    private readonly string $name,
-                    private readonly \ArrayObject $order,
-                ) {
-                }
+        $tracking = (static fn (string $name): Middleware => new readonly class ($name, $order) implements Middleware {
+            public function __construct(
+                private string $name,
+                private \ArrayObject $order,
+            ) {
+            }
 
-                public function handle(Request $request, \Closure $next): Response
-                {
-                    $this->order[] = "{$this->name}:before";
-                    $response = $next($request);
-                    $this->order[] = "{$this->name}:after";
+            public function handle(Request $request, \Closure $next): Response
+            {
+                $this->order[] = "{$this->name}:before";
+                $response = $next($request);
+                $this->order[] = "{$this->name}:after";
 
-                    return $response;
-                }
-            };
-        };
+                return $response;
+            }
+        });
 
         $pipeline = new Pipeline([$tracking('A'), $tracking('B')]);
 
@@ -73,7 +71,7 @@ final class PipelineTest extends TestCase
     {
         $destinationCalled = false;
 
-        $shortCircuit = new class implements Middleware {
+        $shortCircuit = new class () implements Middleware {
             public function handle(Request $request, \Closure $next): Response
             {
                 return new JsonResponse(['blocked' => true], 403);

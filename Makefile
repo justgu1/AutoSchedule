@@ -1,4 +1,4 @@
-.PHONY: setup up down restart build logs ps test migrate rollback seed keys load-test
+.PHONY: setup up down restart build logs ps test migrate rollback seed keys load-test static-analysis lint lint-fix rector rector-fix
 
 setup:
 	@if [ -f .env ]; then \
@@ -88,6 +88,21 @@ ps:
 
 test:
 	@docker compose exec backend vendor/bin/phpunit
+
+static-analysis:
+	@docker compose exec backend vendor/bin/phpstan analyse --no-progress
+
+lint:
+	@docker compose exec backend vendor/bin/php-cs-fixer fix --dry-run --diff
+
+lint-fix:
+	@docker compose exec backend vendor/bin/php-cs-fixer fix
+
+rector:
+	@docker compose exec backend vendor/bin/rector process --dry-run
+
+rector-fix:
+	@docker compose exec backend vendor/bin/rector process
 
 migrate:
 	@docker compose exec backend php bin/migrate.php

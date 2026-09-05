@@ -25,7 +25,7 @@ final class ResponseTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
 
-        new Response(headers: ["X-Foo" => "bar\r\nX-Injected: 1"]);
+        new Response(headers: ['X-Foo' => "bar\r\nX-Injected: 1"]);
     }
 
     #[Test]
@@ -99,7 +99,7 @@ final class ResponseTest extends TestCase
     #[Test]
     public function with_cookie_aceita_max_age_negativo_pra_apagar_no_logout(): void
     {
-        $response = (new Response())->withCookie('access_token', '', maxAge: -1);
+        $response = new Response()->withCookie('access_token', '', maxAge: -1);
 
         $this->assertSame(-1, $response->cookies()['access_token']['maxAge']);
     }
@@ -107,7 +107,7 @@ final class ResponseTest extends TestCase
     #[Test]
     public function with_cookie_aceita_httponly_e_secure_configuraveis(): void
     {
-        $response = (new Response())->withCookie('XSRF-TOKEN', 'xyz', httpOnly: false, secure: true);
+        $response = new Response()->withCookie('XSRF-TOKEN', 'xyz', httpOnly: false, secure: true);
 
         $cookie = $response->cookies()['XSRF-TOKEN'];
         $this->assertFalse($cookie['httpOnly']);

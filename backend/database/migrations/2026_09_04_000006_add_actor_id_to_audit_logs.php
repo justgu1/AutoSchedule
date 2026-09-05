@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Infrastructure\Database\Migration;
 
-return new class implements Migration {
+return new class () implements Migration {
     public function up(\PDO $pdo): void
     {
         // user_id é a conta AFETADA pela ação (o "no quê"); actor_id é quem

@@ -61,7 +61,7 @@ final class RoleMiddlewareTest extends TestCase
 
         try {
             $middleware->handle(
-                (new Request(method: 'GET', path: '/api/users'))->withAttribute('auth', $claims),
+                new Request(method: 'GET', path: '/api/users')->withAttribute('auth', $claims),
                 static fn (Request $request): Response => new JsonResponse([]),
             );
             $this->fail('Expected a DomainException to be thrown.');
@@ -79,7 +79,7 @@ final class RoleMiddlewareTest extends TestCase
         $claims = AccessTokenClaims::issue('user-1', 'autoschedule-web', UserRole::Admin, [], 900);
 
         $response = $middleware->handle(
-            (new Request(method: 'GET', path: '/api/users'))->withAttribute('auth', $claims),
+            new Request(method: 'GET', path: '/api/users')->withAttribute('auth', $claims),
             static fn (Request $request): Response => new JsonResponse(['ok' => true]),
         );
 

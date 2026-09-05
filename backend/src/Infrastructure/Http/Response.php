@@ -17,7 +17,7 @@ class Response
         protected array $cookies = [],
     ) {
         foreach ($this->headers as $name => $value) {
-            self::assertSafeHeader($name, $value);
+            $this->assertSafeHeader($name, $value);
         }
     }
 
@@ -76,7 +76,7 @@ class Response
 
     public function withHeader(string $name, string $value): static
     {
-        self::assertSafeHeader($name, $value);
+        $this->assertSafeHeader($name, $value);
 
         $clone = clone $this;
         $clone->headers[$name] = $value;
@@ -136,7 +136,7 @@ class Response
      * Barra header injection (CRLF) explicitamente — o `header()` do PHP já
      * recusa isso sozinho, mas falhar aqui é mais cedo e mais claro.
      */
-    private static function assertSafeHeader(string $name, string $value): void
+    private function assertSafeHeader(string $name, string $value): void
     {
         if (preg_match('/[\r\n]/', $name . $value) === 1) {
             throw new \InvalidArgumentException('Invalid header: line breaks are not allowed.');

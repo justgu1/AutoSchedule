@@ -9,11 +9,11 @@ use App\Domain\Exceptions\DomainException;
 use App\Infrastructure\Logging\Logger;
 use Psr\Log\LoggerInterface;
 
-final class ExceptionHandler
+final readonly class ExceptionHandler
 {
     public function __construct(
-        private readonly bool $debug = false,
-        private readonly LoggerInterface $logger = new Logger(),
+        private bool $debug = false,
+        private LoggerInterface $logger = new Logger(),
     ) {
     }
 

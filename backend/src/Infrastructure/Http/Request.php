@@ -146,7 +146,7 @@ final class Request
     {
         if (function_exists('getallheaders')) {
             /** @var array<string, string> $headers */
-            $headers = getallheaders() ?: [];
+            $headers = getallheaders();
 
             return array_change_key_case($headers, CASE_LOWER);
         }
