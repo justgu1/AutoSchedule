@@ -4,63 +4,47 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Http;
 
+use App\Infrastructure\RateLimit\RateLimitPolicy;
+
 final class Router
 {
     /**
-     * @var array<string, list<array{path: string, pattern: string, paramNames: list<string>, handler: callable, roles: list<string>, serviceContext: bool, description: string, accepts: list<string>}>>
+     * @var array<string, list<array{path: string, pattern: string, paramNames: list<string>, handler: callable, roles: list<string>, serviceContext: bool, description: string, accepts: list<string>, rateLimit: ?RateLimitPolicy}>>
      */
     private array $routes = [];
 
     /**
      * @param list<string> $roles vazio = pública; qualquer outro valor = role exigida pelo RoleMiddleware
      * @param list<string> $accepts nomes dos campos aceitos no corpo da requisição -- só documentação do catálogo (GET /api), o Validator continua sendo a fonte de verdade da validação
+     * @param ?RateLimitPolicy $rateLimit null = usa a policy geral do RateLimitMiddleware; só rotas mais sensíveis (ex: login) precisam de uma própria
      */
-    public function get(string $path, callable $handler, array $roles = [], bool $serviceContext = false, string $description = '', array $accepts = []): void
+    public function get(string $path, callable $handler, array $roles = [], bool $serviceContext = false, string $description = '', array $accepts = [], ?RateLimitPolicy $rateLimit = null): void
     {
-        $this->add(HttpMethod::Get, $path, $handler, $roles, $serviceContext, $description, $accepts);
+        $this->add(HttpMethod::Get, $path, $handler, $roles, $serviceContext, $description, $accepts, $rateLimit);
     }
 
-    /**
-     * @param list<string> $roles
-     * @param list<string> $accepts
-     */
-    public function post(string $path, callable $handler, array $roles = [], bool $serviceContext = false, string $description = '', array $accepts = []): void
+    public function post(string $path, callable $handler, array $roles = [], bool $serviceContext = false, string $description = '', array $accepts = [], ?RateLimitPolicy $rateLimit = null): void
     {
-        $this->add(HttpMethod::Post, $path, $handler, $roles, $serviceContext, $description, $accepts);
+        $this->add(HttpMethod::Post, $path, $handler, $roles, $serviceContext, $description, $accepts, $rateLimit);
     }
 
-    /**
-     * @param list<string> $roles
-     * @param list<string> $accepts
-     */
-    public function put(string $path, callable $handler, array $roles = [], bool $serviceContext = false, string $description = '', array $accepts = []): void
+    public function put(string $path, callable $handler, array $roles = [], bool $serviceContext = false, string $description = '', array $accepts = [], ?RateLimitPolicy $rateLimit = null): void
     {
-        $this->add(HttpMethod::Put, $path, $handler, $roles, $serviceContext, $description, $accepts);
+        $this->add(HttpMethod::Put, $path, $handler, $roles, $serviceContext, $description, $accepts, $rateLimit);
     }
 
-    /**
-     * @param list<string> $roles
-     * @param list<string> $accepts
-     */
-    public function patch(string $path, callable $handler, array $roles = [], bool $serviceContext = false, string $description = '', array $accepts = []): void
+    public function patch(string $path, callable $handler, array $roles = [], bool $serviceContext = false, string $description = '', array $accepts = [], ?RateLimitPolicy $rateLimit = null): void
     {
-        $this->add(HttpMethod::Patch, $path, $handler, $roles, $serviceContext, $description, $accepts);
+        $this->add(HttpMethod::Patch, $path, $handler, $roles, $serviceContext, $description, $accepts, $rateLimit);
     }
 
-    /**
-     * @param list<string> $roles
-     * @param list<string> $accepts
-     */
-    public function delete(string $path, callable $handler, array $roles = [], bool $serviceContext = false, string $description = '', array $accepts = []): void
+    public function delete(string $path, callable $handler, array $roles = [], bool $serviceContext = false, string $description = '', array $accepts = [], ?RateLimitPolicy $rateLimit = null): void
     {
-        $this->add(HttpMethod::Delete, $path, $handler, $roles, $serviceContext, $description, $accepts);
+        $this->add(HttpMethod::Delete, $path, $handler, $roles, $serviceContext, $description, $accepts, $rateLimit);
     }
 
-    /**
-     * @param list<string> $roles
-     * @param list<string> $accepts
-     */
-    public function add(HttpMethod|string $method, string $path, callable $handler, array $roles = [], bool $serviceContext = false, string $description = '', array $accepts = []): void
+    /** Todo `get/post/put/patch/delete` empurra pra cá -- é aqui, só uma vez, que o formato da rota registrada é decidido. */
+    public function add(HttpMethod|string $method, string $path, callable $handler, array $roles = [], bool $serviceContext = false, string $description = '', array $accepts = [], ?RateLimitPolicy $rateLimit = null): void
     {
         $method = $this->resolveMethod($method);
         $normalizedPath = Request::normalizePath($path);
@@ -76,6 +60,7 @@ final class Router
             'serviceContext' => $serviceContext,
             'description' => $description,
             'accepts' => $accepts,
+            'rateLimit' => $rateLimit,
         ];
     }
 
@@ -130,7 +115,16 @@ final class Router
     }
 
     /**
-     * @return array{pattern: string, paramNames: list<string>, handler: callable, roles: list<string>, serviceContext: bool}|null
+     * Policy própria da rota que bate com $method+$path, ou null (usa a geral
+     * do RateLimitMiddleware) quando a rota não declarou uma -- ou não existe.
+     */
+    public function rateLimitPolicy(string $method, string $path): ?RateLimitPolicy
+    {
+        return $this->matchRoute($method, $path)['rateLimit'] ?? null;
+    }
+
+    /**
+     * @return array{pattern: string, paramNames: list<string>, handler: callable, roles: list<string>, serviceContext: bool, rateLimit: ?RateLimitPolicy}|null
      */
     private function matchRoute(string $method, string $path): ?array
     {

@@ -9,6 +9,7 @@ use App\Infrastructure\Http\JsonResponse;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
 use App\Infrastructure\Http\Router;
+use App\Infrastructure\RateLimit\RateLimitPolicy;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -134,5 +135,24 @@ final class RouterTest extends TestCase
             ],
             $router->catalog(),
         );
+    }
+
+    #[Test]
+    public function rate_limit_policy_devolve_a_policy_declarada_no_registro_da_rota(): void
+    {
+        $router = new Router();
+        $policy = new RateLimitPolicy('auth', 5, 60);
+        $router->post('/api/oauth/token', static fn (Request $request): Response => new JsonResponse([]), rateLimit: $policy);
+
+        $this->assertSame($policy, $router->rateLimitPolicy('POST', '/api/oauth/token'));
+    }
+
+    #[Test]
+    public function rate_limit_policy_e_null_quando_a_rota_nao_declara_uma(): void
+    {
+        $router = new Router();
+        $router->get('/api/ping', static fn (Request $request): Response => new JsonResponse([]));
+
+        $this->assertNull($router->rateLimitPolicy('GET', '/api/ping'));
     }
 }

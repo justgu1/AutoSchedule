@@ -13,6 +13,7 @@ use App\Infrastructure\Http\Controllers\UsersController;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
 use App\Infrastructure\Http\Router;
+use App\Infrastructure\RateLimit\RateLimitPolicy;
 
 /**
  * Registra toda rota da API. Só sabe QUAIS rotas existem e qual handler cada
@@ -52,6 +53,8 @@ return static function (Router $router, Container $container, Application $app):
         return Response::success(['endpoints' => $endpoints, 'me' => $me]);
     }, description: 'Lists the endpoints your role can access.');
 
+    $authRateLimit = $app->config('rate_limit')['auth'];
+
     $oauthController = $container->get(OAuthController::class);
     $router->post(
         '/api/oauth/token',
@@ -59,6 +62,7 @@ return static function (Router $router, Container $container, Application $app):
         serviceContext: true,
         description: 'Logs in with email+password, or renews tokens when refresh_token is sent.',
         accepts: ['client_id', 'email', 'password', 'refresh_token'],
+        rateLimit: new RateLimitPolicy('auth', $authRateLimit['max_attempts'], $authRateLimit['window_seconds']),
     );
 
     $anyAuthenticatedRole = array_map(static fn (UserRole $role): string => $role->value, UserRole::cases());
