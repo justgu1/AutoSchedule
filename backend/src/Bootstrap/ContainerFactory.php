@@ -19,6 +19,7 @@ use App\Infrastructure\Auth\Postgres\PostgresRefreshTokenRepository;
 use App\Infrastructure\Container\Container;
 use App\Infrastructure\Database\PostgresConnection;
 use App\Infrastructure\Logging\Logger;
+use App\Infrastructure\Pagination\PaginationPolicy;
 use App\Infrastructure\RateLimit\RateLimiter;
 use App\Infrastructure\RateLimit\RedisRateLimiter;
 use App\Infrastructure\Redis\RedisConnection;
@@ -87,6 +88,11 @@ final class ContainerFactory
             RateLimiter::class,
             static fn (Container $c): RateLimiter => new RedisRateLimiter($c->get(RedisConnection::class)),
         );
+        $container->set(PaginationPolicy::class, static function () use ($app): PaginationPolicy {
+            $config = $app->config('pagination');
+
+            return new PaginationPolicy($config['default_per_page'], $config['max_per_page']);
+        });
 
         $container->set(OAuthService::class, static function (Container $c) use ($app): OAuthService {
             $auth = $app->config('auth');

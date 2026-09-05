@@ -23,7 +23,10 @@ interface UserRepository
     public function anonymizeAndSoftDelete(string $id): void;
 
     /** @return list<User> */
-    public function findAll(): array;
+    public function findPage(int $limit, int $offset): array;
+
+    /** Total de usuários não deletados -- base pro `meta.last_page` da paginação. */
+    public function count(): int;
 
     /** Usado pra bloquear DELETE do último admin restante (409 Conflict). */
     public function countByRole(UserRole $role): int;

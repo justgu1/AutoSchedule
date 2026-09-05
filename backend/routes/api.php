@@ -99,7 +99,7 @@ return static function (Router $router, Container $container, Application $app):
         '/api/users',
         [$usersController, 'index'],
         roles: ['admin'],
-        description: 'Lists every user.',
+        description: 'Lists users, paginated (query: page, per_page).',
     );
     $router->get(
         '/api/users/{id}',

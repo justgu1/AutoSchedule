@@ -80,11 +80,21 @@ final class PostgresUserRepository implements UserRepository
         ]);
     }
 
-    public function findAll(): array
+    public function findPage(int $limit, int $offset): array
     {
-        $rows = $this->pdo->query('SELECT * FROM users WHERE deleted_at IS NULL ORDER BY created_at')->fetchAll();
+        $statement = $this->pdo->prepare(
+            'SELECT * FROM users WHERE deleted_at IS NULL ORDER BY created_at LIMIT :limit OFFSET :offset',
+        );
+        $statement->bindValue('limit', $limit, \PDO::PARAM_INT);
+        $statement->bindValue('offset', $offset, \PDO::PARAM_INT);
+        $statement->execute();
 
-        return array_map(self::fromRow(...), $rows);
+        return array_map(self::fromRow(...), $statement->fetchAll());
+    }
+
+    public function count(): int
+    {
+        return (int) $this->pdo->query('SELECT COUNT(*) FROM users WHERE deleted_at IS NULL')->fetchColumn();
     }
 
     public function countByRole(UserRole $role): int

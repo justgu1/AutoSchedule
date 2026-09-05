@@ -15,6 +15,7 @@ use App\Domain\Users\User;
 use App\Domain\Users\UserRole;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
+use App\Infrastructure\Pagination\PaginationPolicy;
 use App\Infrastructure\Validation\Validator;
 
 /** CRUD admin de /users -- distinto do self-service (UserController, /me): aqui um admin gerencia a conta de outra pessoa. */
@@ -24,17 +25,20 @@ final class UsersController
         private readonly UserRepository $users,
         private readonly RefreshTokenRepository $refreshTokens,
         private readonly AuditLogger $audit,
+        private readonly PaginationPolicy $pagination,
     ) {
     }
 
     public function index(Request $request): Response
     {
+        [$page, $perPage] = $this->pagination->resolve($request->query('page'), $request->query('per_page'));
+
         $profiles = array_map(
             static fn (User $user): array => UserProfile::fromUser($user)->toArray(),
-            $this->users->findAll(),
+            $this->users->findPage($perPage, ($page - 1) * $perPage),
         );
 
-        return Response::success($profiles);
+        return Response::paginated($profiles, $page, $perPage, $this->users->count());
     }
 
     public function show(Request $request): Response
