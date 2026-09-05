@@ -10,9 +10,11 @@ use App\Domain\Auth\Ports\TokenIssuer;
 use App\Domain\Ports\DatabaseConnection;
 use App\Infrastructure\Http\ExceptionHandler;
 use App\Infrastructure\Http\Middleware\AuthContextMiddleware;
+use App\Infrastructure\Http\Middleware\CorsMiddleware;
 use App\Infrastructure\Http\Middleware\LoggingMiddleware;
 use App\Infrastructure\Http\Middleware\RateLimitMiddleware;
 use App\Infrastructure\Http\Middleware\RoleMiddleware;
+use App\Infrastructure\Http\Middleware\SecurityHeadersMiddleware;
 use App\Infrastructure\Http\Pipeline;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
@@ -29,11 +31,16 @@ $router = new Router();
 (require dirname(__DIR__) . '/routes/api.php')($router, $container, $app);
 
 $generalRateLimit = $app->config('rate_limit')['general'];
+$security = $app->config('security');
 
 $pipeline = new Pipeline([
     new LoggingMiddleware(log: static fn (string $line): mixed => $logger->info($line)),
-    // Antes de qualquer outro middleware -- barra abuso com um round-trip ao
-    // Redis só, sem nem abrir transação no Postgres (AuthContextMiddleware).
+    new SecurityHeadersMiddleware($security['hsts_enabled']),
+    // Preflight sai direto daqui, antes do rate limit -- OPTIONS nunca pode
+    // ser barrado por cota.
+    new CorsMiddleware($app->config('cors')['allowed_origins']),
+    // Antes de AuthContextMiddleware -- barra abuso com um round-trip ao
+    // Redis só, sem nem abrir transação no Postgres.
     // Construído na mão (não via $container->get()) porque precisa do $router,
     // que não é gerenciado pelo Container -- só existe aqui no index.php.
     new RateLimitMiddleware(
