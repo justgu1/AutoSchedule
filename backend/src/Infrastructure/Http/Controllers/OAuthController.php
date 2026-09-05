@@ -29,11 +29,11 @@ final class OAuthController
         $body = $request->json();
 
         if (array_key_exists('refresh_token', $body)) {
-            return $this->refresh($body);
+            return $this->refresh($request, $body);
         }
 
         if (array_key_exists('email', $body) || array_key_exists('password', $body)) {
-            return $this->login($body);
+            return $this->login($request, $body);
         }
 
         throw new DomainException(
@@ -44,7 +44,7 @@ final class OAuthController
     }
 
     /** @param array<string, mixed> $body */
-    private function login(array $body): Response
+    private function login(Request $request, array $body): Response
     {
         $data = Validator::validate($body, [
             'client_id' => 'required',
@@ -52,18 +52,29 @@ final class OAuthController
             'password' => 'required',
         ]);
 
-        return $this->tokenResponse($this->oauth->loginWithPassword($data['client_id'], $data['email'], $data['password']));
+        return $this->tokenResponse($this->oauth->loginWithPassword(
+            $data['client_id'],
+            $data['email'],
+            $data['password'],
+            $request->ip(),
+            $request->header('user-agent'),
+        ));
     }
 
     /** @param array<string, mixed> $body */
-    private function refresh(array $body): Response
+    private function refresh(Request $request, array $body): Response
     {
         $data = Validator::validate($body, [
             'client_id' => 'required',
             'refresh_token' => 'required',
         ]);
 
-        return $this->tokenResponse($this->oauth->refresh($data['client_id'], $data['refresh_token']));
+        return $this->tokenResponse($this->oauth->refresh(
+            $data['client_id'],
+            $data['refresh_token'],
+            $request->ip(),
+            $request->header('user-agent'),
+        ));
     }
 
     private function tokenResponse(TokenPair $tokenPair): Response

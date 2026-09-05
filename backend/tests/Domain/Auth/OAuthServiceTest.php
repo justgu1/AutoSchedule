@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Domain\Auth;
 
+use App\Domain\Audit\AuditEvent;
+use App\Domain\Audit\Ports\AuditLogger;
 use App\Domain\Auth\ClientType;
 use App\Domain\Auth\GrantType;
 use App\Domain\Auth\OAuthClient;
@@ -25,6 +27,7 @@ final class OAuthServiceTest extends TestCase
 {
     private InMemoryUserRepository $users;
     private InMemoryRefreshTokenRepository $refreshTokens;
+    private FakeAuditLogger $audit;
     private OAuthClient $webClient;
     private User $customer;
 
@@ -42,26 +45,29 @@ final class OAuthServiceTest extends TestCase
 
         $this->users = new InMemoryUserRepository($this->customer);
         $this->refreshTokens = new InMemoryRefreshTokenRepository();
+        $this->audit = new FakeAuditLogger();
     }
 
     #[Test]
     public function login_with_password_com_credenciais_corretas_emite_tokens(): void
     {
-        $tokenPair = $this->makeService()->loginWithPassword('autoschedule-web', 'ada@example.com', 'correct-password');
+        $tokenPair = $this->makeService()->loginWithPassword('autoschedule-web', 'ada@example.com', 'correct-password', '127.0.0.1', 'phpunit');
 
         $this->assertNotSame('', $tokenPair->accessToken);
         $this->assertNotNull($tokenPair->refreshToken);
+        $this->assertSame([AuditEvent::LoginSucceeded], $this->audit->events);
     }
 
     #[Test]
     public function login_with_password_com_senha_errada_falha_com_mensagem_generica(): void
     {
         try {
-            $this->makeService()->loginWithPassword('autoschedule-web', 'ada@example.com', 'wrong-password');
+            $this->makeService()->loginWithPassword('autoschedule-web', 'ada@example.com', 'wrong-password', '127.0.0.1', 'phpunit');
             $this->fail('Expected a DomainException to be thrown.');
         } catch (DomainException $exception) {
             $this->assertSame(DomainErrorType::Unauthorized, $exception->type());
             $this->assertSame('Invalid credentials.', $exception->getMessage());
+            $this->assertSame([AuditEvent::LoginFailed], $this->audit->events);
         }
     }
 
@@ -69,7 +75,7 @@ final class OAuthServiceTest extends TestCase
     public function login_with_password_com_email_inexistente_falha_com_a_mesma_mensagem(): void
     {
         try {
-            $this->makeService()->loginWithPassword('autoschedule-web', 'nobody@example.com', 'whatever');
+            $this->makeService()->loginWithPassword('autoschedule-web', 'nobody@example.com', 'whatever', '127.0.0.1', 'phpunit');
             $this->fail('Expected a DomainException to be thrown.');
         } catch (DomainException $exception) {
             $this->assertSame('Invalid credentials.', $exception->getMessage());
@@ -92,21 +98,22 @@ final class OAuthServiceTest extends TestCase
             users: $this->users,
             refreshTokens: $this->refreshTokens,
             tokens: new FakeTokenIssuer(),
+            audit: $this->audit,
             accessTokenTtl: 900,
             refreshTokenTtl: 1_209_600,
         );
 
         $this->expectException(DomainException::class);
-        $service->loginWithPassword('autoschedule-mobile', 'ada@example.com', 'correct-password');
+        $service->loginWithPassword('autoschedule-mobile', 'ada@example.com', 'correct-password', '127.0.0.1', 'phpunit');
     }
 
     #[Test]
     public function refresh_rotaciona_o_token_e_o_anterior_para_de_funcionar(): void
     {
         $service = $this->makeService();
-        $original = $service->loginWithPassword('autoschedule-web', 'ada@example.com', 'correct-password');
+        $original = $service->loginWithPassword('autoschedule-web', 'ada@example.com', 'correct-password', '127.0.0.1', 'phpunit');
 
-        $rotated = $service->refresh('autoschedule-web', $original->refreshToken);
+        $rotated = $service->refresh('autoschedule-web', $original->refreshToken, '127.0.0.1', 'phpunit');
 
         $this->assertNotSame($original->refreshToken, $rotated->refreshToken);
     }
@@ -115,20 +122,22 @@ final class OAuthServiceTest extends TestCase
     public function refresh_com_token_ja_rotacionado_revoga_a_familia_inteira(): void
     {
         $service = $this->makeService();
-        $original = $service->loginWithPassword('autoschedule-web', 'ada@example.com', 'correct-password');
-        $rotated = $service->refresh('autoschedule-web', $original->refreshToken);
+        $original = $service->loginWithPassword('autoschedule-web', 'ada@example.com', 'correct-password', '127.0.0.1', 'phpunit');
+        $rotated = $service->refresh('autoschedule-web', $original->refreshToken, '127.0.0.1', 'phpunit');
 
         // Reusar o token já rotacionado aciona a detecção de reuso; deve
         // também queimar o token que saiu dessa mesma rotação.
         try {
-            $service->refresh('autoschedule-web', $original->refreshToken);
+            $service->refresh('autoschedule-web', $original->refreshToken, '127.0.0.1', 'phpunit');
             $this->fail('Expected a DomainException to be thrown.');
         } catch (DomainException) {
             // esperado
         }
 
+        $this->assertContains(AuditEvent::RefreshTokenReused, $this->audit->events);
+
         $this->expectException(DomainException::class);
-        $service->refresh('autoschedule-web', $rotated->refreshToken);
+        $service->refresh('autoschedule-web', $rotated->refreshToken, '127.0.0.1', 'phpunit');
     }
 
     private function makeService(): OAuthService
@@ -138,6 +147,7 @@ final class OAuthServiceTest extends TestCase
             users: $this->users,
             refreshTokens: $this->refreshTokens,
             tokens: new FakeTokenIssuer(),
+            audit: $this->audit,
             accessTokenTtl: 900,
             refreshTokenTtl: 1_209_600,
         );
@@ -266,6 +276,18 @@ final class InMemoryRefreshTokenRepository implements RefreshTokenRepository
                 );
             }
         }
+    }
+}
+
+final class FakeAuditLogger implements AuditLogger
+{
+    /** @var list<AuditEvent> */
+    public array $events = [];
+
+    /** @param array<string, mixed> $context */
+    public function record(AuditEvent $event, ?string $userId, array $context, string $ipAddress, ?string $userAgent): void
+    {
+        $this->events[] = $event;
     }
 }
 

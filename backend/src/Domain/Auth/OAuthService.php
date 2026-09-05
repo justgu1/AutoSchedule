@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domain\Auth;
 
+use App\Domain\Audit\AuditEvent;
+use App\Domain\Audit\Ports\AuditLogger;
 use App\Domain\Auth\DTO\TokenPair;
 use App\Domain\Auth\Ports\OAuthClientRepository;
 use App\Domain\Auth\Ports\RefreshTokenRepository;
@@ -25,26 +27,32 @@ final class OAuthService
         private readonly UserRepository $users,
         private readonly RefreshTokenRepository $refreshTokens,
         private readonly TokenIssuer $tokens,
+        private readonly AuditLogger $audit,
         private readonly int $accessTokenTtl,
         private readonly int $refreshTokenTtl,
     ) {
     }
 
-    public function loginWithPassword(string $clientId, string $email, string $password): TokenPair
+    public function loginWithPassword(string $clientId, string $email, string $password, string $ipAddress, ?string $userAgent): TokenPair
     {
         $client = $this->requireClient($clientId, GrantType::Password);
         $user = $this->users->findByEmail($email);
 
         if ($user === null || !$user->verifyPassword($password)) {
+            $this->audit->record(AuditEvent::LoginFailed, null, ['email' => $email], $ipAddress, $userAgent);
+
             // De propósito, a mesma mensagem/status pra "email não existe" e "senha
             // errada" -- não pode vazar se a conta existe ou não.
             throw new DomainException('Invalid credentials.', DomainErrorType::Unauthorized);
         }
 
-        return $this->issueTokenPair($client, $user->id, $user->role, $client->allowedScopes);
+        $tokenPair = $this->issueTokenPair($client, $user->id, $user->role, $client->allowedScopes);
+        $this->audit->record(AuditEvent::LoginSucceeded, $user->id, [], $ipAddress, $userAgent);
+
+        return $tokenPair;
     }
 
-    public function refresh(string $clientId, string $rawRefreshToken): TokenPair
+    public function refresh(string $clientId, string $rawRefreshToken, string $ipAddress, ?string $userAgent): TokenPair
     {
         $client = $this->requireClient($clientId, GrantType::RefreshToken);
         $current = $this->refreshTokens->findByRawToken($rawRefreshToken);
@@ -57,6 +65,7 @@ final class OAuthService
             // Reuso de um token já rotacionado: pode ter sido roubado, então
             // queima a família inteira -- todo descendente para de funcionar.
             $this->refreshTokens->revokeFamily($current->familyId);
+            $this->audit->record(AuditEvent::RefreshTokenReused, $current->userId, [], $ipAddress, $userAgent);
 
             throw new DomainException('Invalid or expired refresh token.', DomainErrorType::Unauthorized);
         }
