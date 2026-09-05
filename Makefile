@@ -119,6 +119,8 @@ load-test:
 e2e-setup:
 	@docker compose build nginx
 	@RATE_LIMIT_AUTH_MAX=1000 docker compose up -d nginx mailpit backend
+	@echo "==> instalando dependências do backend (imagem é --no-dev, bind-mount local some com o vendor/)..."
+	@docker compose exec backend composer install --no-interaction --prefer-dist
 	@echo "==> aplicando migrations e seeders (banco pode estar vazio -- ambiente novo/CI)..."
 	@docker compose exec backend php bin/migrate.php
 	@docker compose exec backend php bin/seed.php
