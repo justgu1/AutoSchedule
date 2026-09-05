@@ -29,6 +29,9 @@ final class ContainerFactory
     {
         $container = new Container();
 
+        // Conecta como autoschedule_app (não a role admin/superuser usada por
+        // bin/migrate.php e bin/seed.php) -- é a role restrita (NOSUPERUSER
+        // NOBYPASSRLS) que faz o RLS de users valer a pena em runtime.
         $container->set(DatabaseConnection::class, static function () use ($app): DatabaseConnection {
             $config = $app->config('database');
 
@@ -37,8 +40,8 @@ final class ContainerFactory
                 host: $config['host'],
                 port: $config['port'],
                 database: $config['database'],
-                username: $config['username'],
-                password: $config['password'],
+                username: $config['app_username'],
+                password: $config['app_password'],
             );
         });
 

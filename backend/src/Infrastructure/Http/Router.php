@@ -7,42 +7,42 @@ namespace App\Infrastructure\Http;
 final class Router
 {
     /**
-     * @var array<string, list<array{pattern: string, paramNames: list<string>, handler: callable, roles: list<string>}>>
+     * @var array<string, list<array{pattern: string, paramNames: list<string>, handler: callable, roles: list<string>, serviceContext: bool}>>
      */
     private array $routes = [];
 
     /** @param list<string> $roles vazio = pública; qualquer outro valor = role exigida pelo RoleMiddleware */
-    public function get(string $path, callable $handler, array $roles = []): void
+    public function get(string $path, callable $handler, array $roles = [], bool $serviceContext = false): void
     {
-        $this->add(HttpMethod::Get, $path, $handler, $roles);
+        $this->add(HttpMethod::Get, $path, $handler, $roles, $serviceContext);
     }
 
     /** @param list<string> $roles */
-    public function post(string $path, callable $handler, array $roles = []): void
+    public function post(string $path, callable $handler, array $roles = [], bool $serviceContext = false): void
     {
-        $this->add(HttpMethod::Post, $path, $handler, $roles);
+        $this->add(HttpMethod::Post, $path, $handler, $roles, $serviceContext);
     }
 
     /** @param list<string> $roles */
-    public function put(string $path, callable $handler, array $roles = []): void
+    public function put(string $path, callable $handler, array $roles = [], bool $serviceContext = false): void
     {
-        $this->add(HttpMethod::Put, $path, $handler, $roles);
+        $this->add(HttpMethod::Put, $path, $handler, $roles, $serviceContext);
     }
 
     /** @param list<string> $roles */
-    public function patch(string $path, callable $handler, array $roles = []): void
+    public function patch(string $path, callable $handler, array $roles = [], bool $serviceContext = false): void
     {
-        $this->add(HttpMethod::Patch, $path, $handler, $roles);
+        $this->add(HttpMethod::Patch, $path, $handler, $roles, $serviceContext);
     }
 
     /** @param list<string> $roles */
-    public function delete(string $path, callable $handler, array $roles = []): void
+    public function delete(string $path, callable $handler, array $roles = [], bool $serviceContext = false): void
     {
-        $this->add(HttpMethod::Delete, $path, $handler, $roles);
+        $this->add(HttpMethod::Delete, $path, $handler, $roles, $serviceContext);
     }
 
     /** @param list<string> $roles */
-    public function add(HttpMethod|string $method, string $path, callable $handler, array $roles = []): void
+    public function add(HttpMethod|string $method, string $path, callable $handler, array $roles = [], bool $serviceContext = false): void
     {
         $method = $this->resolveMethod($method);
 
@@ -53,6 +53,7 @@ final class Router
             'paramNames' => $paramNames,
             'handler' => $handler,
             'roles' => $roles,
+            'serviceContext' => $serviceContext,
         ];
     }
 
@@ -66,13 +67,31 @@ final class Router
      */
     public function requiredRoles(string $method, string $path): array
     {
+        return $this->matchRoute($method, $path)['roles'] ?? [];
+    }
+
+    /**
+     * Se a rota pública que bate com $method+$path precisa de contexto de
+     * serviço no RLS (ex: login busca usuário por email antes de existir
+     * qualquer autenticação) -- usado pelo AuthContextMiddleware.
+     */
+    public function isServiceContext(string $method, string $path): bool
+    {
+        return $this->matchRoute($method, $path)['serviceContext'] ?? false;
+    }
+
+    /**
+     * @return array{pattern: string, paramNames: list<string>, handler: callable, roles: list<string>, serviceContext: bool}|null
+     */
+    private function matchRoute(string $method, string $path): ?array
+    {
         foreach ($this->routes[strtoupper($method)] ?? [] as $route) {
             if ($this->match($route, $path) !== null) {
-                return $route['roles'];
+                return $route;
             }
         }
 
-        return [];
+        return null;
     }
 
     private function resolveMethod(HttpMethod|string $method): HttpMethod

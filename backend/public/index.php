@@ -6,8 +6,12 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 
 use App\Application;
 use App\Bootstrap\ContainerFactory;
+use App\Domain\Auth\Ports\TokenIssuer;
+use App\Domain\Ports\DatabaseConnection;
 use App\Infrastructure\Http\ExceptionHandler;
+use App\Infrastructure\Http\Middleware\AuthContextMiddleware;
 use App\Infrastructure\Http\Middleware\LoggingMiddleware;
+use App\Infrastructure\Http\Middleware\RoleMiddleware;
 use App\Infrastructure\Http\Pipeline;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
@@ -23,6 +27,10 @@ $router = new Router();
 
 $pipeline = new Pipeline([
     new LoggingMiddleware(log: static fn (string $line): mixed => $logger->info($line)),
+    // Construído na mão (não via $container->get()) porque precisa do $router,
+    // que não é gerenciado pelo Container -- só existe aqui no index.php.
+    new AuthContextMiddleware($container->get(TokenIssuer::class), $container->get(DatabaseConnection::class), $router),
+    new RoleMiddleware($router),
 ]);
 
 $exceptionHandler = new ExceptionHandler(debug: (bool) $app->config('debug'), logger: $logger);

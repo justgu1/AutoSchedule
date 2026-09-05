@@ -16,6 +16,8 @@ final class ConfigTest extends TestCase
         'DB_DATABASE',
         'DB_USERNAME',
         'DB_PASSWORD',
+        'DB_APP_USERNAME',
+        'DB_APP_PASSWORD',
     ];
 
     /** @var array<string, string|false> */
@@ -48,6 +50,8 @@ final class ConfigTest extends TestCase
             'database' => 'autoschedule',
             'username' => 'pgsql',
             'password' => 'password',
+            'app_username' => 'autoschedule_app',
+            'app_password' => 'changeme',
         ], $config['database']);
     }
 
@@ -60,6 +64,8 @@ final class ConfigTest extends TestCase
         putenv('DB_DATABASE=custom');
         putenv('DB_USERNAME=admin');
         putenv('DB_PASSWORD=secret');
+        putenv('DB_APP_USERNAME=app_role');
+        putenv('DB_APP_PASSWORD=app_secret');
 
         $config = require dirname(__DIR__) . '/config/app.php';
 
@@ -70,6 +76,8 @@ final class ConfigTest extends TestCase
             'database' => 'custom',
             'username' => 'admin',
             'password' => 'secret',
+            'app_username' => 'app_role',
+            'app_password' => 'app_secret',
         ], $config['database']);
     }
 }

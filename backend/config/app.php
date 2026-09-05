@@ -21,5 +21,7 @@ return [
         'database' => getenv('DB_DATABASE') ?: 'autoschedule',
         'username' => getenv('DB_USERNAME') ?: 'pgsql',
         'password' => getenv('DB_PASSWORD') ?: 'password',
+        'app_username' => getenv('DB_APP_USERNAME') ?: 'autoschedule_app',
+        'app_password' => getenv('DB_APP_PASSWORD') ?: 'changeme',
     ],
 ];

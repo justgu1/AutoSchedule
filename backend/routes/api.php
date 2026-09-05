@@ -23,5 +23,5 @@ return static function (Router $router, Container $container, Application $app):
     });
 
     $oauthController = $container->get(OAuthController::class);
-    $router->post('/api/oauth/token', [$oauthController, 'token']);
+    $router->post('/api/oauth/token', [$oauthController, 'token'], serviceContext: true);
 };
