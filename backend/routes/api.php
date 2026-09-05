@@ -59,8 +59,8 @@ return static function (Router $router, Container $container, Application $app):
         '/api/oauth/token',
         [$oauthController, 'token'],
         serviceContext: true,
-        description: 'Logs in with email+password, or renews tokens when refresh_token is sent.',
-        accepts: ['client_id', 'email', 'password', 'refresh_token'],
+        description: 'Logs in with email+password, renews tokens when refresh_token is sent, or issues a machine-to-machine token with client_id+client_secret.',
+        accepts: ['client_id', 'email', 'password', 'refresh_token', 'client_secret'],
         rateLimit: new RateLimitPolicy('auth', $authRateLimit['max_attempts'], $authRateLimit['window_seconds']),
     );
 

@@ -23,9 +23,9 @@ final class OAuthController
 
     /**
      * Sem `grant_type` de propósito -- quem integra não devia aprender
-     * vocabulário de OAuth só pra logar. `refresh_token` presente manda mais
-     * que qualquer outro campo: se sobrou email/senha no body por engano ou
-     * reaproveitado de outro request, ignora, renova mesmo assim.
+     * vocabulário de OAuth só pra logar. Ordem importa quando o body traz
+     * campo de mais de um formato por engano: `refresh_token` manda mais que
+     * `email`/`password`, que manda mais que `client_secret` (M2M).
      */
     public function token(Request $request): Response
     {
@@ -39,10 +39,14 @@ final class OAuthController
             return $this->login($request, $body);
         }
 
+        if (array_key_exists('client_secret', $body)) {
+            return $this->clientCredentials($request, $body);
+        }
+
         throw new DomainException(
             'Invalid data.',
             DomainErrorType::Validation,
-            ['body' => 'Send {email, password} to log in or {refresh_token} to renew.'],
+            ['body' => 'Send {email, password} to log in, {refresh_token} to renew, or {client_id, client_secret} for machine-to-machine access.'],
         );
     }
 
@@ -78,6 +82,30 @@ final class OAuthController
             $request->ip(),
             $request->header('user-agent'),
         ));
+    }
+
+    /** @param array<string, mixed> $body */
+    private function clientCredentials(Request $request, array $body): Response
+    {
+        $data = Validator::validate($body, [
+            'client_id' => 'required',
+            'client_secret' => 'required',
+        ]);
+
+        $tokenPair = $this->oauth->clientCredentials(
+            $data['client_id'],
+            $data['client_secret'],
+            $request->ip(),
+            $request->header('user-agent'),
+        );
+
+        // M2M: sem browser no meio, sem sessão pra manter em cookie -- só o JSON de sempre.
+        return Response::success([
+            'access_token' => $tokenPair->accessToken,
+            'token_type' => 'Bearer',
+            'expires_in' => $tokenPair->expiresIn,
+            'scope' => implode(' ', $tokenPair->scopes),
+        ]);
     }
 
     /** Lê o refresh token do cookie (SPA não manda no corpo) -- sem cookie, não tem o quê revogar, mas ainda limpa os cookies do client. */

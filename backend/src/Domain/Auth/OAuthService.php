@@ -17,8 +17,8 @@ use App\Domain\Users\Ports\UserRepository;
 use App\Domain\Users\UserRole;
 
 /**
- * Orquestra o login (email+senha -> tokens) e a renovação via refresh_token.
- * client_credentials (M2M) fica adiado -- ainda não tem consumidor.
+ * Orquestra o login (email+senha -> tokens), a renovação via refresh_token e
+ * o client_credentials (M2M, sem usuário, sem refresh token).
  */
 final class OAuthService
 {
@@ -96,6 +96,33 @@ final class OAuthService
         ));
 
         return new TokenPair($accessToken, $this->accessTokenTtl, $current->scopes, $rawNext);
+    }
+
+    /**
+     * M2M: sem usuário, sem sessão pra renovar -- só access token, sem refresh
+     * token. Client tem que ser confidencial (guarda segredo) e provar posse
+     * dele; mesma mensagem genérica de sempre pra não vazar se o client_id existe.
+     */
+    public function clientCredentials(string $clientId, string $clientSecret, string $ipAddress, ?string $userAgent): TokenPair
+    {
+        $client = $this->requireClient($clientId, GrantType::ClientCredentials);
+
+        if ($client->type !== ClientType::Confidential || !$client->verifySecret($clientSecret)) {
+            throw new DomainException('Invalid client credentials.', DomainErrorType::Unauthorized);
+        }
+
+        $accessToken = $this->tokens->issueAccessToken(AccessTokenClaims::issue(
+            subject: $client->clientId,
+            clientId: $client->clientId,
+            role: null,
+            scopes: $client->allowedScopes,
+            ttlSeconds: $this->accessTokenTtl,
+        ));
+
+        // actorId/userId nulos -- não é um usuário, é o client se autenticando; o client_id vai no context.
+        $this->audit->record(AuditEvent::ServiceTokenIssued, null, null, ['client_id' => $client->clientId], $ipAddress, $userAgent);
+
+        return new TokenPair($accessToken, $this->accessTokenTtl, $client->allowedScopes);
     }
 
     /** Sempre "sucesso" do ponto de vista do client -- token já inválido/inexistente não é erro, só não tem mais nada a revogar. */

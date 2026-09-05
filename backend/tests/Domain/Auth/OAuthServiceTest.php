@@ -175,6 +175,94 @@ final class OAuthServiceTest extends TestCase
         $this->addToAssertionCount(1);
     }
 
+    #[Test]
+    public function client_credentials_com_secret_correto_emite_token_sem_refresh(): void
+    {
+        $service = $this->makeServiceWithServiceClient('correct-secret');
+
+        $tokenPair = $service->clientCredentials('autoschedule-service', 'correct-secret', '127.0.0.1', 'phpunit');
+
+        $this->assertNotSame('', $tokenPair->accessToken);
+        $this->assertNull($tokenPair->refreshToken);
+        $this->assertSame(['service:internal'], $tokenPair->scopes);
+        $this->assertSame([AuditEvent::ServiceTokenIssued], $this->audit->events);
+        // Não é um usuário se autenticando -- sem actor nem target.
+        $this->assertNull($this->audit->calls[0]['actorId']);
+        $this->assertNull($this->audit->calls[0]['targetUserId']);
+    }
+
+    #[Test]
+    public function client_credentials_com_secret_errado_falha_com_mensagem_generica(): void
+    {
+        $service = $this->makeServiceWithServiceClient('correct-secret');
+
+        try {
+            $service->clientCredentials('autoschedule-service', 'wrong-secret', '127.0.0.1', 'phpunit');
+            $this->fail('Expected a DomainException to be thrown.');
+        } catch (DomainException $exception) {
+            $this->assertSame(DomainErrorType::Unauthorized, $exception->type());
+            $this->assertSame('Invalid client credentials.', $exception->getMessage());
+        }
+    }
+
+    #[Test]
+    public function client_credentials_rejeita_client_publico(): void
+    {
+        $service = $this->makeService(); // só tem o autoschedule-web, público
+
+        $this->expectException(DomainException::class);
+        $service->clientCredentials('autoschedule-web', 'whatever', '127.0.0.1', 'phpunit');
+    }
+
+    #[Test]
+    public function client_credentials_rejeita_client_sem_esse_grant(): void
+    {
+        $client = OAuthClient::create(
+            clientId: 'autoschedule-no-m2m',
+            name: 'Sem M2M',
+            type: ClientType::Confidential,
+            allowedGrantTypes: [GrantType::RefreshToken], // sem ClientCredentials de propósito
+            redirectUris: [],
+            allowedScopes: ['service:internal'],
+            plainSecret: 'correct-secret',
+        );
+        $service = new OAuthService(
+            clients: new InMemoryOAuthClientRepository([$client]),
+            users: $this->users,
+            refreshTokens: $this->refreshTokens,
+            tokens: new FakeTokenIssuer(),
+            audit: $this->audit,
+            accessTokenTtl: 900,
+            refreshTokenTtl: 1_209_600,
+        );
+
+        $this->expectException(DomainException::class);
+        $service->clientCredentials('autoschedule-no-m2m', 'correct-secret', '127.0.0.1', 'phpunit');
+    }
+
+    private function makeServiceWithServiceClient(string $plainSecret): OAuthService
+    {
+        $serviceClient = OAuthClient::create(
+            clientId: 'autoschedule-service',
+            name: 'AutoSchedule Service',
+            type: ClientType::Confidential,
+            allowedGrantTypes: [GrantType::ClientCredentials],
+            redirectUris: [],
+            allowedScopes: ['service:internal'],
+            plainSecret: $plainSecret,
+        );
+
+        return new OAuthService(
+            clients: new InMemoryOAuthClientRepository([$this->webClient, $serviceClient]),
+            users: $this->users,
+            refreshTokens: $this->refreshTokens,
+            tokens: new FakeTokenIssuer(),
+            audit: $this->audit,
+            accessTokenTtl: 900,
+            refreshTokenTtl: 1_209_600,
+        );
+    }
+
     private function makeService(): OAuthService
     {
         return new OAuthService(
