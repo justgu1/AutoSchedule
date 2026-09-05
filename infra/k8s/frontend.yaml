@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: autoschedule-frontend
+  namespace: apps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: autoschedule-frontend
+  template:
+    metadata:
+      labels:
+        app: autoschedule-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: ghcr.io/justgu1/autoschedule-nginx:latest
+          ports:
+            - name: http
+              containerPort: 80
+          env:
+            # Nome do Service do backend nesse namespace -- `apps` é compartilhado
+            # entre vários apps, por isso o prefixo (não dá pra usar só `backend`).
+            - name: BACKEND_UPSTREAM
+              value: autoschedule-backend:9000
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: autoschedule-frontend
+  namespace: apps
+spec:
+  selector:
+    app: autoschedule-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

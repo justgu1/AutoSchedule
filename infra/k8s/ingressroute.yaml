@@ -1,0 +1,18 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: autoschedule-tls
+  namespace: apps
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    # nginx já resolve /api/* internamente via fastcgi (igual local) -- não
+    # precisa de regra separada apontando pro Service do backend.
+    - match: Host(`autoschedule.justgui.dev`)
+      kind: Rule
+      services:
+        - name: autoschedule-frontend
+          port: 80
+  tls:
+    certResolver: letsencrypt
