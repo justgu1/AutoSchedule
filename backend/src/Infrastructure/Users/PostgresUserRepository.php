@@ -80,6 +80,21 @@ final class PostgresUserRepository implements UserRepository
         ]);
     }
 
+    public function findAll(): array
+    {
+        $rows = $this->pdo->query('SELECT * FROM users WHERE deleted_at IS NULL ORDER BY created_at')->fetchAll();
+
+        return array_map(self::fromRow(...), $rows);
+    }
+
+    public function countByRole(UserRole $role): int
+    {
+        $statement = $this->pdo->prepare('SELECT COUNT(*) FROM users WHERE role = :role AND deleted_at IS NULL');
+        $statement->execute(['role' => $role->value]);
+
+        return (int) $statement->fetchColumn();
+    }
+
     private function findOneBy(string $column, string $value): ?User
     {
         $statement = $this->pdo->prepare("SELECT * FROM users WHERE {$column} = :value AND deleted_at IS NULL");

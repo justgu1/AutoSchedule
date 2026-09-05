@@ -40,6 +40,7 @@ final class MigrationRunnerTest extends TestCase
         // Ordem importa aqui: CASCADE numa tabela referenciada só dropa a
         // *constraint* de FK na tabela dependente, não a tabela em si -- por
         // isso toda tabela com FK ainda precisa do próprio DROP explícito.
+        $this->pdo->exec('DROP TABLE IF EXISTS audit_logs CASCADE');
         $this->pdo->exec('DROP TABLE IF EXISTS oauth_refresh_tokens CASCADE');
         $this->pdo->exec('DROP TABLE IF EXISTS oauth_clients CASCADE');
         $this->pdo->exec('DROP TABLE IF EXISTS users CASCADE');

@@ -58,4 +58,43 @@ final class UserTest extends TestCase
         $this->assertNull($anonymized->phone);
         $this->assertStringContainsString(substr($user->id, 0, 8), $anonymized->email);
     }
+
+    #[Test]
+    public function with_profile_troca_nome_e_telefone_mas_preserva_o_resto(): void
+    {
+        $user = User::register('Ada', 'ada@example.com', '+55 11 90000-0000', 'secret', UserRole::Customer);
+
+        $updated = $user->withProfile('Ada Lovelace', null);
+
+        $this->assertSame('Ada Lovelace', $updated->name);
+        $this->assertNull($updated->phone);
+        $this->assertSame($user->id, $updated->id);
+        $this->assertSame($user->email, $updated->email);
+        $this->assertSame($user->passwordHash, $updated->passwordHash);
+    }
+
+    #[Test]
+    public function with_new_password_troca_o_hash_mas_a_senha_antiga_para_de_validar(): void
+    {
+        $user = User::register('Ada', 'ada@example.com', null, 'old-password', UserRole::Customer);
+
+        $updated = $user->withNewPassword('new-password');
+
+        $this->assertNotSame($user->passwordHash, $updated->passwordHash);
+        $this->assertTrue($updated->verifyPassword('new-password'));
+        $this->assertFalse($updated->verifyPassword('old-password'));
+    }
+
+    #[Test]
+    public function with_role_troca_o_role_mas_preserva_o_resto(): void
+    {
+        $user = User::register('Ada', 'ada@example.com', null, 'secret', UserRole::Customer);
+
+        $updated = $user->withRole(UserRole::Admin);
+
+        $this->assertSame(UserRole::Admin, $updated->role);
+        $this->assertSame($user->id, $updated->id);
+        $this->assertSame($user->name, $updated->name);
+        $this->assertSame($user->passwordHash, $updated->passwordHash);
+    }
 }

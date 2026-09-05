@@ -17,4 +17,7 @@ interface RefreshTokenRepository
 
     /** Reuso detectado: revoga todo token da família, pra nenhum descendente de um token roubado continuar funcionando. */
     public function revokeFamily(string $familyId): void;
+
+    /** Exclusão de conta (LGPD): revoga todo refresh token do usuário, de qualquer client/família. */
+    public function revokeAllForUser(string $userId): void;
 }

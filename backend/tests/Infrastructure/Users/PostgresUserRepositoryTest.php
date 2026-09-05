@@ -148,4 +148,29 @@ final class PostgresUserRepositoryTest extends TestCase
 
         $this->addToAssertionCount(1);
     }
+
+    #[Test]
+    public function find_all_inclui_usuario_recem_criado_mas_nao_o_soft_deletado(): void
+    {
+        $active = User::register('Ada Lovelace', 'ada@example.com', null, 'secret', UserRole::Customer);
+        $deleted = User::register('Charles Babbage', 'charles@example.com', null, 'secret', UserRole::Customer);
+        $this->repository->insert($active);
+        $this->repository->insert($deleted);
+        $this->repository->anonymizeAndSoftDelete($deleted->id);
+
+        $ids = array_map(static fn (User $user): string => $user->id, $this->repository->findAll());
+
+        $this->assertContains($active->id, $ids);
+        $this->assertNotContains($deleted->id, $ids);
+    }
+
+    #[Test]
+    public function count_by_role_conta_so_usuario_ativo_do_role_informado(): void
+    {
+        $before = $this->repository->countByRole(UserRole::Seller);
+
+        $this->repository->insert(User::register('Ada', 'ada-seller@example.com', null, 'secret', UserRole::Seller));
+
+        $this->assertSame($before + 1, $this->repository->countByRole(UserRole::Seller));
+    }
 }

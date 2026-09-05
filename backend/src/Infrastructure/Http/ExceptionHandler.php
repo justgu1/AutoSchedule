@@ -33,6 +33,7 @@ final class ExceptionHandler
                 DomainErrorType::Validation => Response::error($exception->getMessage(), 422, $exception->errors()),
                 DomainErrorType::Conflict => Response::error($exception->getMessage(), 409),
                 DomainErrorType::Unauthorized => Response::error($exception->getMessage(), 401),
+                DomainErrorType::Forbidden => Response::error($exception->getMessage(), 403),
             };
         }
 

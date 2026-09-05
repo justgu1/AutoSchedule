@@ -7,46 +7,140 @@ namespace App\Infrastructure\Http;
 final class Router
 {
     /**
-     * @var array<string, list<array{pattern: string, paramNames: list<string>, handler: callable}>>
+     * @var array<string, list<array{path: string, pattern: string, paramNames: list<string>, handler: callable, roles: list<string>, serviceContext: bool, description: string, accepts: list<string>}>>
      */
     private array $routes = [];
 
-    public function get(string $path, callable $handler): void
+    /**
+     * @param list<string> $roles vazio = pública; qualquer outro valor = role exigida pelo RoleMiddleware
+     * @param list<string> $accepts nomes dos campos aceitos no corpo da requisição -- só documentação do catálogo (GET /api), o Validator continua sendo a fonte de verdade da validação
+     */
+    public function get(string $path, callable $handler, array $roles = [], bool $serviceContext = false, string $description = '', array $accepts = []): void
     {
-        $this->add(HttpMethod::Get, $path, $handler);
+        $this->add(HttpMethod::Get, $path, $handler, $roles, $serviceContext, $description, $accepts);
     }
 
-    public function post(string $path, callable $handler): void
+    /**
+     * @param list<string> $roles
+     * @param list<string> $accepts
+     */
+    public function post(string $path, callable $handler, array $roles = [], bool $serviceContext = false, string $description = '', array $accepts = []): void
     {
-        $this->add(HttpMethod::Post, $path, $handler);
+        $this->add(HttpMethod::Post, $path, $handler, $roles, $serviceContext, $description, $accepts);
     }
 
-    public function put(string $path, callable $handler): void
+    /**
+     * @param list<string> $roles
+     * @param list<string> $accepts
+     */
+    public function put(string $path, callable $handler, array $roles = [], bool $serviceContext = false, string $description = '', array $accepts = []): void
     {
-        $this->add(HttpMethod::Put, $path, $handler);
+        $this->add(HttpMethod::Put, $path, $handler, $roles, $serviceContext, $description, $accepts);
     }
 
-    public function patch(string $path, callable $handler): void
+    /**
+     * @param list<string> $roles
+     * @param list<string> $accepts
+     */
+    public function patch(string $path, callable $handler, array $roles = [], bool $serviceContext = false, string $description = '', array $accepts = []): void
     {
-        $this->add(HttpMethod::Patch, $path, $handler);
+        $this->add(HttpMethod::Patch, $path, $handler, $roles, $serviceContext, $description, $accepts);
     }
 
-    public function delete(string $path, callable $handler): void
+    /**
+     * @param list<string> $roles
+     * @param list<string> $accepts
+     */
+    public function delete(string $path, callable $handler, array $roles = [], bool $serviceContext = false, string $description = '', array $accepts = []): void
     {
-        $this->add(HttpMethod::Delete, $path, $handler);
+        $this->add(HttpMethod::Delete, $path, $handler, $roles, $serviceContext, $description, $accepts);
     }
 
-    public function add(HttpMethod|string $method, string $path, callable $handler): void
+    /**
+     * @param list<string> $roles
+     * @param list<string> $accepts
+     */
+    public function add(HttpMethod|string $method, string $path, callable $handler, array $roles = [], bool $serviceContext = false, string $description = '', array $accepts = []): void
     {
         $method = $this->resolveMethod($method);
+        $normalizedPath = Request::normalizePath($path);
 
-        [$pattern, $paramNames] = $this->compile(Request::normalizePath($path));
+        [$pattern, $paramNames] = $this->compile($normalizedPath);
 
         $this->routes[$method->value][] = [
+            'path' => $normalizedPath,
             'pattern' => $pattern,
             'paramNames' => $paramNames,
             'handler' => $handler,
+            'roles' => $roles,
+            'serviceContext' => $serviceContext,
+            'description' => $description,
+            'accepts' => $accepts,
         ];
+    }
+
+    /**
+     * Catálogo de toda rota registrada -- usado pelo endpoint raiz da API
+     * (`GET /api`) pra listar o que existe, sem expor o handler em si. `roles`
+     * vai junto só pra quem monta a resposta poder filtrar por acesso -- não
+     * é pra vazar pro cliente (ele já recebe só o que o próprio role alcança).
+     *
+     * @return list<array{path: string, methods: list<string>, description: string, accepts: list<string>, roles: list<string>}>
+     */
+    public function catalog(): array
+    {
+        $catalog = [];
+
+        foreach ($this->routes as $method => $routes) {
+            foreach ($routes as $route) {
+                $catalog[] = [
+                    'path' => $route['path'],
+                    'methods' => [$method],
+                    'description' => $route['description'],
+                    'accepts' => $route['accepts'],
+                    'roles' => $route['roles'],
+                ];
+            }
+        }
+
+        return $catalog;
+    }
+
+    /**
+     * Roles exigidos pela rota que bate com $method+$path, sem despachar de
+     * verdade -- usado pelo RoleMiddleware pra checar antes do handler rodar.
+     * Rota inexistente devolve [] (o 404 de verdade é responsabilidade do
+     * dispatch(), não daqui).
+     *
+     * @return list<string>
+     */
+    public function requiredRoles(string $method, string $path): array
+    {
+        return $this->matchRoute($method, $path)['roles'] ?? [];
+    }
+
+    /**
+     * Se a rota pública que bate com $method+$path precisa de contexto de
+     * serviço no RLS (ex: login busca usuário por email antes de existir
+     * qualquer autenticação) -- usado pelo AuthContextMiddleware.
+     */
+    public function isServiceContext(string $method, string $path): bool
+    {
+        return $this->matchRoute($method, $path)['serviceContext'] ?? false;
+    }
+
+    /**
+     * @return array{pattern: string, paramNames: list<string>, handler: callable, roles: list<string>, serviceContext: bool}|null
+     */
+    private function matchRoute(string $method, string $path): ?array
+    {
+        foreach ($this->routes[strtoupper($method)] ?? [] as $route) {
+            if ($this->match($route, $path) !== null) {
+                return $route;
+            }
+        }
+
+        return null;
     }
 
     private function resolveMethod(HttpMethod|string $method): HttpMethod

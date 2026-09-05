@@ -53,6 +53,62 @@ final class User
         return password_verify($plainPassword, $this->passwordHash);
     }
 
+    /** Devolve uma cópia com nome/telefone atualizados -- usado pelo self-service (PATCH /me). */
+    public function withProfile(string $name, ?string $phone): self
+    {
+        return new self(
+            id: $this->id,
+            name: $name,
+            email: $this->email,
+            phone: $phone,
+            passwordHash: $this->passwordHash,
+            role: $this->role,
+            passwordSetAt: $this->passwordSetAt,
+            emailVerifiedAt: $this->emailVerifiedAt,
+            createdAt: $this->createdAt,
+            updatedAt: new \DateTimeImmutable(),
+            deletedAt: $this->deletedAt,
+        );
+    }
+
+    /** Devolve uma cópia com uma nova senha (hash Argon2id) e passwordSetAt renovado. */
+    public function withNewPassword(string $plainPassword): self
+    {
+        $now = new \DateTimeImmutable();
+
+        return new self(
+            id: $this->id,
+            name: $this->name,
+            email: $this->email,
+            phone: $this->phone,
+            passwordHash: password_hash($plainPassword, PASSWORD_ARGON2ID),
+            role: $this->role,
+            passwordSetAt: $now,
+            emailVerifiedAt: $this->emailVerifiedAt,
+            createdAt: $this->createdAt,
+            updatedAt: $now,
+            deletedAt: $this->deletedAt,
+        );
+    }
+
+    /** Devolve uma cópia com role trocado -- usado pelo CRUD admin (/users), nunca pelo self-service. */
+    public function withRole(UserRole $role): self
+    {
+        return new self(
+            id: $this->id,
+            name: $this->name,
+            email: $this->email,
+            phone: $this->phone,
+            passwordHash: $this->passwordHash,
+            role: $role,
+            passwordSetAt: $this->passwordSetAt,
+            emailVerifiedAt: $this->emailVerifiedAt,
+            createdAt: $this->createdAt,
+            updatedAt: new \DateTimeImmutable(),
+            deletedAt: $this->deletedAt,
+        );
+    }
+
     /**
      * Devolve uma cópia com PII escrubada pro "direito ao esquecimento" da LGPD —
      * id, hash de senha, role e timestamps são mantidos pra histórico/auditoria
@@ -64,7 +120,10 @@ final class User
         return new self(
             id: $this->id,
             name: 'Deleted user',
-            email: sprintf('deleted-%s@anonymized.local', substr($this->id, 0, 8)),
+            // Id inteiro, não um prefixo -- os primeiros 8 hex de um UUIDv7 só
+            // mudam a cada ~65s (são os bits mais altos do timestamp em ms), então
+            // um prefixo curto colide fácil entre exclusões próximas no tempo.
+            email: sprintf('deleted-%s@anonymized.local', $this->id),
             phone: null,
             passwordHash: $this->passwordHash,
             role: $this->role,

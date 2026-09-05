@@ -30,8 +30,10 @@ setup:
 
 	@echo "==> Gerando credenciais aleatórias..."
 	@DB_PASSWORD=$$(openssl rand -hex 24); \
+	DB_APP_PASSWORD=$$(openssl rand -hex 24); \
 	MINIO_ROOT_PASSWORD=$$(openssl rand -hex 24); \
 	sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=$$DB_PASSWORD/" .env; \
+	sed -i "s/^DB_APP_PASSWORD=.*/DB_APP_PASSWORD=$$DB_APP_PASSWORD/" .env; \
 	sed -i "s/^MINIO_ROOT_PASSWORD=.*/MINIO_ROOT_PASSWORD=$$MINIO_ROOT_PASSWORD/" .env
 
 	@$(MAKE) keys

@@ -78,6 +78,15 @@ final class PostgresRefreshTokenRepository implements RefreshTokenRepository
         $statement->execute(['family_id' => $familyId]);
     }
 
+    public function revokeAllForUser(string $userId): void
+    {
+        $statement = $this->pdo->prepare(<<<'SQL'
+            UPDATE oauth_refresh_tokens SET revoked_at = now() WHERE user_id = :user_id AND revoked_at IS NULL
+            SQL);
+
+        $statement->execute(['user_id' => $userId]);
+    }
+
     /** @param array<string, mixed> $row */
     private static function fromRow(array $row): RefreshToken
     {
