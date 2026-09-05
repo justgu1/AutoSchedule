@@ -236,9 +236,14 @@ final class InMemoryUserRepository implements UserRepository
         unset($this->byId[$id]);
     }
 
-    public function findAll(): array
+    public function findPage(int $limit, int $offset): array
     {
-        return array_values($this->byId);
+        return array_slice(array_values($this->byId), $offset, $limit);
+    }
+
+    public function count(): int
+    {
+        return count($this->byId);
     }
 
     public function countByRole(UserRole $role): int

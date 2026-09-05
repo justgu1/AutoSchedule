@@ -33,6 +33,14 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
 
+      RATE_LIMIT_GENERAL_MAX: ${RATE_LIMIT_GENERAL_MAX:-1000}
+      RATE_LIMIT_GENERAL_WINDOW: ${RATE_LIMIT_GENERAL_WINDOW:-60}
+      RATE_LIMIT_AUTH_MAX: ${RATE_LIMIT_AUTH_MAX:-5}
+      RATE_LIMIT_AUTH_WINDOW: ${RATE_LIMIT_AUTH_WINDOW:-60}
+
+      PAGINATION_DEFAULT_PER_PAGE: ${PAGINATION_DEFAULT_PER_PAGE:-20}
+      PAGINATION_MAX_PER_PAGE: ${PAGINATION_MAX_PER_PAGE:-100}
+
       S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
       S3_BUCKET: ${S3_BUCKET:-autoschedule}
       S3_REGION: ${S3_REGION:-us-east-1}
@@ -106,6 +114,21 @@ services:
     ports:
       - "${MINIO_API_PORT:-9000}:9000"
       - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    networks:
+      - autoschedule
+
+  # profile próprio -- nunca sobe com `docker compose up`, só com
+  # `docker compose run` (via `make load-test`).
+  k6:
+    image: grafana/k6:latest
+    container_name: autoschedule-k6
+    profiles: ["load-test"]
+    environment:
+      BASE_URL: http://nginx
+    volumes:
+      - ./backend/load-tests:/scripts:ro
+    depends_on:
+      - nginx
     networks:
       - autoschedule
 

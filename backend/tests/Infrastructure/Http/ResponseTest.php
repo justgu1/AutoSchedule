@@ -63,4 +63,23 @@ final class ResponseTest extends TestCase
 
         $this->assertSame('{"message":"Invalid data.","errors":{"id":"must be an integer"}}', $response->body());
     }
+
+    #[Test]
+    public function paginated_inclui_data_e_meta_com_last_page_calculado(): void
+    {
+        $response = Response::paginated(['a', 'b'], page: 2, perPage: 2, total: 5);
+
+        $this->assertSame(
+            '{"data":["a","b"],"meta":{"page":2,"per_page":2,"total":5,"last_page":3}}',
+            $response->body(),
+        );
+    }
+
+    #[Test]
+    public function paginated_last_page_e_pelo_menos_1_mesmo_sem_resultado(): void
+    {
+        $response = Response::paginated([], page: 1, perPage: 20, total: 0);
+
+        $this->assertSame(1, json_decode($response->body(), true)['meta']['last_page']);
+    }
 }

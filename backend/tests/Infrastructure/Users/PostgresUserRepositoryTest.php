@@ -150,7 +150,7 @@ final class PostgresUserRepositoryTest extends TestCase
     }
 
     #[Test]
-    public function find_all_inclui_usuario_recem_criado_mas_nao_o_soft_deletado(): void
+    public function find_page_inclui_usuario_recem_criado_mas_nao_o_soft_deletado(): void
     {
         $active = User::register('Ada Lovelace', 'ada@example.com', null, 'secret', UserRole::Customer);
         $deleted = User::register('Charles Babbage', 'charles@example.com', null, 'secret', UserRole::Customer);
@@ -158,10 +158,33 @@ final class PostgresUserRepositoryTest extends TestCase
         $this->repository->insert($deleted);
         $this->repository->anonymizeAndSoftDelete($deleted->id);
 
-        $ids = array_map(static fn (User $user): string => $user->id, $this->repository->findAll());
+        $ids = array_map(static fn (User $user): string => $user->id, $this->repository->findPage(1000, 0));
 
         $this->assertContains($active->id, $ids);
         $this->assertNotContains($deleted->id, $ids);
+    }
+
+    #[Test]
+    public function find_page_respeita_limit_e_offset(): void
+    {
+        $first = User::register('First', 'first@example.com', null, 'secret', UserRole::Customer);
+        $second = User::register('Second', 'second@example.com', null, 'secret', UserRole::Customer);
+        $this->repository->insert($first);
+        $this->repository->insert($second);
+
+        $page = $this->repository->findPage(1, 0);
+
+        $this->assertCount(1, $page);
+    }
+
+    #[Test]
+    public function count_conta_todo_usuario_nao_deletado(): void
+    {
+        $before = $this->repository->count();
+
+        $this->repository->insert(User::register('Ada', 'ada-count@example.com', null, 'secret', UserRole::Customer));
+
+        $this->assertSame($before + 1, $this->repository->count());
     }
 
     #[Test]

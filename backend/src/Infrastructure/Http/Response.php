@@ -38,6 +38,20 @@ class Response
         return new JsonResponse(['data' => $data], $status);
     }
 
+    /** @param list<mixed> $data */
+    public static function paginated(array $data, int $page, int $perPage, int $total): JsonResponse
+    {
+        return new JsonResponse([
+            'data' => $data,
+            'meta' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => (int) max(1, ceil($total / $perPage)),
+            ],
+        ]);
+    }
+
     /** @param array<string, string> $errors */
     public static function error(string $message, int $status, array $errors = []): JsonResponse
     {
