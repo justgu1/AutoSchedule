@@ -117,6 +117,21 @@ services:
     networks:
       - autoschedule
 
+  # profile próprio -- nunca sobe com `docker compose up`, só com
+  # `docker compose run` (via `make load-test`).
+  k6:
+    image: grafana/k6:latest
+    container_name: autoschedule-k6
+    profiles: ["load-test"]
+    environment:
+      BASE_URL: http://nginx
+    volumes:
+      - ./backend/load-tests:/scripts:ro
+    depends_on:
+      - nginx
+    networks:
+      - autoschedule
+
 volumes:
   postgres_data:
   redis_data:

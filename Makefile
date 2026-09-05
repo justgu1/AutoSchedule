@@ -1,4 +1,4 @@
-.PHONY: setup up down restart build logs ps test migrate rollback seed keys
+.PHONY: setup up down restart build logs ps test migrate rollback seed keys load-test
 
 setup:
 	@if [ -f .env ]; then \
@@ -97,6 +97,9 @@ rollback:
 
 seed:
 	@docker compose exec backend php bin/seed.php
+
+load-test:
+	@docker compose run --rm k6 run /scripts/api-load-test.js
 
 keys:
 	@mkdir -p backend/storage/keys
