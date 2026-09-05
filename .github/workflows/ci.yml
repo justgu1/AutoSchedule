@@ -7,35 +7,83 @@ on:
     branches: [main]
 
 jobs:
+  # PHP nativo no runner (sem Docker) + services do próprio GitHub Actions pro
+  # que a suíte precisa de verdade (RLS/migrations reais no Postgres, rate
+  # limiting real no Redis, reset de senha real no Mailpit -- não são mocks,
+  # é decisão arquitetural do projeto). Mais rápido que subir o docker-compose
+  # inteiro só pra isso, e evita o bind-mount/ownership do compose local (que
+  # é pensado pra live-reload de dev, não pra CI).
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: autoschedule
+          POSTGRES_USER: pgsql
+          POSTGRES_PASSWORD: password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U pgsql -d autoschedule"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      mailpit:
+        image: axllent/mailpit:latest
+        ports: ['1025:1025', '8025:8025']
     steps:
       - uses: actions/checkout@v4
 
-      - name: Sobe postgres, redis, mailpit e backend
-        run: docker compose up -d postgres redis mailpit backend
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, opcache
+          coverage: none
 
-      # Imagem de produção do backend é buildada `--no-dev` -- os pacotes de
-      # qualidade (phpunit/phpstan/php-cs-fixer/rector) são require-dev, então
-      # entram aqui em cima da imagem já buildada, sem precisar de Dockerfile
-      # alternativo só pra CI.
-      - name: Instala dependências de dev do Composer
-        run: docker compose exec backend composer install
+      - name: Instala dependências do Composer
+        working-directory: backend
+        run: composer install --no-interaction --prefer-dist
 
       - name: Gera as chaves RSA do JWT
         run: make keys
 
+      # Container do Postgres sobe vazio (sem tabela, sem role autoschedule_app)
+      # -- os testes de integração (RLS, repositórios reais) esperam o schema já
+      # aplicado, igual qualquer ambiente real (local roda isso uma vez via
+      # `make migrate`/`make seed`; aqui roda toda vez, é idempotente).
+      - name: Migrations + seeders
+        working-directory: backend
+        env:
+          DB_HOST: 127.0.0.1
+        run: php bin/migrate.php && php bin/seed.php
+
       - name: Testes (PHPUnit)
-        run: make test
+        working-directory: backend
+        env:
+          DB_HOST: 127.0.0.1
+          REDIS_HOST: 127.0.0.1
+          MAIL_HOST: 127.0.0.1
+        run: vendor/bin/phpunit
 
       - name: Análise estática (PHPStan)
-        run: make static-analysis
+        working-directory: backend
+        run: vendor/bin/phpstan analyse --no-progress
 
       - name: Lint (PHP-CS-Fixer)
-        run: make lint
+        working-directory: backend
+        run: vendor/bin/php-cs-fixer fix --dry-run --diff
 
       - name: Rector (dry-run)
-        run: make rector
+        working-directory: backend
+        run: vendor/bin/rector process --dry-run
 
   frontend:
     runs-on: ubuntu-latest
