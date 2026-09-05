@@ -7,18 +7,22 @@ namespace App\Domain\Auth;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
 use App\Domain\Auth\DTO\TokenPair;
+use App\Domain\Auth\Ports\GoogleIdTokenVerifier;
 use App\Domain\Auth\Ports\OAuthClientRepository;
 use App\Domain\Auth\Ports\RefreshTokenRepository;
 use App\Domain\Auth\Ports\TokenIssuer;
+use App\Domain\Auth\Ports\UserIdentityRepository;
 use App\Domain\Auth\ValueObjects\AccessTokenClaims;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
 use App\Domain\Users\Ports\UserRepository;
+use App\Domain\Users\User;
 use App\Domain\Users\UserRole;
 
 /**
- * Orquestra o login (email+senha -> tokens), a renovação via refresh_token e
- * o client_credentials (M2M, sem usuário, sem refresh token).
+ * Orquestra o login (email+senha -> tokens), a renovação via refresh_token, o
+ * client_credentials (M2M, sem usuário, sem refresh token) e o login social
+ * via Google (conta existente por e-mail linka, e-mail novo cria customer).
  */
 final class OAuthService
 {
@@ -26,7 +30,9 @@ final class OAuthService
         private readonly OAuthClientRepository $clients,
         private readonly UserRepository $users,
         private readonly RefreshTokenRepository $refreshTokens,
+        private readonly UserIdentityRepository $identities,
         private readonly TokenIssuer $tokens,
+        private readonly GoogleIdTokenVerifier $googleVerifier,
         private readonly AuditLogger $audit,
         private readonly int $accessTokenTtl,
         private readonly int $refreshTokenTtl,
@@ -96,6 +102,55 @@ final class OAuthService
         ));
 
         return new TokenPair($accessToken, $this->accessTokenTtl, $current->scopes, $rawNext);
+    }
+
+    /**
+     * E-mail verificado pelo Google já prova posse -- conta existente com o
+     * mesmo e-mail é linkada automaticamente (sem mudar role), e-mail novo
+     * cria conta `customer` (mesma regra do registro manual: customer só
+     * precisa de login pra ver histórico). Senha aleatória inutilizável --
+     * conta social-only até pedir "esqueci minha senha" se quiser também
+     * logar com senha.
+     */
+    public function loginWithGoogle(string $clientId, string $idToken, string $ipAddress, ?string $userAgent): TokenPair
+    {
+        $client = $this->requireClient($clientId, GrantType::Google);
+        $claims = $this->googleVerifier->verify($idToken);
+
+        if (!$claims->emailVerified) {
+            throw new DomainException('Google account email is not verified.', DomainErrorType::Unauthorized);
+        }
+
+        $identity = $this->identities->findByProvider('google', $claims->subject);
+
+        if ($identity !== null) {
+            $user = $this->users->findById($identity->userId);
+
+            if ($user === null) {
+                throw new DomainException('Invalid Google credential.', DomainErrorType::Unauthorized);
+            }
+
+            $this->audit->record(AuditEvent::LoginSucceeded, $user->id, $user->id, ['via' => 'google'], $ipAddress, $userAgent);
+
+            return $this->issueTokenPair($client, $user->id, $user->role, $client->allowedScopes);
+        }
+
+        $existingByEmail = $this->users->findByEmail($claims->email);
+
+        if ($existingByEmail !== null) {
+            $this->identities->insert(UserIdentity::link($existingByEmail->id, 'google', $claims->subject, $claims->email));
+            $this->audit->record(AuditEvent::LoginSucceeded, $existingByEmail->id, $existingByEmail->id, ['via' => 'google', 'linked' => true], $ipAddress, $userAgent);
+
+            return $this->issueTokenPair($client, $existingByEmail->id, $existingByEmail->role, $client->allowedScopes);
+        }
+
+        // Ninguém sabe/usa essa senha -- só ocupa o campo NOT NULL; login dessa conta é sempre via Google até um reset trocar por uma real.
+        $newUser = User::register($claims->name, $claims->email, null, bin2hex(random_bytes(32)), UserRole::Customer);
+        $this->users->insert($newUser);
+        $this->identities->insert(UserIdentity::link($newUser->id, 'google', $claims->subject, $claims->email));
+        $this->audit->record(AuditEvent::UserCreated, $newUser->id, $newUser->id, ['role' => $newUser->role->value, 'via' => 'google'], $ipAddress, $userAgent);
+
+        return $this->issueTokenPair($client, $newUser->id, $newUser->role, $client->allowedScopes);
     }
 
     /**

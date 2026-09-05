@@ -198,6 +198,14 @@ POST /api/logout
 
 Lê o `refresh_token` do cookie, revoga a família inteira (mesmo mecanismo do reuso detectado), limpa os cookies `access_token`/`refresh_token`. Sem cookie de refresh, ainda limpa os cookies do lado do client — não é erro, só não tem mais nada a revogar.
 
+### Login social (Google)
+
+```text
+{ client_id, id_token }   -> login via Google Identity Services
+```
+
+`id_token` vem assinado pelo Google (verificado via JWKS, `firebase/php-jwt`) -- `aud`/`iss`/assinatura conferidos, e `email_verified` tem que ser verdadeiro. E-mail batendo com conta existente (seller/admin inclusive) linka automaticamente, sem mudar role -- e-mail verificado pelo Google já prova posse, mesmo padrão que outros provedores usam. E-mail novo cria conta `customer` com senha aleatória inutilizável (conta social-only até um reset de senha trocar por uma real).
+
 ### Reset de senha
 
 ```text
@@ -224,6 +232,8 @@ A autorização é aplicada no backend.
 - `admin`: acesso global;
 - `seller`: acesso às concessionárias associadas;
 - `customer`: acesso aos próprios dados e agendamentos.
+
+Troca de role via CRUD admin (`PATCH /api/users/{id}`) aceita qualquer transição (com a trava do último admin). Self-service (`PATCH /me`) só aceita uma: `customer` virando `seller`, por vontade própria -- qualquer outra transição no caminho self é rejeitada (`403`).
 
 Validações do frontend não são mecanismos de segurança.
 

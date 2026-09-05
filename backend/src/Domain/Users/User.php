@@ -91,7 +91,18 @@ final class User
         );
     }
 
-    /** Devolve uma cópia com role trocado -- usado pelo CRUD admin (/users), nunca pelo self-service. */
+    /**
+     * Self-service só permite uma escalada: `customer` virando `seller`, por
+     * vontade própria (ex: login social provisiona `customer`, mas a pessoa
+     * quer vender). Nunca vira `admin`, nunca desce de role, nunca a partir de
+     * `seller`/`admin` -- qualquer outra transição passa só pelo CRUD admin.
+     */
+    public function isEligibleForSelfServiceRoleChange(UserRole $to): bool
+    {
+        return $this->role === UserRole::Customer && $to === UserRole::Seller;
+    }
+
+    /** Devolve uma cópia com role trocado -- usado pelo CRUD admin (/users) e pela escalada self-service restrita acima. */
     public function withRole(UserRole $role): self
     {
         return new self(

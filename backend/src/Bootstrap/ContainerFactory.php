@@ -7,18 +7,22 @@ namespace App\Bootstrap;
 use App\Application;
 use App\Domain\Audit\Ports\AuditLogger;
 use App\Domain\Auth\OAuthService;
+use App\Domain\Auth\Ports\GoogleIdTokenVerifier;
 use App\Domain\Auth\Ports\OAuthClientRepository;
 use App\Domain\Auth\Ports\PasswordResetTokenRepository;
 use App\Domain\Auth\Ports\RefreshTokenRepository;
 use App\Domain\Auth\Ports\TokenIssuer;
+use App\Domain\Auth\Ports\UserIdentityRepository;
 use App\Domain\Notifications\Ports\MailProvider;
 use App\Domain\Ports\DatabaseConnection;
 use App\Domain\Users\Ports\UserRepository;
 use App\Infrastructure\Audit\PostgresAuditLogger;
+use App\Infrastructure\Auth\Google\GoogleJwksIdTokenVerifier;
 use App\Infrastructure\Auth\Jwt\JwtTokenIssuer;
 use App\Infrastructure\Auth\Postgres\PostgresOAuthClientRepository;
 use App\Infrastructure\Auth\Postgres\PostgresPasswordResetTokenRepository;
 use App\Infrastructure\Auth\Postgres\PostgresRefreshTokenRepository;
+use App\Infrastructure\Auth\Postgres\PostgresUserIdentityRepository;
 use App\Infrastructure\Container\Container;
 use App\Infrastructure\Database\PostgresConnection;
 use App\Infrastructure\Http\Controllers\OAuthController;
@@ -89,6 +93,16 @@ final class ContainerFactory
             PasswordResetTokenRepository::class,
             static fn (Container $c): PasswordResetTokenRepository => new PostgresPasswordResetTokenRepository($c->get(DatabaseConnection::class)->pdo()),
         );
+        $container->set(
+            UserIdentityRepository::class,
+            static fn (Container $c): UserIdentityRepository => new PostgresUserIdentityRepository($c->get(DatabaseConnection::class)->pdo()),
+        );
+        $container->set(GoogleIdTokenVerifier::class, static function (Container $c) use ($app): GoogleIdTokenVerifier {
+            return new GoogleJwksIdTokenVerifier(
+                clientId: $app->config('google')['client_id'],
+                redis: $c->get(RedisConnection::class),
+            );
+        });
         $container->set(MailProvider::class, static function () use ($app): MailProvider {
             $mail = $app->config('mail');
 
@@ -116,7 +130,9 @@ final class ContainerFactory
                 clients: $c->get(OAuthClientRepository::class),
                 users: $c->get(UserRepository::class),
                 refreshTokens: $c->get(RefreshTokenRepository::class),
+                identities: $c->get(UserIdentityRepository::class),
                 tokens: $c->get(TokenIssuer::class),
+                googleVerifier: $c->get(GoogleIdTokenVerifier::class),
                 audit: $c->get(AuditLogger::class),
                 accessTokenTtl: $auth['access_token_ttl'],
                 refreshTokenTtl: $auth['refresh_token_ttl'],
