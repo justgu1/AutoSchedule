@@ -168,7 +168,9 @@ POST /api/oauth/token
 nenhum dos dois           -> 422
 ```
 
-Resposta: `access_token` (JWT RS256, TTL curto), `refresh_token` (opaco, TTL longo, uso único — reuso revoga a família toda), `expires_in`, `scope`.
+Resposta: `access_token` (JWT RS256, TTL curto), `refresh_token` (opaco, TTL longo, uso único — reuso revoga a família toda), `expires_in`, `scope` — no corpo (pra quem integra via script/Postman) **e** em cookies `HttpOnly`/`SameSite=Strict` (pra SPA, que nunca lê o token do corpo). Cookie evita exposição a roubo via XSS que `localStorage` teria.
+
+Mutação autenticada por cookie exige o header `X-CSRF-Token` batendo com o cookie `XSRF-TOKEN` (double-submit) — request com `Authorization: Bearer` explícito não precisa disso, CSRF só é risco de credencial ambiente (cookie).
 
 `client_id` identifica a aplicação (hoje só `autoschedule-web`), não o usuário — `role` vem do JWT.
 

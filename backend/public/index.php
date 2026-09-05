@@ -11,6 +11,7 @@ use App\Domain\Ports\DatabaseConnection;
 use App\Infrastructure\Http\ExceptionHandler;
 use App\Infrastructure\Http\Middleware\AuthContextMiddleware;
 use App\Infrastructure\Http\Middleware\CorsMiddleware;
+use App\Infrastructure\Http\Middleware\CsrfMiddleware;
 use App\Infrastructure\Http\Middleware\LoggingMiddleware;
 use App\Infrastructure\Http\Middleware\RateLimitMiddleware;
 use App\Infrastructure\Http\Middleware\RoleMiddleware;
@@ -50,6 +51,7 @@ $pipeline = new Pipeline([
         $container->get(TokenIssuer::class),
         $logger,
     ),
+    new CsrfMiddleware($security['cookie_secure']),
     new AuthContextMiddleware($container->get(TokenIssuer::class), $container->get(DatabaseConnection::class), $router),
     new RoleMiddleware($router),
 ]);

@@ -6,11 +6,15 @@ namespace App\Infrastructure\Http;
 
 class Response
 {
-    /** @param array<string, string> $headers */
+    /**
+     * @param array<string, string> $headers
+     * @param array<string, array{value: string, maxAge: int, httpOnly: bool, sameSite: string, secure: bool}> $cookies
+     */
     public function __construct(
         protected readonly string $body = '',
         protected readonly int $status = 200,
         protected array $headers = [],
+        protected array $cookies = [],
     ) {
         foreach ($this->headers as $name => $value) {
             self::assertSafeHeader($name, $value);
@@ -26,6 +30,12 @@ class Response
     public function headers(): array
     {
         return $this->headers;
+    }
+
+    /** @return array<string, array{value: string, maxAge: int, httpOnly: bool, sameSite: string, secure: bool}> */
+    public function cookies(): array
+    {
+        return $this->cookies;
     }
 
     public function body(): string
@@ -74,12 +84,43 @@ class Response
         return $clone;
     }
 
+    /** $maxAge em segundos; 0 = cookie de sessão (some ao fechar o browser). */
+    public function withCookie(
+        string $name,
+        string $value,
+        int $maxAge = 0,
+        bool $httpOnly = true,
+        string $sameSite = 'Strict',
+        bool $secure = false,
+    ): static {
+        $clone = clone $this;
+        $clone->cookies[$name] = [
+            'value' => $value,
+            'maxAge' => $maxAge,
+            'httpOnly' => $httpOnly,
+            'sameSite' => $sameSite,
+            'secure' => $secure,
+        ];
+
+        return $clone;
+    }
+
     public function send(): void
     {
         http_response_code($this->status);
 
         foreach ($this->headers as $name => $value) {
             header($name . ': ' . $value);
+        }
+
+        foreach ($this->cookies as $name => $cookie) {
+            setcookie($name, $cookie['value'], [
+                'expires' => $cookie['maxAge'] > 0 ? time() + $cookie['maxAge'] : 0,
+                'path' => '/',
+                'httponly' => $cookie['httpOnly'],
+                'samesite' => $cookie['sameSite'],
+                'secure' => $cookie['secure'],
+            ]);
         }
 
         echo $this->body;

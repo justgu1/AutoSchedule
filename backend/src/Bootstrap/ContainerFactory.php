@@ -18,6 +18,7 @@ use App\Infrastructure\Auth\Postgres\PostgresOAuthClientRepository;
 use App\Infrastructure\Auth\Postgres\PostgresRefreshTokenRepository;
 use App\Infrastructure\Container\Container;
 use App\Infrastructure\Database\PostgresConnection;
+use App\Infrastructure\Http\Controllers\OAuthController;
 use App\Infrastructure\Logging\Logger;
 use App\Infrastructure\Pagination\PaginationPolicy;
 use App\Infrastructure\RateLimit\RateLimiter;
@@ -105,6 +106,13 @@ final class ContainerFactory
                 audit: $c->get(AuditLogger::class),
                 accessTokenTtl: $auth['access_token_ttl'],
                 refreshTokenTtl: $auth['refresh_token_ttl'],
+            );
+        });
+        $container->set(OAuthController::class, static function (Container $c) use ($app): OAuthController {
+            return new OAuthController(
+                oauth: $c->get(OAuthService::class),
+                refreshTokenTtl: $app->config('auth')['refresh_token_ttl'],
+                cookieSecure: $app->config('security')['cookie_secure'],
             );
         });
 

@@ -12,17 +12,20 @@ final class RequestTest extends TestCase
 {
     private array $serverBackup;
     private array $getBackup;
+    private array $cookieBackup;
 
     protected function setUp(): void
     {
         $this->serverBackup = $_SERVER;
         $this->getBackup = $_GET;
+        $this->cookieBackup = $_COOKIE;
     }
 
     protected function tearDown(): void
     {
         $_SERVER = $this->serverBackup;
         $_GET = $this->getBackup;
+        $_COOKIE = $this->cookieBackup;
     }
 
     #[Test]
@@ -89,6 +92,19 @@ final class RequestTest extends TestCase
         $this->assertSame('/api', Request::normalizePath('/api'));
         $this->assertSame('/', Request::normalizePath('/'));
         $this->assertSame('/', Request::normalizePath(''));
+    }
+
+    #[Test]
+    public function from_globals_expoe_cookies_via_cookie(): void
+    {
+        $_SERVER['REQUEST_METHOD'] = 'GET';
+        $_SERVER['PATH_INFO'] = '/api/ping';
+        $_COOKIE = ['access_token' => 'abc123'];
+
+        $request = Request::fromGlobals();
+
+        $this->assertSame('abc123', $request->cookie('access_token'));
+        $this->assertNull($request->cookie('inexistente'));
     }
 
     #[Test]

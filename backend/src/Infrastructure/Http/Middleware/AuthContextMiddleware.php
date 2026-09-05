@@ -12,13 +12,15 @@ use App\Infrastructure\Http\Response;
 use App\Infrastructure\Http\Router;
 
 /**
- * Decodifica o Bearer se presente e anexa as claims ao Request. Autenticado,
- * abre transação + SET LOCAL pro RLS (current_user_id/role) antes de seguir
- * -- automático em toda query, ninguém precisa lembrar de aplicar.
+ * Decodifica o access token (header `Authorization: Bearer` ou cookie
+ * `access_token` -- o que vier primeiro) e anexa as claims ao Request.
+ * Autenticado, abre transação + SET LOCAL pro RLS (current_user_id/role)
+ * antes de seguir -- automático em toda query, ninguém precisa lembrar de
+ * aplicar.
  *
- * Sem Bearer, a rota pode estar marcada como serviceContext (ex: login busca
- * usuário por email antes de existir qualquer autenticação) -- nesse caso
- * abre transação com um contexto de serviço mais restrito (só enxerga o
+ * Sem token nenhum, a rota pode estar marcada como serviceContext (ex: login
+ * busca usuário por email antes de existir qualquer autenticação) -- nesse
+ * caso abre transação com um contexto de serviço mais restrito (só enxerga o
  * necessário pra autenticação em si). Nenhum dos dois casos: segue direto,
  * sem transação (rota pública comum, ou o RoleMiddleware barra depois).
  */
@@ -33,10 +35,10 @@ final class AuthContextMiddleware implements Middleware
 
     public function handle(Request $request, \Closure $next): Response
     {
-        $header = $request->header('authorization');
+        $token = $this->extractToken($request);
 
-        if ($header !== null && str_starts_with($header, 'Bearer ')) {
-            $claims = $this->tokens->decodeAccessToken(substr($header, 7));
+        if ($token !== null) {
+            $claims = $this->tokens->decodeAccessToken($token);
             $request = $request->withAttribute('auth', $claims);
 
             return $this->runInTransaction($request, $next, static function (\PDO $pdo) use ($claims): void {
@@ -52,6 +54,17 @@ final class AuthContextMiddleware implements Middleware
         }
 
         return $next($request);
+    }
+
+    private function extractToken(Request $request): ?string
+    {
+        $header = $request->header('authorization');
+
+        if ($header !== null && str_starts_with($header, 'Bearer ')) {
+            return substr($header, 7);
+        }
+
+        return $request->cookie('access_token');
     }
 
     private function runInTransaction(Request $request, \Closure $next, \Closure $setContext): Response
