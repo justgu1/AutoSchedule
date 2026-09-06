@@ -13,8 +13,10 @@ use App\Domain\Auth\Ports\PasswordResetTokenRepository;
 use App\Domain\Auth\Ports\RefreshTokenRepository;
 use App\Domain\Auth\Ports\TokenIssuer;
 use App\Domain\Auth\Ports\UserIdentityRepository;
+use App\Domain\Files\Ports\FileRepository;
 use App\Domain\Notifications\Ports\MailProvider;
 use App\Domain\Ports\DatabaseConnection;
+use App\Domain\Ports\StorageProvider;
 use App\Domain\Users\Ports\UserRepository;
 use App\Infrastructure\Audit\PostgresAuditLogger;
 use App\Infrastructure\Auth\Google\GoogleJwksIdTokenVerifier;
@@ -25,6 +27,8 @@ use App\Infrastructure\Auth\Postgres\PostgresRefreshTokenRepository;
 use App\Infrastructure\Auth\Postgres\PostgresUserIdentityRepository;
 use App\Infrastructure\Container\Container;
 use App\Infrastructure\Database\PostgresConnection;
+use App\Infrastructure\Files\FileUploadService;
+use App\Infrastructure\Files\PostgresFileRepository;
 use App\Infrastructure\Http\Controllers\OAuthController;
 use App\Infrastructure\Http\Controllers\UserController;
 use App\Infrastructure\Logging\Logger;
@@ -33,6 +37,7 @@ use App\Infrastructure\Pagination\PaginationPolicy;
 use App\Infrastructure\RateLimit\RateLimiter;
 use App\Infrastructure\RateLimit\RedisRateLimiter;
 use App\Infrastructure\Redis\RedisConnection;
+use App\Infrastructure\Storage\MinioAdapter;
 use App\Infrastructure\Users\PostgresUserRepository;
 
 /**
@@ -106,6 +111,27 @@ final class ContainerFactory
 
             return new SymfonyMailProvider($mail['dsn'], $mail['from']);
         });
+        $container->set(StorageProvider::class, static function () use ($app): StorageProvider {
+            $storage = $app->config('storage');
+
+            return new MinioAdapter(
+                endpoint: $storage['endpoint'],
+                bucket: $storage['bucket'],
+                region: $storage['region'],
+                accessKey: $storage['access_key'],
+                secretKey: $storage['secret_key'],
+                publicUrl: $storage['public_url'],
+            );
+        });
+        $container->set(
+            FileRepository::class,
+            static fn (Container $c): FileRepository => new PostgresFileRepository($c->get(DatabaseConnection::class)->pdo()),
+        );
+        $container->set(FileUploadService::class, static fn (Container $c): FileUploadService => new FileUploadService(
+            storage: $c->get(StorageProvider::class),
+            files: $c->get(FileRepository::class),
+            tempPath: $app->config('storage')['temp_path'],
+        ));
         $container->set(RedisConnection::class, static function () use ($app): RedisConnection {
             $config = $app->config('redis');
 

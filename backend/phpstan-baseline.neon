@@ -27,7 +27,13 @@ parameters:
 		-
 			message: '#^Call to an undefined method object\:\:pdo\(\)\.$#'
 			identifier: method.notFound
-			count: 6
+			count: 7
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Cannot access offset ''access_key'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
 			path: src/Bootstrap/ContainerFactory.php
 
 		-
@@ -50,6 +56,12 @@ parameters:
 
 		-
 			message: '#^Cannot access offset ''audience'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Cannot access offset ''bucket'' on mixed\.$#'
 			identifier: offsetAccess.nonOffsetAccessible
 			count: 1
 			path: src/Bootstrap/ContainerFactory.php
@@ -86,6 +98,12 @@ parameters:
 
 		-
 			message: '#^Cannot access offset ''dsn'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Cannot access offset ''endpoint'' on mixed\.$#'
 			identifier: offsetAccess.nonOffsetAccessible
 			count: 1
 			path: src/Bootstrap/ContainerFactory.php
@@ -163,9 +181,33 @@ parameters:
 			path: src/Bootstrap/ContainerFactory.php
 
 		-
+			message: '#^Cannot access offset ''public_url'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
 			message: '#^Cannot access offset ''refresh_token_ttl'' on mixed\.$#'
 			identifier: offsetAccess.nonOffsetAccessible
 			count: 2
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Cannot access offset ''region'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Cannot access offset ''secret_key'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Cannot access offset ''temp_path'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
 			path: src/Bootstrap/ContainerFactory.php
 
 		-
@@ -229,6 +271,12 @@ parameters:
 			path: src/Bootstrap/ContainerFactory.php
 
 		-
+			message: '#^Parameter \#1 \$pdo of class App\\Infrastructure\\Files\\PostgresFileRepository constructor expects PDO, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
 			message: '#^Parameter \#1 \$pdo of class App\\Infrastructure\\Users\\PostgresUserRepository constructor expects PDO, mixed given\.$#'
 			identifier: argument.type
 			count: 1
@@ -242,6 +290,12 @@ parameters:
 
 		-
 			message: '#^Parameter \#2 \$maxPerPage of class App\\Infrastructure\\Pagination\\PaginationPolicy constructor expects int, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Parameter \$accessKey of class App\\Infrastructure\\Storage\\MinioAdapter constructor expects string, mixed given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Bootstrap/ContainerFactory.php
@@ -266,6 +320,12 @@ parameters:
 
 		-
 			message: '#^Parameter \$audit of class App\\Infrastructure\\Http\\Controllers\\UserController constructor expects App\\Domain\\Audit\\Ports\\AuditLogger, object given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Parameter \$bucket of class App\\Infrastructure\\Storage\\MinioAdapter constructor expects string, mixed given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Bootstrap/ContainerFactory.php
@@ -296,6 +356,18 @@ parameters:
 
 		-
 			message: '#^Parameter \$driver of class App\\Infrastructure\\Database\\PostgresConnection constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Parameter \$endpoint of class App\\Infrastructure\\Storage\\MinioAdapter constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Parameter \$files of class App\\Infrastructure\\Files\\FileUploadService constructor expects App\\Domain\\Files\\Ports\\FileRepository, object given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Bootstrap/ContainerFactory.php
@@ -409,6 +481,12 @@ parameters:
 			path: src/Bootstrap/ContainerFactory.php
 
 		-
+			message: '#^Parameter \$publicUrl of class App\\Infrastructure\\Storage\\MinioAdapter constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
 			message: '#^Parameter \$redis of class App\\Infrastructure\\Auth\\Google\\GoogleJwksIdTokenVerifier constructor expects App\\Infrastructure\\Redis\\RedisConnection, object given\.$#'
 			identifier: argument.type
 			count: 1
@@ -434,6 +512,30 @@ parameters:
 
 		-
 			message: '#^Parameter \$refreshTokens of class App\\Infrastructure\\Http\\Controllers\\UserController constructor expects App\\Domain\\Auth\\Ports\\RefreshTokenRepository, object given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Parameter \$region of class App\\Infrastructure\\Storage\\MinioAdapter constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Parameter \$secretKey of class App\\Infrastructure\\Storage\\MinioAdapter constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Parameter \$storage of class App\\Infrastructure\\Files\\FileUploadService constructor expects App\\Domain\\Ports\\StorageProvider, object given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Parameter \$tempPath of class App\\Infrastructure\\Files\\FileUploadService constructor expects string, mixed given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Bootstrap/ContainerFactory.php
@@ -749,6 +851,90 @@ parameters:
 			identifier: return.type
 			count: 1
 			path: src/Infrastructure/Database/MigrationRunner.php
+
+		-
+			message: '#^Parameter \#1 \$finfo of function finfo_close expects finfo, finfo\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Files/FileUploadService.php
+
+		-
+			message: '#^Parameter \#1 \$finfo of function finfo_file expects finfo, finfo\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Files/FileUploadService.php
+
+		-
+			message: '#^Parameter \#1 \$string of function strlen expects string, string\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Files/FileUploadService.php
+
+		-
+			message: '#^Parameter \#2 \$contents of method App\\Domain\\Ports\\StorageProvider\:\:put\(\) expects string, string\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Files/FileUploadService.php
+
+		-
+			message: '#^Parameter \#2 \$data of function hash expects string, string\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Files/FileUploadService.php
+
+		-
+			message: '#^Cannot cast mixed to int\.$#'
+			identifier: cast.int
+			count: 1
+			path: src/Infrastructure/Files/PostgresFileRepository.php
+
+		-
+			message: '#^Parameter \#1 \$datetime of class DateTimeImmutable constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Files/PostgresFileRepository.php
+
+		-
+			message: '#^Parameter \#1 \$row of method App\\Infrastructure\\Files\\PostgresFileRepository\:\:fromRow\(\) expects array\<string, mixed\>, mixed given\.$#'
+			identifier: argument.type
+			count: 2
+			path: src/Infrastructure/Files/PostgresFileRepository.php
+
+		-
+			message: '#^Parameter \$checksum of class App\\Domain\\Files\\StoredFile constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Files/PostgresFileRepository.php
+
+		-
+			message: '#^Parameter \$id of class App\\Domain\\Files\\StoredFile constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Files/PostgresFileRepository.php
+
+		-
+			message: '#^Parameter \$mimeType of class App\\Domain\\Files\\StoredFile constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Files/PostgresFileRepository.php
+
+		-
+			message: '#^Parameter \$originalName of class App\\Domain\\Files\\StoredFile constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Files/PostgresFileRepository.php
+
+		-
+			message: '#^Parameter \$path of class App\\Domain\\Files\\StoredFile constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Files/PostgresFileRepository.php
+
+		-
+			message: '#^Parameter \$uploadedBy of class App\\Domain\\Files\\StoredFile constructor expects string\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Files/PostgresFileRepository.php
 
 		-
 			message: '#^Parameter \#1 \$clientId of method App\\Domain\\Auth\\OAuthService\:\:clientCredentials\(\) expects string, mixed given\.$#'
