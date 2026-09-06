@@ -19,7 +19,9 @@ test('desativar a conta -> logar de novo -> conta restaurada', async ({ page }) 
     await page.getByRole('button', { name: 'Desativar minha conta' }).click();
     await page.getByRole('button', { name: 'Desativar', exact: true }).click();
     await expect(page).toHaveURL(/\/login$/);
-    await expect(page.getByText('Sua conta foi desativada com sucesso. Faça login em até 30 dias para restaurá-la.')).toBeVisible();
+    await expect(
+        page.getByText('Sua conta foi desativada com sucesso. Faça login em até 30 dias para restaurá-la.'),
+    ).toBeVisible();
 
     // Conta na lixeira -- logar de novo com as mesmas credenciais restaura sozinho, sem passo extra.
     await page.getByLabel('E-mail').fill(email);
