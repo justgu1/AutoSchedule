@@ -130,18 +130,18 @@ Priorizado antes do domínio de veículo/agendamento porque o primeiro endpoint 
 - [ ] Revisar experiência do usuário
 - [ ] Validar fluxo completo
 - [ ] Corrigir problemas encontrados
-- [ ] Configurar pipeline de CI
-- [ ] Configurar build das imagens
-- [ ] Configurar publicação das imagens no registry
-- [ ] Estruturar manifests Kubernetes
-- [ ] Configurar repositório GitOps
-- [ ] Configurar ArgoCD
-- [ ] Automatizar deploy no Kubernetes
+- [x] Configurar pipeline de CI (GitHub Actions: backend/frontend/phpunit/e2e/load-test/build-and-push)
+- [x] Configurar build das imagens
+- [x] Configurar publicação das imagens no registry (GHCR)
+- [x] Estruturar manifests Kubernetes (`infra/k8s`: backend, frontend, ingressroute, sealed-secret, kustomization)
+- [x] Configurar repositório GitOps (monorepo — ArgoCD aponta pro próprio `infra/k8s`, sem repo separado)
+- [x] Configurar ArgoCD (Application `autoschedule`, auto-sync + prune + selfHeal, image-updater por digest)
+- [x] Automatizar deploy no Kubernetes (merge na `main` → build-and-push → image-updater → ArgoCD sync, sem passo manual)
 
 ### Dia 6 — Estabilização e validação
 
-- [ ] Validar fluxo completo de CI/CD
-- [ ] Validar deploy através do ArgoCD
+- [x] Validar fluxo completo de CI/CD (confirmado em prod: PR #26 mergeada, pipeline verde, ArgoCD sincronizou sozinho)
+- [x] Validar deploy através do ArgoCD (`autoschedule-backend`/`autoschedule-frontend` `1/1 Running` no namespace `apps`, Application Synced/Healthy)
 - [ ] Revisar configuração Docker
 - [ ] Revisar manifests Kubernetes
 - [ ] Revisar configuração do GitOps

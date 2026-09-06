@@ -354,6 +354,45 @@ A busca por proximidade pode ser realizada pelo PostgreSQL. PostGIS pode ser adi
 └── Worklist.md
 ```
 
+## CI/CD e Deploy
+
+Pipeline no GitHub Actions (`.github/workflows/ci.yml`):
+
+```text
+push/PR
+   │
+   ▼
+backend ──┐
+frontend ─┼─► phpunit ──► e2e ──► load-test ──► build-and-push
+```
+
+`backend`/`frontend` rodam análise estática e lint; `phpunit`, `e2e` (Playwright) e `load-test` (k6) rodam contra Postgres/Redis reais via services do Actions. `build-and-push` só roda em push na `main` (`if: github.ref == 'refs/heads/main'`) e publica as imagens no GHCR:
+
+```text
+ghcr.io/justgu1/autoschedule-backend
+ghcr.io/justgu1/autoschedule-nginx
+```
+
+Deploy é GitOps, monorepo (sem repositório separado): o ArgoCD já roda no cluster de produção e a Application `autoschedule` (namespace `argocd`) aponta direto pra `infra/k8s` deste repositório, `targetRevision: main`, com `automated.prune` + `selfHeal` e `argocd-image-updater` rastreando as duas imagens acima por digest. Fluxo completo:
+
+```text
+merge na main
+   │
+   ▼
+build-and-push (GHCR)
+   │
+   ▼
+argocd-image-updater detecta novo digest
+   │
+   ▼
+ArgoCD sincroniza infra/k8s
+   │
+   ▼
+namespace `apps`: autoschedule-backend / autoschedule-frontend
+```
+
+Sem passo manual: merge na `main` já reflete em produção.
+
 ## Runtime
 
 O ambiente local utiliza Docker Compose com:
