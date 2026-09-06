@@ -121,12 +121,35 @@ jobs:
           DB_HOST: 127.0.0.1
         run: php bin/migrate.php && php bin/seed.php
 
+      # MinIO não dá pra subir via `services:` (a imagem exige `server /data`
+      # como comando, e o bloco `services:` do GitHub não aceita `command:`)
+      # -- sobe via `docker run` direto, só pra este job.
+      - name: Sobe o MinIO
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=admin -e MINIO_ROOT_PASSWORD=password \
+            minio/minio server /data
+          for i in $(seq 1 20); do
+            curl -sf http://127.0.0.1:9000/minio/health/live && break
+            sleep 1
+          done
+          docker run --rm --network host --entrypoint sh minio/mc -c "
+            mc alias set local http://127.0.0.1:9000 admin password &&
+            mc mb --ignore-existing local/autoschedule
+          "
+
       - name: PHPUnit
         working-directory: backend
         env:
           DB_HOST: 127.0.0.1
           REDIS_HOST: 127.0.0.1
           MAIL_HOST: 127.0.0.1
+          S3_ENDPOINT: http://127.0.0.1:9000
+          S3_BUCKET: autoschedule
+          S3_REGION: us-east-1
+          S3_ACCESS_KEY: admin
+          S3_SECRET_KEY: password
+          S3_PUBLIC_URL: http://127.0.0.1:9000/autoschedule
         run: vendor/bin/phpunit
 
   # E2E precisa da app inteira rodando (nginx + backend containerizados, não
