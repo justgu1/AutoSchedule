@@ -282,22 +282,24 @@ Alterações relevantes são registradas em `audit_logs`, permitindo identificar
 
 ## Processamento assíncrono
 
-O processamento assíncrono utiliza Redis quando necessário:
+O processamento assíncrono utiliza Redis como fila:
 
 ```text
-Appointment
+UserController
      │
      ▼
-Redis Queue
+Queue (RedisQueue)
      │
      ▼
-PHP Worker
+PHP Worker (bin/worker.php)
      │
      ▼
-MailProvider
+Job (SendEmailJob) -> MailProvider
 ```
 
-Scheduler e worker podem ser processos PHP CLI.
+Falha reenfileira com `attempts` incrementado; passadas 3 tentativas, vira dead-letter (`jobs:failed`) em vez de tentar pra sempre.
+
+Scheduler (`bin/scheduler.php`) e worker são processos PHP CLI -- mesma imagem Docker do backend, só o comando do container muda (`php bin/worker.php`/`php bin/scheduler.php` em vez de `php-fpm`). Cada um escala e reinicia independente via Deployment próprio no k8s.
 
 Não é necessário adicionar outro sistema de mensageria.
 

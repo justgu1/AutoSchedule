@@ -87,6 +87,17 @@ Priorizado antes do domínio de veículo/agendamento porque o primeiro endpoint 
 - [x] Reset de senha por e-mail (Mailpit + `symfony/mailer`, template HTML próprio)
 - [x] Logout (`POST /api/logout`, revoga refresh token e limpa cookies)
 
+### Entregue além do escopo original — pré-requisitos do domínio de concessionária
+
+Concessionária precisa de foto (→ MinIO) e a lixeira com purge após 30 dias precisa de tarefa agendada de verdade (→ Scheduler/Worker), então essas duas peças de infraestrutura entram antes do domínio em si. Ordem: MinIO → Scheduler/Worker → desativação de conta (User) → Concessionária → Endereço (ViaCEP + mapa).
+
+- [x] `StorageProvider` port + `MinioAdapter` (Flysystem S3, bucket compartilhado de prod provisionado em `infra-k8s`)
+- [x] Tabela `files` (metadado: path/mime/tamanho/checksum/uploaded_by) + `FileUploadService` — backup local até confirmar sucesso no storage, nunca antes
+- [x] Fila (`Queue`/`RedisQueue`, Redis): retry automático, dead-letter (`jobs:failed`) após 3 tentativas
+- [x] Scheduler (`ScheduledTask`, Redis-backed): tarefas periódicas sem duplicar disparo entre réplicas
+- [x] `bin/worker.php`/`bin/scheduler.php`, deployments próprios em k8s (mesma imagem do backend, comando diferente)
+- [x] Envio de e-mail assíncrono de verdade (reset de senha via fila — fecha lacuna que já era regra de negócio documentada e nunca tinha sido implementada)
+
 ### Dia 3 — API e regras de negócio
 
 - [x] Definir contratos da API (`GET /api` funciona como catálogo: lista endpoint, método, descrição e campos aceitos por role)

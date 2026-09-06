@@ -11,7 +11,7 @@ use App\Domain\Auth\Ports\PasswordResetTokenRepository;
 use App\Domain\Auth\Ports\RefreshTokenRepository;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
-use App\Domain\Notifications\Ports\MailProvider;
+use App\Domain\Ports\Queue;
 use App\Domain\Users\DTO\UserProfile;
 use App\Domain\Users\Ports\UserRepository;
 use App\Domain\Users\User;
@@ -19,6 +19,7 @@ use App\Domain\Users\UserRole;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
 use App\Infrastructure\Mail\MailTemplate;
+use App\Infrastructure\Mail\SendEmailJob;
 use App\Infrastructure\Pagination\PaginationPolicy;
 use App\Infrastructure\Validation\Validator;
 
@@ -38,7 +39,7 @@ final readonly class UserController
         private AuditLogger $audit,
         private PaginationPolicy $pagination,
         private PasswordResetTokenRepository $passwordResetTokens,
-        private MailProvider $mail,
+        private Queue $queue,
         private int $passwordResetTtl,
         private string $frontendUrl,
         private string $passwordResetTemplatePath,
@@ -164,7 +165,11 @@ final readonly class UserController
                 'EXPIRES_MINUTES' => (string) intdiv($this->passwordResetTtl, 60),
             ]);
 
-            $this->mail->send($user->email, 'Redefinir senha -- AutoSchedule', $html);
+            $this->queue->push(SendEmailJob::class, [
+                'to' => $user->email,
+                'subject' => 'Redefinir senha -- AutoSchedule',
+                'html_body' => $html,
+            ]);
         }
 
         return Response::success(['message' => 'If the email exists, a reset link was sent.']);

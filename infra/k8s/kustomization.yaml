@@ -4,5 +4,7 @@ kind: Kustomization
 resources:
   - sealed-secret.yaml
   - backend.yaml
+  - worker.yaml
+  - scheduler.yaml
   - frontend.yaml
   - ingressroute.yaml

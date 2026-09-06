@@ -308,17 +308,19 @@ A falha no envio do e-mail não deve impedir a criação do agendamento.
 
 ## Scheduler
 
-O scheduler PHP executa tarefas periódicas simples, como:
+O scheduler PHP executa tarefas periódicas (`ScheduledTask`), cada uma com seu próprio intervalo. O "último run" de cada tarefa fica no Redis, não em memória do processo -- sobrevive a restart e não duplica disparo se subir mais de uma réplica durante rollout.
+
+Tarefas previstas:
 
 - expirar agendamentos pendentes;
-- executar tarefas de manutenção;
+- purgar da lixeira (usuário e concessionária) passados 30 dias sem recuperação;
 - limpar dados temporários quando necessário.
 
 ## Worker
 
-O worker PHP executa tarefas assíncronas, como envio de e-mails.
+O worker PHP consome uma fila (`Queue`/Redis) e executa tarefas assíncronas, como envio de e-mails.
 
-As tarefas devem ser idempotentes sempre que possível e possuir retry para falhas temporárias.
+As tarefas devem ser idempotentes sempre que possível. Falha reenfileira com `attempts` incrementado; passadas 3 tentativas, o job vai pra uma lista de falhas (dead-letter) em vez de tentar pra sempre.
 
 ## Busca
 
