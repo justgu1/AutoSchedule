@@ -65,3 +65,8 @@ export function confirmPasswordReset(resetToken: string, password: string): Prom
 export function logout(): Promise<{ message: string }> {
     return apiFetch('/logout', { method: 'POST' });
 }
+
+/** Move a conta pra lixeira -- recuperável por 30 dias fazendo login de novo. Revoga a sessão, igual logout. */
+export function deactivateAccount(): Promise<{ message: string }> {
+    return apiFetch('/me', { method: 'DELETE' });
+}

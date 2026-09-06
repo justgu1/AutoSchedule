@@ -3,7 +3,8 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { becomeSeller, getMe } from '../lib/auth';
+import { useNavigate } from 'react-router-dom';
+import { becomeSeller, deactivateAccount, getMe } from '../lib/auth';
 
 const ROLE_LABEL: Record<string, string> = {
     admin: 'Administrador',
@@ -14,14 +15,28 @@ const ROLE_LABEL: Record<string, string> = {
 /** Confirmação do fluxo ponta a ponta: se chegou até aqui, o cookie de sessão prova quem é o usuário. */
 export function MePage() {
     const queryClient = useQueryClient();
+    const navigate = useNavigate();
     const { data: me } = useQuery({ queryKey: ['me'], queryFn: getMe });
     const becomeSellerMutation = useMutation({
         mutationFn: becomeSeller,
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ['me'] }),
     });
+    const deactivateMutation = useMutation({
+        mutationFn: deactivateAccount,
+        onSuccess: () => {
+            queryClient.removeQueries({ queryKey: ['me'] });
+            void navigate('/login', { replace: true });
+        },
+    });
 
     if (!me) {
         return null;
+    }
+
+    function handleDeactivate() {
+        if (window.confirm('Desativar sua conta? Você pode recuperá-la fazendo login de novo em até 30 dias.')) {
+            deactivateMutation.mutate();
+        }
     }
 
     return (
@@ -45,6 +60,15 @@ export function MePage() {
                     Tornar-se vendedor
                 </Button>
             )}
+            <Button
+                sx={{ mt: 2, ml: me.role === 'customer' ? 1 : 0 }}
+                variant="outlined"
+                color="error"
+                disabled={deactivateMutation.isPending}
+                onClick={handleDeactivate}
+            >
+                Desativar minha conta
+            </Button>
         </Paper>
     );
 }

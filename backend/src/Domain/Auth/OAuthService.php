@@ -18,6 +18,7 @@ use App\Domain\Exceptions\DomainException;
 use App\Domain\Users\Ports\UserRepository;
 use App\Domain\Users\User;
 use App\Domain\Users\UserRole;
+use App\Domain\Users\UserStatus;
 
 /**
  * Orquestra o login (email+senha -> tokens), a renovação via refresh_token, o
@@ -54,10 +55,23 @@ final readonly class OAuthService
             throw new DomainException('Invalid credentials.', DomainErrorType::Unauthorized);
         }
 
+        $this->restoreIfTrashed($user, $ipAddress, $userAgent);
+
         $tokenPair = $this->issueTokenPair($client, $user->id, $user->role, $client->allowedScopes);
         $this->audit->record(AuditEvent::LoginSucceeded, $user->id, $user->id, [], $ipAddress, $userAgent);
 
         return $tokenPair;
+    }
+
+    /** Login com sucesso é a chance de recuperar a conta -- se ainda não foi anonimizada em definitivo, sai da lixeira aqui, sem exigir passo extra do usuário. */
+    private function restoreIfTrashed(User $user, string $ipAddress, ?string $userAgent): void
+    {
+        if ($user->status !== UserStatus::Trashed || $user->anonymizedAt instanceof \DateTimeImmutable) {
+            return;
+        }
+
+        $this->users->restore($user->id);
+        $this->audit->record(AuditEvent::AccountRestored, $user->id, $user->id, [], $ipAddress, $userAgent);
     }
 
     public function refresh(string $clientId, string $rawRefreshToken, string $ipAddress, ?string $userAgent): TokenPair
@@ -130,6 +144,7 @@ final readonly class OAuthService
                 throw new DomainException('Invalid Google credential.', DomainErrorType::Unauthorized);
             }
 
+            $this->restoreIfTrashed($user, $ipAddress, $userAgent);
             $this->audit->record(AuditEvent::LoginSucceeded, $user->id, $user->id, ['via' => 'google'], $ipAddress, $userAgent);
 
             return $this->issueTokenPair($client, $user->id, $user->role, $client->allowedScopes);
@@ -139,6 +154,7 @@ final readonly class OAuthService
 
         if ($existingByEmail instanceof \App\Domain\Users\User) {
             $this->identities->insert(UserIdentity::link($existingByEmail->id, 'google', $claims->subject, $claims->email));
+            $this->restoreIfTrashed($existingByEmail, $ipAddress, $userAgent);
             $this->audit->record(AuditEvent::LoginSucceeded, $existingByEmail->id, $existingByEmail->id, ['via' => 'google', 'linked' => true], $ipAddress, $userAgent);
 
             return $this->issueTokenPair($client, $existingByEmail->id, $existingByEmail->role, $client->allowedScopes);

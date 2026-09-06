@@ -6,6 +6,7 @@ namespace Tests\Infrastructure\Users;
 
 use App\Domain\Users\User;
 use App\Domain\Users\UserRole;
+use App\Domain\Users\UserStatus;
 use App\Infrastructure\Database\PostgresConnection;
 use App\Infrastructure\Users\PostgresUserRepository;
 use PHPUnit\Framework\Attributes\Test;
@@ -100,6 +101,8 @@ final class PostgresUserRepositoryTest extends TestCase
             createdAt: $user->createdAt,
             updatedAt: new \DateTimeImmutable(),
             deletedAt: null,
+            status: $user->status,
+            anonymizedAt: $user->anonymizedAt,
         );
         $this->repository->update($updated);
 
@@ -150,6 +153,74 @@ final class PostgresUserRepositoryTest extends TestCase
     }
 
     #[Test]
+    public function trash_move_pra_status_trashed_e_seta_deleted_at_sem_apagar_pii(): void
+    {
+        $user = User::register('Ada Lovelace', 'ada@example.com', null, 'secret', UserRole::Customer);
+        $this->repository->insert($user);
+
+        $this->repository->trash($user->id);
+
+        $statement = $this->pdo->prepare('SELECT name, email, status, deleted_at FROM users WHERE id = ?');
+        $statement->execute([$user->id]);
+        $row = $statement->fetch();
+
+        $this->assertSame('Ada Lovelace', $row['name']);
+        $this->assertSame('ada@example.com', $row['email']);
+        $this->assertSame('trashed', $row['status']);
+        $this->assertNotNull($row['deleted_at']);
+    }
+
+    #[Test]
+    public function trashed_ainda_e_encontrado_por_email_e_bloqueia_reuso_do_email(): void
+    {
+        $user = User::register('Ada Lovelace', 'ada@example.com', null, 'secret', UserRole::Customer);
+        $this->repository->insert($user);
+
+        $this->repository->trash($user->id);
+
+        $found = $this->repository->findByEmail('ada@example.com');
+        $this->assertNotNull($found);
+        $this->assertSame(UserStatus::Trashed, $found->status);
+        $this->assertTrue($this->repository->existsByEmail('ada@example.com'));
+    }
+
+    #[Test]
+    public function restore_volta_status_active_e_limpa_deleted_at(): void
+    {
+        $user = User::register('Ada Lovelace', 'ada@example.com', null, 'secret', UserRole::Customer);
+        $this->repository->insert($user);
+        $this->repository->trash($user->id);
+
+        $this->repository->restore($user->id);
+
+        $restored = $this->repository->findById($user->id);
+        assert($restored instanceof \App\Domain\Users\User);
+        $this->assertSame(UserStatus::Active, $restored->status);
+        $this->assertNull($restored->deletedAt);
+    }
+
+    #[Test]
+    public function find_purge_eligible_so_traz_trashed_ha_mais_de_grace_days_e_ainda_nao_anonimizado(): void
+    {
+        $now = new \DateTimeImmutable();
+        $recentlyTrashed = User::register('Recent', 'recent@example.com', null, 'secret', UserRole::Customer);
+        $longTrashed = User::register('Long', 'long@example.com', null, 'secret', UserRole::Customer);
+        $active = User::register('Active', 'active@example.com', null, 'secret', UserRole::Customer);
+        $this->repository->insert($recentlyTrashed);
+        $this->repository->insert($longTrashed);
+        $this->repository->insert($active);
+        $this->repository->trash($recentlyTrashed->id);
+        $this->repository->trash($longTrashed->id);
+        // trash() usa now() do banco -- ajusta deleted_at pra simular 31 dias atrás.
+        $this->pdo->prepare("UPDATE users SET deleted_at = now() - interval '31 days' WHERE id = ?")->execute([$longTrashed->id]);
+
+        $eligible = $this->repository->findPurgeEligible(30, $now);
+
+        $this->assertCount(1, $eligible);
+        $this->assertSame($longTrashed->id, $eligible[0]->id);
+    }
+
+    #[Test]
     public function find_page_inclui_usuario_recem_criado_mas_nao_o_soft_deletado(): void
     {
         $active = User::register('Ada Lovelace', 'ada@example.com', null, 'secret', UserRole::Customer);
@@ -195,5 +266,17 @@ final class PostgresUserRepositoryTest extends TestCase
         $this->repository->insert(User::register('Ada', 'ada-seller@example.com', null, 'secret', UserRole::Seller));
 
         $this->assertSame($before + 1, $this->repository->countByRole(UserRole::Seller));
+    }
+
+    #[Test]
+    public function count_by_role_nao_conta_admin_trashed(): void
+    {
+        $admin = User::register('Ada', 'ada-admin@example.com', null, 'secret', UserRole::Admin);
+        $this->repository->insert($admin);
+        $before = $this->repository->countByRole(UserRole::Admin);
+
+        $this->repository->trash($admin->id);
+
+        $this->assertSame($before - 1, $this->repository->countByRole(UserRole::Admin));
     }
 }

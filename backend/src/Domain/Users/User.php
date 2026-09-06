@@ -20,6 +20,8 @@ final readonly class User
         public \DateTimeImmutable $createdAt,
         public \DateTimeImmutable $updatedAt,
         public ?\DateTimeImmutable $deletedAt,
+        public UserStatus $status,
+        public ?\DateTimeImmutable $anonymizedAt,
     ) {
     }
 
@@ -45,6 +47,8 @@ final readonly class User
             createdAt: $now,
             updatedAt: $now,
             deletedAt: null,
+            status: UserStatus::Active,
+            anonymizedAt: null,
         );
     }
 
@@ -68,6 +72,8 @@ final readonly class User
             createdAt: $this->createdAt,
             updatedAt: new \DateTimeImmutable(),
             deletedAt: $this->deletedAt,
+            status: $this->status,
+            anonymizedAt: $this->anonymizedAt,
         );
     }
 
@@ -88,6 +94,8 @@ final readonly class User
             createdAt: $this->createdAt,
             updatedAt: $now,
             deletedAt: $this->deletedAt,
+            status: $this->status,
+            anonymizedAt: $this->anonymizedAt,
         );
     }
 
@@ -117,7 +125,25 @@ final readonly class User
             createdAt: $this->createdAt,
             updatedAt: new \DateTimeImmutable(),
             deletedAt: $this->deletedAt,
+            status: $this->status,
+            anonymizedAt: $this->anonymizedAt,
         );
+    }
+
+    /** Só dá pra restaurar da lixeira antes da anonimização definitiva ter rodado. */
+    public function isEligibleForRestore(): bool
+    {
+        return $this->status === UserStatus::Trashed && !$this->anonymizedAt instanceof \DateTimeImmutable;
+    }
+
+    /** Passou da janela de recuperação (30 dias) sem ser restaurado -- elegível pra rotina de purge. */
+    public function isEligibleForPurge(int $graceDays, \DateTimeImmutable $now): bool
+    {
+        if ($this->status !== UserStatus::Trashed || $this->anonymizedAt instanceof \DateTimeImmutable || !$this->deletedAt instanceof \DateTimeImmutable) {
+            return false;
+        }
+
+        return $this->deletedAt <= $now->modify("-{$graceDays} days");
     }
 
     /**
@@ -143,6 +169,8 @@ final readonly class User
             createdAt: $this->createdAt,
             updatedAt: $this->updatedAt,
             deletedAt: $this->deletedAt,
+            status: UserStatus::Deleted,
+            anonymizedAt: new \DateTimeImmutable(),
         );
     }
 }

@@ -22,6 +22,12 @@ Enum user_role {
   customer
 }
 
+Enum user_status {
+  active
+  trashed
+  deleted
+}
+
 Enum vehicle_status {
   available
   sold
@@ -48,6 +54,8 @@ Table users {
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
   deleted_at timestamptz
+  status user_status [not null, default: 'active']
+  anonymized_at timestamptz
 }
 
 Table dealerships {
@@ -199,6 +207,19 @@ A senha é armazenada somente como hash no campo `password`.
 `password_set_at` pode ser `NULL` enquanto a senha ainda não tiver sido definida pelo próprio cliente.
 
 A senha em texto puro nunca deve ser persistida ou registrada em logs.
+
+## Ciclo de vida (lixeira)
+
+`status` (`active`/`trashed`/`deleted`) é a fonte de verdade do ciclo de vida -- `deleted_at` marca quando entrou na lixeira (não é mais "deletado = deleted_at preenchido" sozinho). `anonymized_at` marca quando a anonimização definitiva rodou, idempotência da rotina de purge.
+
+Índice em `status` (`users_status_idx`) -- toda query de listagem/login filtra por ele.
+
+Convenção de visibilidade nas queries:
+
+```text
+findByEmail/findById/existsByEmail/findPage/count  -> status <> 'deleted'  (mostra active + trashed)
+countByRole (trava do último admin)                -> status = 'active'   (só ativo protege)
+```
 
 ## Auditoria
 

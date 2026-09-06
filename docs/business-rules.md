@@ -225,6 +225,28 @@ PUT /me/password
 
 Qualquer um dos dois caminhos revoga todos os refresh tokens do usuário e audita `user.password_changed` com `context.via` (`reset` ou `self`).
 
+## Ciclo de vida da conta (lixeira)
+
+Três estados: `active`, `trashed`, `deleted`. Modelo pensado pra ser reaproveitado por outras entidades com a mesma necessidade (concessionária, por exemplo).
+
+```text
+DELETE /me (ou /users/{id})
+        │
+        ▼
+    trashed (revoga todo refresh token -- ninguém continua logado)
+        │
+        ├── login de novo dentro de 30 dias ──► active (restaurado, sem passo extra)
+        ├── admin chama POST /users/{id}/restore ──► active
+        ├── POST /me/purge (ou admin /users/{id}/purge) ──► deleted, agora
+        └── 30 dias sem recuperação (rotina agendada) ──► deleted, automático
+```
+
+`deleted` é terminal: nome/e-mail/telefone escrubados (LGPD, direito ao esquecimento), `id`/`role`/timestamps preservados pra histórico/auditoria continuar válido. A linha nunca é removida do banco -- dado anonimizado deixa de ser dado pessoal (LGPD Art. 12), pode ser retido.
+
+Enquanto `trashed`, a conta ainda existe pra fins de unicidade de e-mail (ninguém mais consegue se cadastrar com aquele e-mail até a purge rodar) mas não aparece como ativa em nenhum fluxo (login com sucesso a restaura antes de mais nada).
+
+`assertNotLastAdmin` só conta admin com `status = active` -- um admin `trashed` já não protege ninguém.
+
 ## Autorização
 
 A autorização é aplicada no backend.
@@ -250,6 +272,9 @@ user.created
 user.profile_updated
 user.password_changed
 user.deleted
+user.trashed
+user.restored
+user.purged
 ```
 
 Planejados conforme os domínios abaixo forem implementados:

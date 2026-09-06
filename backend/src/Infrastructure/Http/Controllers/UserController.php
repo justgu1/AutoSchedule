@@ -16,6 +16,7 @@ use App\Domain\Users\DTO\UserProfile;
 use App\Domain\Users\Ports\UserRepository;
 use App\Domain\Users\User;
 use App\Domain\Users\UserRole;
+use App\Domain\Users\UserStatus;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
 use App\Infrastructure\Mail\MailTemplate;
@@ -242,9 +243,10 @@ final readonly class UserController
     }
 
     /**
-     * LGPD, direito ao esquecimento: anonimiza+soft-delete (nunca hard-delete)
-     * e revoga todo refresh token do usuário -- ninguém continua logado depois
-     * disso. Roda dentro da transação já aberta pelo AuthContextMiddleware.
+     * Move pra lixeira (reversível por 30 dias -- login de novo restaura, ou
+     * `restore()`/`purge()` abaixo) e revoga todo refresh token, ninguém
+     * continua logado depois disso. Roda dentro da transação já aberta pelo
+     * AuthContextMiddleware.
      */
     public function destroy(Request $request): Response
     {
@@ -254,11 +256,41 @@ final readonly class UserController
             $this->assertNotLastAdmin();
         }
 
-        $this->users->anonymizeAndSoftDelete($user->id);
+        $this->users->trash($user->id);
         $this->refreshTokens->revokeAllForUser($user->id);
-        $this->audit->record(AuditEvent::AccountDeleted, $request->attribute('auth')->subject, $user->id, [], $request->ip(), $request->header('user-agent'));
+        $this->audit->record(AuditEvent::AccountTrashed, $request->attribute('auth')->subject, $user->id, [], $request->ip(), $request->header('user-agent'));
 
-        return Response::success(['message' => 'Account deleted.']);
+        return Response::success(['message' => 'Account moved to trash. Log in again within 30 days to restore it, or it will be permanently anonymized.']);
+    }
+
+    /** Admin-only -- recupera uma conta na lixeira sem esperar o dono logar de novo. */
+    public function restore(Request $request): Response
+    {
+        $user = $this->requireUser($request);
+
+        if (!$user->isEligibleForRestore()) {
+            throw new DomainException('This account is not in the trash (or was already permanently deleted).', DomainErrorType::Conflict);
+        }
+
+        $this->users->restore($user->id);
+        $this->audit->record(AuditEvent::AccountRestored, $request->attribute('auth')->subject, $user->id, [], $request->ip(), $request->header('user-agent'));
+
+        return Response::success(['message' => 'Account restored.']);
+    }
+
+    /** Apaga em definitivo agora, sem esperar os 30 dias -- self (`/me/purge`) ou admin (`/users/{id}/purge`). */
+    public function purge(Request $request): Response
+    {
+        $user = $this->requireUser($request);
+
+        if ($user->status !== UserStatus::Trashed) {
+            throw new DomainException('This account is not in the trash.', DomainErrorType::Conflict);
+        }
+
+        $this->users->anonymizeAndSoftDelete($user->id);
+        $this->audit->record(AuditEvent::AccountPurged, $request->attribute('auth')->subject, $user->id, [], $request->ip(), $request->header('user-agent'));
+
+        return Response::success(['message' => 'Account permanently deleted.']);
     }
 
     /** @param array<string, mixed> $data */

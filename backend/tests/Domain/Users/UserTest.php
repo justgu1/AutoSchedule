@@ -6,6 +6,7 @@ namespace Tests\Domain\Users;
 
 use App\Domain\Users\User;
 use App\Domain\Users\UserRole;
+use App\Domain\Users\UserStatus;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -23,6 +24,8 @@ final class UserTest extends TestCase
         $this->assertNotNull($user->passwordSetAt);
         $this->assertNull($user->emailVerifiedAt);
         $this->assertNull($user->deletedAt);
+        $this->assertSame(UserStatus::Active, $user->status);
+        $this->assertNull($user->anonymizedAt);
     }
 
     #[Test]
@@ -57,6 +60,8 @@ final class UserTest extends TestCase
         $this->assertNotSame('ada@example.com', $anonymized->email);
         $this->assertNull($anonymized->phone);
         $this->assertStringContainsString(substr($user->id, 0, 8), $anonymized->email);
+        $this->assertSame(UserStatus::Deleted, $anonymized->status);
+        $this->assertNotNull($anonymized->anonymizedAt);
     }
 
     #[Test]
@@ -117,5 +122,53 @@ final class UserTest extends TestCase
         $this->assertSame($user->id, $updated->id);
         $this->assertSame($user->name, $updated->name);
         $this->assertSame($user->passwordHash, $updated->passwordHash);
+    }
+
+    #[Test]
+    public function is_eligible_for_restore_permite_so_trashed_ainda_nao_anonimizado(): void
+    {
+        $active = User::register('Ada', 'ada@example.com', null, 'secret', UserRole::Customer);
+        $trashed = $this->trashedFixture();
+        $alreadyAnonymized = $this->trashedFixture(anonymizedAt: new \DateTimeImmutable());
+
+        $this->assertFalse($active->isEligibleForRestore());
+        $this->assertTrue($trashed->isEligibleForRestore());
+        $this->assertFalse($alreadyAnonymized->isEligibleForRestore());
+    }
+
+    #[Test]
+    public function is_eligible_for_purge_exige_trashed_ha_mais_de_grace_days_e_ainda_nao_anonimizado(): void
+    {
+        $now = new \DateTimeImmutable();
+        $active = User::register('Ada', 'ada@example.com', null, 'secret', UserRole::Customer);
+        $recentlyTrashed = $this->trashedFixture(deletedAt: $now->modify('-5 days'));
+        $longTrashed = $this->trashedFixture(deletedAt: $now->modify('-31 days'));
+        $alreadyAnonymized = $this->trashedFixture(deletedAt: $now->modify('-31 days'), anonymizedAt: $now);
+
+        $this->assertFalse($active->isEligibleForPurge(30, $now));
+        $this->assertFalse($recentlyTrashed->isEligibleForPurge(30, $now));
+        $this->assertTrue($longTrashed->isEligibleForPurge(30, $now));
+        $this->assertFalse($alreadyAnonymized->isEligibleForPurge(30, $now));
+    }
+
+    private function trashedFixture(?\DateTimeImmutable $deletedAt = null, ?\DateTimeImmutable $anonymizedAt = null): User
+    {
+        $user = User::register('Ada', 'ada@example.com', null, 'secret', UserRole::Customer);
+
+        return new User(
+            id: $user->id,
+            name: $user->name,
+            email: $user->email,
+            phone: $user->phone,
+            passwordHash: $user->passwordHash,
+            role: $user->role,
+            passwordSetAt: $user->passwordSetAt,
+            emailVerifiedAt: $user->emailVerifiedAt,
+            createdAt: $user->createdAt,
+            updatedAt: $user->updatedAt,
+            deletedAt: $deletedAt ?? new \DateTimeImmutable(),
+            status: UserStatus::Trashed,
+            anonymizedAt: $anonymizedAt,
+        );
     }
 }

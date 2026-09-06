@@ -47,6 +47,7 @@ final class MigrationRunnerTest extends TestCase
         $this->pdo->exec('DROP TABLE IF EXISTS oauth_refresh_tokens CASCADE');
         $this->pdo->exec('DROP TABLE IF EXISTS oauth_clients CASCADE');
         $this->pdo->exec('DROP TABLE IF EXISTS users CASCADE');
+        $this->pdo->exec('DROP TYPE IF EXISTS user_status');
 
         if ($this->pdo->query("SELECT to_regclass('public.migrations')")->fetchColumn() !== null) {
             $this->pdo->exec('DELETE FROM migrations');

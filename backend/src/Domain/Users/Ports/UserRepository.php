@@ -19,8 +19,17 @@ interface UserRepository
 
     public function update(User $user): void;
 
-    /** Anonymizes PII and soft-deletes the row (LGPD right to erasure). No-op if the user doesn't exist. */
+    /** Anonymizes PII and marks the row permanently deleted (LGPD right to erasure, purge da lixeira). No-op if the user doesn't exist. */
     public function anonymizeAndSoftDelete(string $id): void;
+
+    /** Move pra lixeira -- recuperável por até 30 dias (login de novo ou `restore()`). */
+    public function trash(string $id): void;
+
+    /** Restaura da lixeira -- controller já validou `isEligibleForRestore()` antes de chamar. */
+    public function restore(string $id): void;
+
+    /** @return list<User> usuários na lixeira há mais de `$graceDays`, ainda não anonimizados -- candidatos da rotina de purge. */
+    public function findPurgeEligible(int $graceDays, \DateTimeImmutable $now): array;
 
     /** @return list<User> */
     public function findPage(int $limit, int $offset): array;
@@ -28,6 +37,6 @@ interface UserRepository
     /** Total de usuários não deletados -- base pro `meta.last_page` da paginação. */
     public function count(): int;
 
-    /** Usado pra bloquear DELETE do último admin restante (409 Conflict). */
+    /** Usado pra bloquear DELETE do último admin restante (409 Conflict) -- só conta admin ativo, um trashed não protege ninguém. */
     public function countByRole(UserRole $role): int;
 }

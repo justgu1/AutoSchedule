@@ -117,7 +117,13 @@ return static function (Router $router, Container $container, Application $app):
         '/api/me',
         [$userController, 'destroy'],
         roles: $anyAuthenticatedRole,
-        description: 'Deletes your account (anonymizes PII and soft-deletes it, per LGPD).',
+        description: 'Moves your account to trash (recoverable for 30 days by logging in again, or restored/purged by an admin).',
+    );
+    $router->post(
+        '/api/me/purge',
+        [$userController, 'purge'],
+        roles: $anyAuthenticatedRole,
+        description: 'Permanently anonymizes your trashed account now, without waiting 30 days.',
     );
 
     $router->get(
@@ -150,6 +156,18 @@ return static function (Router $router, Container $container, Application $app):
         '/api/users/{id}',
         [$userController, 'destroy'],
         roles: ['admin'],
-        description: 'Deletes a user (anonymizes PII and soft-deletes it, per LGPD). Fails if it is the last admin.',
+        description: 'Moves a user to trash. Fails if it is the last admin.',
+    );
+    $router->post(
+        '/api/users/{id}/restore',
+        [$userController, 'restore'],
+        roles: ['admin'],
+        description: 'Restores a trashed user before the 30-day window expires.',
+    );
+    $router->post(
+        '/api/users/{id}/purge',
+        [$userController, 'purge'],
+        roles: ['admin'],
+        description: 'Permanently anonymizes a trashed user now, without waiting 30 days.',
     );
 };

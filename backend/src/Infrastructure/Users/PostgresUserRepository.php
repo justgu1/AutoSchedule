@@ -7,6 +7,7 @@ namespace App\Infrastructure\Users;
 use App\Domain\Users\Ports\UserRepository;
 use App\Domain\Users\User;
 use App\Domain\Users\UserRole;
+use App\Domain\Users\UserStatus;
 
 final readonly class PostgresUserRepository implements UserRepository
 {
@@ -26,7 +27,7 @@ final readonly class PostgresUserRepository implements UserRepository
 
     public function existsByEmail(string $email): bool
     {
-        $statement = $this->pdo->prepare('SELECT 1 FROM users WHERE email = :email AND deleted_at IS NULL');
+        $statement = $this->pdo->prepare("SELECT 1 FROM users WHERE email = :email AND status <> 'deleted'");
         $statement->execute(['email' => $email]);
 
         return $statement->fetchColumn() !== false;
@@ -57,18 +58,36 @@ final readonly class PostgresUserRepository implements UserRepository
         $statement->execute($params);
     }
 
+    public function trash(string $id): void
+    {
+        $statement = $this->pdo->prepare(
+            "UPDATE users SET status = 'trashed', deleted_at = now(), updated_at = now() WHERE id = :id",
+        );
+        $statement->execute(['id' => $id]);
+    }
+
+    public function restore(string $id): void
+    {
+        $statement = $this->pdo->prepare(
+            "UPDATE users SET status = 'active', deleted_at = NULL, updated_at = now() WHERE id = :id",
+        );
+        $statement->execute(['id' => $id]);
+    }
+
     public function anonymizeAndSoftDelete(string $id): void
     {
         $user = $this->findById($id);
 
-        if (!$user instanceof \App\Domain\Users\User) {
+        if (!$user instanceof User) {
             return;
         }
 
         $anonymized = $user->anonymized();
 
         $statement = $this->pdo->prepare(<<<'SQL'
-            UPDATE users SET name = :name, email = :email, phone = :phone, deleted_at = now(), updated_at = now()
+            UPDATE users SET
+                name = :name, email = :email, phone = :phone,
+                status = 'deleted', anonymized_at = now(), deleted_at = now(), updated_at = now()
             WHERE id = :id
             SQL);
 
@@ -80,10 +99,21 @@ final readonly class PostgresUserRepository implements UserRepository
         ]);
     }
 
+    public function findPurgeEligible(int $graceDays, \DateTimeImmutable $now): array
+    {
+        $statement = $this->pdo->prepare(<<<'SQL'
+            SELECT * FROM users
+            WHERE status = 'trashed' AND anonymized_at IS NULL AND deleted_at <= :threshold
+            SQL);
+        $statement->execute(['threshold' => $now->modify("-{$graceDays} days")->format(DATE_ATOM)]);
+
+        return array_map($this->fromRow(...), $statement->fetchAll());
+    }
+
     public function findPage(int $limit, int $offset): array
     {
         $statement = $this->pdo->prepare(
-            'SELECT * FROM users WHERE deleted_at IS NULL ORDER BY created_at LIMIT :limit OFFSET :offset',
+            "SELECT * FROM users WHERE status <> 'deleted' ORDER BY created_at LIMIT :limit OFFSET :offset",
         );
         $statement->bindValue('limit', $limit, \PDO::PARAM_INT);
         $statement->bindValue('offset', $offset, \PDO::PARAM_INT);
@@ -94,12 +124,12 @@ final readonly class PostgresUserRepository implements UserRepository
 
     public function count(): int
     {
-        return (int) $this->pdo->query('SELECT COUNT(*) FROM users WHERE deleted_at IS NULL')->fetchColumn();
+        return (int) $this->pdo->query("SELECT COUNT(*) FROM users WHERE status <> 'deleted'")->fetchColumn();
     }
 
     public function countByRole(UserRole $role): int
     {
-        $statement = $this->pdo->prepare('SELECT COUNT(*) FROM users WHERE role = :role AND deleted_at IS NULL');
+        $statement = $this->pdo->prepare("SELECT COUNT(*) FROM users WHERE role = :role AND status = 'active'");
         $statement->execute(['role' => $role->value]);
 
         return (int) $statement->fetchColumn();
@@ -107,7 +137,7 @@ final readonly class PostgresUserRepository implements UserRepository
 
     private function findOneBy(string $column, string $value): ?User
     {
-        $statement = $this->pdo->prepare("SELECT * FROM users WHERE {$column} = :value AND deleted_at IS NULL");
+        $statement = $this->pdo->prepare("SELECT * FROM users WHERE {$column} = :value AND status <> 'deleted'");
         $statement->execute(['value' => $value]);
         $row = $statement->fetch();
 
@@ -129,6 +159,8 @@ final readonly class PostgresUserRepository implements UserRepository
             createdAt: new \DateTimeImmutable($row['created_at']),
             updatedAt: new \DateTimeImmutable($row['updated_at']),
             deletedAt: $this->toDateTime($row['deleted_at']),
+            status: UserStatus::from($row['status']),
+            anonymizedAt: $this->toDateTime($row['anonymized_at']),
         );
     }
 
