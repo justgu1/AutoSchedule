@@ -10,8 +10,9 @@ interface AuditLogger
 {
     /**
      * @param ?string $actorId quem executou a ação -- null quando a identidade não foi provada (login falho, reuso de refresh token)
-     * @param ?string $targetUserId conta afetada pela ação -- igual a $actorId numa ação sobre a própria conta, diferente quando um admin mexe em outro usuário
+     * @param string $auditableType nome da entidade afetada (ex: 'User', 'Dealership') -- polimórfico, cresce sem migration nova a cada domínio
+     * @param ?string $auditableId id da entidade afetada -- igual a $actorId quando o próprio ator é o afetado, diferente quando alguém mexe no registro de outra pessoa/entidade
      * @param array<string, mixed> $context detalhe extra (ex: email tentado num login falho, quais campos mudaram)
      */
-    public function record(AuditEvent $event, ?string $actorId, ?string $targetUserId, array $context, string $ipAddress, ?string $userAgent): void;
+    public function record(AuditEvent $event, ?string $actorId, string $auditableType, ?string $auditableId, array $context, string $ipAddress, ?string $userAgent): void;
 }

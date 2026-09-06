@@ -7,6 +7,7 @@ use App\Domain\Users\DTO\UserProfile;
 use App\Domain\Users\Ports\UserRepository;
 use App\Domain\Users\UserRole;
 use App\Infrastructure\Container\Container;
+use App\Infrastructure\Http\Controllers\DealershipController;
 use App\Infrastructure\Http\Controllers\OAuthController;
 use App\Infrastructure\Http\Controllers\UserController;
 use App\Infrastructure\Http\Request;
@@ -169,5 +170,64 @@ return static function (Router $router, Container $container, Application $app):
         [$userController, 'purge'],
         roles: ['admin'],
         description: 'Permanently anonymizes a trashed user now, without waiting 30 days.',
+    );
+
+    $adminOrSeller = ['admin', 'seller'];
+    $dealershipController = $container->get(DealershipController::class);
+    $router->get(
+        '/api/dealerships',
+        [$dealershipController, 'index'],
+        roles: $adminOrSeller,
+        description: 'Lists dealerships -- admin sees all (paginated), seller sees only their own.',
+    );
+    $router->post(
+        '/api/dealerships',
+        [$dealershipController, 'store'],
+        roles: $adminOrSeller,
+        description: 'Creates a dealership. Seller becomes the owner automatically; admin must send owner_user_id.',
+        accepts: ['name', 'zip_code', 'address', 'number', 'complement', 'neighborhood', 'city', 'state', 'phone', 'owner_user_id'],
+    );
+    $router->get(
+        '/api/dealerships/{id}',
+        [$dealershipController, 'show'],
+        roles: $adminOrSeller,
+        description: 'Returns a single dealership with its photo gallery.',
+    );
+    $router->patch(
+        '/api/dealerships/{id}',
+        [$dealershipController, 'update'],
+        roles: $adminOrSeller,
+        description: 'Updates dealership profile fields. Admin may also send owner_user_id to reassign it to another seller.',
+        accepts: ['name', 'zip_code', 'address', 'number', 'complement', 'neighborhood', 'city', 'state', 'phone', 'owner_user_id'],
+    );
+    $router->delete(
+        '/api/dealerships/{id}',
+        [$dealershipController, 'destroy'],
+        roles: $adminOrSeller,
+        description: 'Moves a dealership to trash.',
+    );
+    $router->post(
+        '/api/dealerships/{id}/restore',
+        [$dealershipController, 'restore'],
+        roles: $adminOrSeller,
+        description: 'Restores a trashed dealership before the 30-day window expires.',
+    );
+    $router->post(
+        '/api/dealerships/{id}/purge',
+        [$dealershipController, 'purge'],
+        roles: $adminOrSeller,
+        description: 'Permanently anonymizes a trashed dealership now, without waiting 30 days.',
+    );
+    $router->post(
+        '/api/dealerships/{id}/images',
+        [$dealershipController, 'addImage'],
+        roles: $adminOrSeller,
+        description: 'Uploads a photo to the dealership gallery (multipart, field name "image").',
+    );
+    $router->delete(
+        '/api/dealerships/{id}/images/{imageId}',
+        [$dealershipController, 'removeImage'],
+        roles: $adminOrSeller,
+        description: 'Removes a photo from the dealership gallery.',
     );
 };

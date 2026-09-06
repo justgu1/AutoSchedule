@@ -14,11 +14,35 @@ Possui acesso global à aplicação.
 
 ### Seller
 
-Pode estar associado a uma ou mais concessionárias. Seu acesso é limitado às concessionárias às quais está associado.
+É dono de uma ou mais concessionárias (`owner_user_id`, ver [Concessionária](#concessionária)). Seu acesso é limitado às concessionárias das quais é dono.
 
 ### Customer
 
 Não precisa estar associado a uma concessionária. É identificado por nome, e-mail e telefone durante o agendamento.
+
+## Concessionária
+
+Toda concessionária pertence a exatamente um seller (`owner_user_id`, `NOT NULL`) -- sem tabela de associação, sem concessionária compartilhada entre sellers. Um mesmo seller pode ser dono de mais de uma concessionária.
+
+- `seller`: cria concessionária (torna-se dono automaticamente), gerencia só as próprias (RLS já escopa a leitura -- "não é sua" e "não existe" respondem o mesmo `404`, de propósito, pra não vazar que a concessionária de outro seller existe);
+- `admin`: gerencia qualquer concessionária, inclusive reassocia o dono (`owner_user_id` no corpo de `PATCH`, mesma rota de update -- sem endpoint paralelo só pra isso).
+
+### Ciclo de vida (lixeira)
+
+Mesmo modelo de três estados da conta de usuário (`active`/`trashed`/`deleted`), reaproveitado -- ver [Ciclo de vida da conta](#ciclo-de-vida-da-conta-lixeira) acima pro fluxo genérico. Duas entradas na lixeira:
+
+```text
+DELETE /dealerships/{id}                    -> lixeira manual (o dono decidiu remover)
+conta do dono desativada (DELETE /me)       -> lixeira em cascata, trashed_by_owner_deactivation = true
+```
+
+Só a lixeira em cascata é restaurada automaticamente quando o dono volta a logar -- a manual fica parada até o próprio seller (ou um admin) chamar `POST /dealerships/{id}/restore`. `POST /dealerships/{id}/purge` anonimiza na hora, sem esperar os 30 dias; a rotina agendada faz o mesmo pra quem não foi recuperado a tempo.
+
+Anonimização escruba identificador direto (nome vira "Concessionária removida", endereço/complemento/telefone/`google_place_id` apagados) mas preserva CEP/cidade/estado/geolocalização -- não são dado pessoal, e mantêm o histórico de agendamento localizável.
+
+### Fotos
+
+Validadas por MIME (`image/jpeg`, `image/png`, `image/webp`) antes do upload pro MinIO, mesmo `FileUploadService` do resto da aplicação. `position` calculada automaticamente (próxima livre), sem endpoint de reordenar ainda.
 
 ## Veículos
 
@@ -275,14 +299,19 @@ user.deleted
 user.trashed
 user.restored
 user.purged
+dealership.created
+dealership.updated
+dealership.trashed
+dealership.restored
+dealership.purged
+dealership.owner_reassigned
+dealership.image_added
+dealership.image_removed
 ```
 
 Planejados conforme os domínios abaixo forem implementados:
 
 ```text
-dealership.created
-dealership.updated
-dealership.deleted
 vehicle.created
 vehicle.updated
 vehicle.status_changed
@@ -365,7 +394,7 @@ As regras críticas devem ser protegidas também pelo banco de dados:
 
 - e-mail único;
 - foreign keys;
-- associação única entre seller e dealership;
+- cada concessionária pertence a exatamente um seller (`owner_user_id` `NOT NULL`, sem tabela de associação);
 - posição única das imagens;
 - intervalos de disponibilidade válidos;
 - prevenção de agendamentos concorrentes.

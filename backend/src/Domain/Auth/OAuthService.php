@@ -13,12 +13,13 @@ use App\Domain\Auth\Ports\RefreshTokenRepository;
 use App\Domain\Auth\Ports\TokenIssuer;
 use App\Domain\Auth\Ports\UserIdentityRepository;
 use App\Domain\Auth\ValueObjects\AccessTokenClaims;
+use App\Domain\Dealerships\Ports\DealershipRepository;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
+use App\Domain\Shared\TrashableStatus;
 use App\Domain\Users\Ports\UserRepository;
 use App\Domain\Users\User;
 use App\Domain\Users\UserRole;
-use App\Domain\Users\UserStatus;
 
 /**
  * Orquestra o login (email+senha -> tokens), a renovação via refresh_token, o
@@ -32,6 +33,7 @@ final readonly class OAuthService
         private UserRepository $users,
         private RefreshTokenRepository $refreshTokens,
         private UserIdentityRepository $identities,
+        private DealershipRepository $dealerships,
         private TokenIssuer $tokens,
         private GoogleIdTokenVerifier $googleVerifier,
         private AuditLogger $audit,
@@ -48,7 +50,7 @@ final readonly class OAuthService
         if (!$user instanceof \App\Domain\Users\User || !$user->verifyPassword($password)) {
             // Identidade não provada -- sem actor. $user?->id como alvo quando o
             // email existe (senha errada), null quando nem a conta existe.
-            $this->audit->record(AuditEvent::LoginFailed, null, $user?->id, ['email' => $email], $ipAddress, $userAgent);
+            $this->audit->record(AuditEvent::LoginFailed, null, 'User', $user?->id, ['email' => $email], $ipAddress, $userAgent);
 
             // De propósito, a mesma mensagem/status pra "email não existe" e "senha
             // errada" -- não pode vazar se a conta existe ou não.
@@ -58,7 +60,7 @@ final readonly class OAuthService
         $restored = $this->restoreIfTrashed($user, $ipAddress, $userAgent);
 
         $tokenPair = $this->issueTokenPair($client, $user->id, $user->role, $client->allowedScopes, $restored);
-        $this->audit->record(AuditEvent::LoginSucceeded, $user->id, $user->id, [], $ipAddress, $userAgent);
+        $this->audit->record(AuditEvent::LoginSucceeded, $user->id, 'User', $user->id, [], $ipAddress, $userAgent);
 
         return $tokenPair;
     }
@@ -66,12 +68,13 @@ final readonly class OAuthService
     /** Login com sucesso é a chance de recuperar a conta -- se ainda não foi anonimizada em definitivo, sai da lixeira aqui, sem exigir passo extra do usuário. Devolve se restaurou, pro token final avisar o frontend. */
     private function restoreIfTrashed(User $user, string $ipAddress, ?string $userAgent): bool
     {
-        if ($user->status !== UserStatus::Trashed || $user->anonymizedAt instanceof \DateTimeImmutable) {
+        if ($user->status !== TrashableStatus::Trashed || $user->anonymizedAt instanceof \DateTimeImmutable) {
             return false;
         }
 
         $this->users->restore($user->id);
-        $this->audit->record(AuditEvent::AccountRestored, $user->id, $user->id, [], $ipAddress, $userAgent);
+        $this->dealerships->restoreAutoTrashedOwnedBy($user->id);
+        $this->audit->record(AuditEvent::AccountRestored, $user->id, 'User', $user->id, [], $ipAddress, $userAgent);
 
         return true;
     }
@@ -91,7 +94,7 @@ final readonly class OAuthService
             $this->refreshTokens->revokeFamily($current->familyId);
             // Ninguém provou identidade pra fazer esse request -- é o dono do
             // token roubado que sofre, não quem o usou (esse é o desconhecido).
-            $this->audit->record(AuditEvent::RefreshTokenReused, null, $current->userId, [], $ipAddress, $userAgent);
+            $this->audit->record(AuditEvent::RefreshTokenReused, null, 'User', $current->userId, [], $ipAddress, $userAgent);
 
             throw new DomainException('Invalid or expired refresh token.', DomainErrorType::Unauthorized);
         }
@@ -147,7 +150,7 @@ final readonly class OAuthService
             }
 
             $restored = $this->restoreIfTrashed($user, $ipAddress, $userAgent);
-            $this->audit->record(AuditEvent::LoginSucceeded, $user->id, $user->id, ['via' => 'google'], $ipAddress, $userAgent);
+            $this->audit->record(AuditEvent::LoginSucceeded, $user->id, 'User', $user->id, ['via' => 'google'], $ipAddress, $userAgent);
 
             return $this->issueTokenPair($client, $user->id, $user->role, $client->allowedScopes, $restored);
         }
@@ -157,7 +160,7 @@ final readonly class OAuthService
         if ($existingByEmail instanceof \App\Domain\Users\User) {
             $this->identities->insert(UserIdentity::link($existingByEmail->id, 'google', $claims->subject, $claims->email));
             $restored = $this->restoreIfTrashed($existingByEmail, $ipAddress, $userAgent);
-            $this->audit->record(AuditEvent::LoginSucceeded, $existingByEmail->id, $existingByEmail->id, ['via' => 'google', 'linked' => true], $ipAddress, $userAgent);
+            $this->audit->record(AuditEvent::LoginSucceeded, $existingByEmail->id, 'User', $existingByEmail->id, ['via' => 'google', 'linked' => true], $ipAddress, $userAgent);
 
             return $this->issueTokenPair($client, $existingByEmail->id, $existingByEmail->role, $client->allowedScopes, $restored);
         }
@@ -166,7 +169,7 @@ final readonly class OAuthService
         $newUser = User::register($claims->name, $claims->email, null, bin2hex(random_bytes(32)), UserRole::Customer);
         $this->users->insert($newUser);
         $this->identities->insert(UserIdentity::link($newUser->id, 'google', $claims->subject, $claims->email));
-        $this->audit->record(AuditEvent::UserCreated, $newUser->id, $newUser->id, ['role' => $newUser->role->value, 'via' => 'google'], $ipAddress, $userAgent);
+        $this->audit->record(AuditEvent::UserCreated, $newUser->id, 'User', $newUser->id, ['role' => $newUser->role->value, 'via' => 'google'], $ipAddress, $userAgent);
 
         return $this->issueTokenPair($client, $newUser->id, $newUser->role, $client->allowedScopes);
     }
@@ -193,7 +196,7 @@ final readonly class OAuthService
         ));
 
         // actorId/userId nulos -- não é um usuário, é o client se autenticando; o client_id vai no context.
-        $this->audit->record(AuditEvent::ServiceTokenIssued, null, null, ['client_id' => $client->clientId], $ipAddress, $userAgent);
+        $this->audit->record(AuditEvent::ServiceTokenIssued, null, 'User', null, ['client_id' => $client->clientId], $ipAddress, $userAgent);
 
         return new TokenPair($accessToken, $this->accessTokenTtl, $client->allowedScopes);
     }

@@ -11,9 +11,7 @@ services:
     working_dir: /app
     command: sh -c "npm install && npm run dev -- --host"
     environment:
-      # Mesma fonte que o backend usa (GOOGLE_CLIENT_ID) -- só o Vite exige o
-      # prefixo VITE_ pra expor a variável no bundle do browser, então
-      # derivamos aqui em vez de pedir pra configurar duas vezes no .env.
+      # prefixo VITE_ pra expor a variável no bundle do browser
       VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     volumes:
       - ./frontend:/app

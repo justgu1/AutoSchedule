@@ -9,14 +9,15 @@ use App\Domain\Audit\Ports\AuditLogger;
 use App\Domain\Auth\PasswordResetToken;
 use App\Domain\Auth\Ports\PasswordResetTokenRepository;
 use App\Domain\Auth\Ports\RefreshTokenRepository;
+use App\Domain\Dealerships\Ports\DealershipRepository;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
 use App\Domain\Ports\Queue;
+use App\Domain\Shared\TrashableStatus;
 use App\Domain\Users\DTO\UserProfile;
 use App\Domain\Users\Ports\UserRepository;
 use App\Domain\Users\User;
 use App\Domain\Users\UserRole;
-use App\Domain\Users\UserStatus;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
 use App\Infrastructure\Mail\MailTemplate;
@@ -37,6 +38,7 @@ final readonly class UserController
     public function __construct(
         private UserRepository $users,
         private RefreshTokenRepository $refreshTokens,
+        private DealershipRepository $dealerships,
         private AuditLogger $audit,
         private PaginationPolicy $pagination,
         private PasswordResetTokenRepository $passwordResetTokens,
@@ -72,7 +74,7 @@ final readonly class UserController
         ]);
 
         $user = $this->createUser($data, UserRole::from($data['role']));
-        $this->audit->record(AuditEvent::UserCreated, $user->id, $user->id, ['role' => $user->role->value], $request->ip(), $request->header('user-agent'));
+        $this->audit->record(AuditEvent::UserCreated, $user->id, 'User', $user->id, ['role' => $user->role->value], $request->ip(), $request->header('user-agent'));
 
         return Response::success(UserProfile::fromUser($user)->toArray(), 201);
     }
@@ -89,7 +91,7 @@ final readonly class UserController
         ]);
 
         $user = $this->createUser($data, UserRole::from($data['role']));
-        $this->audit->record(AuditEvent::UserCreated, $request->attribute('auth')->subject, $user->id, ['role' => $user->role->value], $request->ip(), $request->header('user-agent'));
+        $this->audit->record(AuditEvent::UserCreated, $request->attribute('auth')->subject, 'User', $user->id, ['role' => $user->role->value], $request->ip(), $request->header('user-agent'));
 
         return Response::success(UserProfile::fromUser($user)->toArray(), 201);
     }
@@ -143,7 +145,7 @@ final readonly class UserController
             $context['role'] = ['from' => $previousRole->value, 'to' => $user->role->value];
         }
 
-        $this->audit->record(AuditEvent::ProfileUpdated, $request->attribute('auth')->subject, $user->id, $context, $request->ip(), $request->header('user-agent'));
+        $this->audit->record(AuditEvent::ProfileUpdated, $request->attribute('auth')->subject, 'User', $user->id, $context, $request->ip(), $request->header('user-agent'));
 
         return Response::success(UserProfile::fromUser($user)->toArray());
     }
@@ -239,7 +241,7 @@ final readonly class UserController
     private function applyNewPassword(User $user, string $password, string $via, Request $request): void
     {
         $this->users->update($user->withNewPassword($password));
-        $this->audit->record(AuditEvent::PasswordChanged, $user->id, $user->id, ['via' => $via], $request->ip(), $request->header('user-agent'));
+        $this->audit->record(AuditEvent::PasswordChanged, $user->id, 'User', $user->id, ['via' => $via], $request->ip(), $request->header('user-agent'));
     }
 
     /**
@@ -258,7 +260,10 @@ final readonly class UserController
 
         $this->users->trash($user->id);
         $this->refreshTokens->revokeAllForUser($user->id);
-        $this->audit->record(AuditEvent::AccountTrashed, $request->attribute('auth')->subject, $user->id, [], $request->ip(), $request->header('user-agent'));
+        // Cascata: concessionária ativa desse seller vai junto pra lixeira (marcada como "por causa da desativação",
+        // pra restaurar seletivo depois -- a que ele já tinha trashed manualmente antes fica quieta).
+        $this->dealerships->trashAllOwnedBy($user->id);
+        $this->audit->record(AuditEvent::AccountTrashed, $request->attribute('auth')->subject, 'User', $user->id, [], $request->ip(), $request->header('user-agent'));
 
         return Response::success(['message' => 'Account moved to trash. Log in again within 30 days to restore it, or it will be permanently anonymized.']);
     }
@@ -273,7 +278,8 @@ final readonly class UserController
         }
 
         $this->users->restore($user->id);
-        $this->audit->record(AuditEvent::AccountRestored, $request->attribute('auth')->subject, $user->id, [], $request->ip(), $request->header('user-agent'));
+        $this->dealerships->restoreAutoTrashedOwnedBy($user->id);
+        $this->audit->record(AuditEvent::AccountRestored, $request->attribute('auth')->subject, 'User', $user->id, [], $request->ip(), $request->header('user-agent'));
 
         return Response::success(['message' => 'Account restored.']);
     }
@@ -283,12 +289,12 @@ final readonly class UserController
     {
         $user = $this->requireUser($request);
 
-        if ($user->status !== UserStatus::Trashed) {
+        if ($user->status !== TrashableStatus::Trashed) {
             throw new DomainException('This account is not in the trash.', DomainErrorType::Conflict);
         }
 
         $this->users->anonymizeAndSoftDelete($user->id);
-        $this->audit->record(AuditEvent::AccountPurged, $request->attribute('auth')->subject, $user->id, [], $request->ip(), $request->header('user-agent'));
+        $this->audit->record(AuditEvent::AccountPurged, $request->attribute('auth')->subject, 'User', $user->id, [], $request->ip(), $request->header('user-agent'));
 
         return Response::success(['message' => 'Account permanently deleted.']);
     }

@@ -9,12 +9,14 @@ Agendamento de visitas a veículos. Desafio técnico de Engenheiro(a) Full-Stack
 - [Requisitos](#requisitos)
 - [Quick Start](#quick-start)
 - [Desenvolvimento](#desenvolvimento)
+- [Variáveis de ambiente](#variáveis-de-ambiente)
+- [API](#api)
 - [Documentação](#documentação)
 - [Processo seletivo](#processo-seletivo)
 
 ## Sobre o projeto
 
-O AutoSchedule é uma aplicação para agendamento de visitas a veículos. Fluxo:
+O AutoSchedule é uma aplicação para agendamento de visitas a veículos. Fluxo do cliente final:
 
 1. Visualizar os detalhes do veículo;
 2. Consultar as datas disponíveis;
@@ -28,13 +30,17 @@ O AutoSchedule é uma aplicação para agendamento de visitas a veículos. Fluxo
 
 Os horários disponíveis são definidos por data — ao selecionar um dia, só os horários livres naquele dia são apresentados.
 
+Antes desse fluxo existir, o projeto precisou de uma base de conta/autenticação, concessionária e infraestrutura por trás dele (login com role, MinIO pra foto, fila/scheduler pra e-mail assíncrono e purga da lixeira) — é o que já está implementado hoje; veículo/disponibilidade/agendamento em si são a próxima etapa (`Worklist.md`).
+
 ## Stack
 
 **Frontend** — React, TypeScript, Vite, Material UI, TanStack Query
 
-**Backend** — PHP 8.4, PHP-FPM, Composer
+**Backend** — PHP 8.4, PHP-FPM, Composer, PDO (PostgreSQL)
 
-**Infraestrutura** — Docker, Docker Compose, Nginx, PostgreSQL, Redis, MinIO
+**Infraestrutura local** — Docker, Docker Compose, Nginx, PostgreSQL, Redis, MinIO, Mailpit
+
+**Infraestrutura de produção** — Kubernetes, ArgoCD (GitOps), sealed-secrets, GHCR
 
 ## Requisitos
 
@@ -64,6 +70,7 @@ Acesse `http://localhost:8080`.
 | `make build` | Reconstrói as imagens |
 | `make ps` | Verifica o status dos serviços |
 | `make logs` | Acompanha os logs |
+| `make migrate` / `make rollback` / `make seed` | Migrations e seeders |
 | `make test` | Roda os testes do backend |
 | `make load-test` | Roda a suíte de teste de carga (k6) |
 | `make e2e` | Roda a suíte E2E (Playwright) contra o build real |
@@ -92,6 +99,25 @@ docker compose -f docker-compose.yaml up -d --build
 curl http://localhost:8080/health
 ```
 
+## Variáveis de ambiente
+
+`make setup` já gera o `.env` a partir do `.env.example` com credenciais aleatórias (DB, MinIO) e chave RSA do JWT — a lista abaixo é só quando algo precisar mudar manualmente.
+
+- **Banco**: `DB_DRIVER`/`DB_DATABASE`/`DB_USERNAME`/`DB_PASSWORD`/`DB_PORT` (role admin, migrations/seeders); `DB_APP_USERNAME`/`DB_APP_PASSWORD` (role restrita `NOSUPERUSER NOBYPASSRLS` que a aplicação usa em runtime — é o que faz o RLS valer algo).
+- **Aplicação**: `APP_TIMEZONE` (`America/Sao_Paulo` — o container roda em UTC, "hoje" precisa do fuso certo).
+- **Rate limit**: `RATE_LIMIT_GENERAL_MAX`/`_WINDOW`, `RATE_LIMIT_AUTH_MAX`/`_WINDOW` — sliding window, geral vs. rotas sensíveis (login/registro/reset).
+- **Paginação**: `PAGINATION_DEFAULT_PER_PAGE`, `PAGINATION_MAX_PER_PAGE`.
+- **Segurança**: `COOKIE_SECURE`, `SECURITY_HSTS_ENABLED`, `CORS_ALLOWED_ORIGINS`.
+- **Google**: `GOOGLE_CLIENT_ID` (login social).
+- **E-mail**: `MAIL_FROM`, `FRONTEND_URL` (link do reset de senha), `MAILPIT_UI_PORT`.
+- **MinIO**: `S3_ENDPOINT`/`S3_BUCKET`/`S3_REGION`/`S3_ACCESS_KEY`/`S3_SECRET_KEY`/`S3_PUBLIC_URL`, `TEMP_STORAGE_PATH` (backup local do upload até o MinIO confirmar).
+
+## API
+
+Prefixo `/api`, resposta sempre no mesmo envelope (`{ "status": "success", "data": {...} }` ou `{ "status": "error", "message": "...", "errors": {...} }`). Sem doc OpenAPI separada pra manter sincronizada: `GET /api` já devolve, em tempo de request, só as rotas que quem chamou (anônimo ou autenticado) pode de fato usar.
+
+Contratos de cada rota (validação, roles, cascatas) ficam documentados por domínio em [`docs/business-rules.md`](docs/business-rules.md), pra não duplicar em dois lugares.
+
 ## Documentação
 
 - [Arquitetura](docs/architecture.md)
@@ -99,7 +125,7 @@ curl http://localhost:8080/health
 - [Banco de dados](docs/database.md)
 - [Testes](docs/testing.md)
 - [Catálogo regra → teste](docs/test-catalog.md)
-- [Worklist do sprint](Worklist.md)
+- [Worklist](Worklist.md)
 
 ## Processo seletivo
 

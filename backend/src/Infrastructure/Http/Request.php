@@ -14,6 +14,7 @@ final class Request
      * @param array<string, string> $params
      * @param array<string, mixed> $attributes
      * @param array<string, string> $cookies
+     * @param array<string, UploadedFile> $files
      */
     public function __construct(
         private readonly string $method,
@@ -25,6 +26,7 @@ final class Request
         private readonly string $ip = '',
         private array $attributes = [],
         private readonly array $cookies = [],
+        private readonly array $files = [],
     ) {
         // Normaliza aqui, sai sempre normalizado.
         $this->path = self::normalizePath($path);
@@ -46,6 +48,7 @@ final class Request
             body: $rawBody ?? '',
             ip: (string) ($_SERVER['REMOTE_ADDR'] ?? ''),
             cookies: $_COOKIE,
+            files: self::resolveFiles(),
         );
     }
 
@@ -112,6 +115,11 @@ final class Request
         return $this->cookies[$name] ?? $default;
     }
 
+    public function file(string $name): ?UploadedFile
+    {
+        return $this->files[$name] ?? null;
+    }
+
     public function attribute(string $key, mixed $default = null): mixed
     {
         return $this->attributes[$key] ?? $default;
@@ -161,5 +169,26 @@ final class Request
         }
 
         return $headers;
+    }
+
+    /** @return array<string, UploadedFile> */
+    private static function resolveFiles(): array
+    {
+        $files = [];
+
+        foreach ($_FILES as $name => $file) {
+            if (!is_string($name) || !is_array($file)) {
+                continue;
+            }
+
+            $files[$name] = new UploadedFile(
+                tmpName: (string) ($file['tmp_name'] ?? ''),
+                originalName: (string) ($file['name'] ?? ''),
+                size: (int) ($file['size'] ?? 0),
+                error: (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE),
+            );
+        }
+
+        return $files;
     }
 }
