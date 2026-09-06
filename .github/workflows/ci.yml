@@ -66,6 +66,8 @@ jobs:
 
       - name: Build
         working-directory: frontend
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
         run: npm run build
 
   # PHPUnit precisa só de Postgres/Redis/Mailpit como dado -- GitHub cuida
@@ -207,6 +209,8 @@ jobs:
           context: .
           file: infra/docker/frontend/Dockerfile
           push: true
+          build-args: |
+            VITE_GOOGLE_CLIENT_ID=${{ vars.GOOGLE_CLIENT_ID }}
           tags: |
             ghcr.io/justgu1/autoschedule-nginx:latest
             ghcr.io/justgu1/autoschedule-nginx:sha-${{ github.sha }}
