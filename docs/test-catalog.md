@@ -112,7 +112,7 @@ Não é seção de `business-rules.md` (é requisito não-funcional, não regra 
 | Operável 100% por teclado, ordem de foco lógica | E2E: `keyboard-navigation.spec.ts > login é operável só com teclado, sem mouse`, `> registro é operável só com teclado até o campo de role` |
 | Sem quebra de layout em viewport mobile | Toda a suíte E2E roda em 2 projetos Playwright (`chromium` desktop + `mobile`, `iPhone 13`) -- qualquer spec que falhe só no mobile pega isso |
 | Indicador visual de foco (2.4.7, AA) | **Não coberto por teste automatizado** -- é visual, sem asserção confiável sem screenshot-diff; revisão manual |
-| Uso sem JavaScript (texto puro / navegador reader-only) | **Não aplicável a este teste automatizado** -- SPA 100% client-rendered, sem SSR; `<noscript>` em `index.html` avisa o usuário, mas não há conteúdo funcional sem JS (mudaria com migração pra SSR, fora de escopo) |
+| Uso sem JavaScript (texto puro / navegador reader-only) | **Não aplicável a este teste automatizado** -- SPA 100% client-rendered, sem SSR; `<noscript>` em `index.html` avisa o usuário, mas não há conteúdo funcional sem JS (resolve com migração pra SSR, ver `Worklist.md`) |
 
 ## Lacunas conhecidas
 

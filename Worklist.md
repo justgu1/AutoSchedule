@@ -1,208 +1,147 @@
 # Worklist
 
-## Sprint de 7 dias
+Backlog do projeto: epic > issue > task. Cada `[x]` já está em `main`; `[ ]` é o que falta. A ordem das epics é a ordem de dependência real (uma concessionária precisa existir antes de ter veículo; um veículo precisa de disponibilidade antes de agendamento), não um cronograma fixo.
 
-**Período:** 02/09/2026 a 09/09/2026
+## Epic: Fundação
 
-**Objetivo:** desenvolver, testar, documentar e publicar o primeiro release do AutoSchedule, com aplicação containerizada, pipeline automatizado e deploy em Kubernetes utilizando GitOps e ArgoCD.
+### Issue: Ambiente local
 
----
+- [x] Docker Compose (backend, frontend, nginx, postgres, redis, minio, mailpit)
+- [x] `docker-compose.override.yml` -- bind mount + HMR do Vite, nunca em produção
+- [x] Makefile (`setup`/`up`/`down`/`build`/`logs`/`ps` + geração de credenciais e chaves RSA)
+- [x] `.env.example`, `.gitignore`, `.dockerignore`
 
-### Dia 1 — Fundação e ambiente local
+### Issue: Backend PHP sem framework
 
-- [x] Configurar backend PHP 8.4
-- [x] Configurar PHP-FPM
-- [x] Configurar Composer
-- [x] Configurar frontend React + TypeScript
-- [x] Configurar Vite
-- [x] Configurar Material UI
-- [x] Configurar TanStack Query
-- [x] Criar Dockerfile do backend
-- [x] Criar Dockerfile multi-stage do frontend
-- [x] Configurar Docker Compose
-- [x] Definir variáveis de ambiente
-- [x] Definir estrutura inicial da aplicação
-- [x] Definir estratégia de imagens Docker
-- [x] Configurar Nginx como gateway da aplicação
-- [x] Configurar PostgreSQL
-- [x] Configurar Redis
-- [x] Configurar MinIO
-- [x] Configurar armazenamento temporário para uploads
-- [x] Automatizar configuração do ambiente através do Makefile
-- [x] Automatizar instalação das dependências
-- [x] Configurar build do frontend
-- [x] Validar ambiente local completo
-- [x] Validar acesso ao frontend
-- [x] Validar endpoint `/health`
-- [x] Criar `.env.example`
-- [x] Criar `.gitignore`
-- [x] Criar `.dockerignore`
-- [x] Criar documentação inicial
-- [x] Criar branch de setup
-- [x] Aplicar Conventional Commits
+- [x] Bootstrap da aplicação (`Application`, `config/*.php`)
+- [x] Router + pipeline de middlewares
+- [x] Container de injeção de dependência (`ContainerFactory`, bindings explícitos)
+- [x] Sistema de migrations e seeders (PHP, idempotente)
 
-### Dia 2 — Banco de dados e domínio
+### Issue: Frontend
 
-- [x] Implementar bootstrap da aplicação PHP (`Application`, `config/app.php`)
-- [x] Corrigir duplicação da rota `/api` no Nginx
-- [x] Configurar live-reload do backend (PHP) em ambiente local
-- [x] Configurar live-reload do frontend (Vite) em ambiente local
-- [x] Isolar ambiente de desenvolvimento via `docker-compose.override.yml`
-- [x] Definir modelo de dados
-- [x] Definir relacionamentos
-- [x] Definir índices e constraints
-- [x] Configurar banco de dados na aplicação
-- [x] Criar migrations (`users`, `oauth_clients`, `oauth_refresh_tokens`, RLS/role de app, `audit_logs`)
-- [ ] Criar entidade de veículo
-- [ ] Criar entidade de cliente
-- [ ] Criar entidade de agendamento
-- [x] Implementar persistência (`users`, `oauth_clients`, `oauth_refresh_tokens`, `audit_logs` — veículo/agendamento pendente)
-- [x] Criar dados iniciais para desenvolvimento (seeders: admin + oauth clients)
-- [ ] Implementar regras de disponibilidade
-- [ ] Validar modelo e persistência (validado só pro escopo de usuário/auth acima)
+- [x] Vite + React + TypeScript + Material UI + TanStack Query
+- [x] Dockerfile multi-stage (build Node -> runtime Nginx)
 
-### Entregue além do escopo original — fundação de autenticação e API
+## Epic: Conta e autenticação
 
-Priorizado antes do domínio de veículo/agendamento porque o primeiro endpoint real do projeto precisava fixar o padrão de autenticação, autorização e segurança que o resto do sistema (concessionárias, veículos, agendamentos) vai seguir depois.
+### Issue: Domínio de usuário
 
-- [x] Router, pipeline de middlewares, container de injeção de dependência
-- [x] Tratamento central de exceções, validação, fundação de logging e Redis
-- [x] Sistema de migrations e seeders
-- [x] Domínio de usuário (`User`, `UserRole`, self-service `/me`, CRUD admin `/users`)
-- [x] Registro de OAuth clients, emissão de JWT (RS256)
-- [x] Autenticação: endpoint único `POST /oauth/token` (login/refresh pelo formato do body, sem `grant_type`), refresh token opaco com rotação e reuse-detection
-- [x] `AuthContextMiddleware` + `RoleMiddleware`: claims por request, roles declarados por rota
-- [x] Row-Level Security em `users`, role de banco restrita (`autoschedule_app`, `NOSUPERUSER NOBYPASSRLS`)
-- [x] Audit log (`audit_logs`, `actor_id` separado de `user_id`) nos fluxos de auth e nas rotas de usuário
-- [x] Rate limiting (Redis, sliding window, policies `general`/`auth`, fail-open)
-- [x] Paginação em `GET /users`
-- [x] Suíte de teste de carga (k6)
-- [x] Telas de login, registro, esqueci/redefinir senha e perfil (`/me`) — 3 layouts (`PublicLayout`/`AuthLayout`/`AuthenticatedLayout`), componentizado (`FormTextField`/`SubmitButton`/`FormError`)
+- [x] `User`/`UserRole` (`admin`/`seller`/`customer`)
+- [x] Registro público (`POST /register`, role `seller`/`customer`, nunca `admin`)
+- [x] Self-service (`GET`/`PATCH /me`, self-upgrade `customer` -> `seller`)
+- [x] CRUD admin (`GET`/`POST /users`, `PATCH`/`DELETE /users/{id}`, trava do último admin)
+
+### Issue: OAuth e sessão
+
+- [x] `POST /oauth/token` único, sem `grant_type` -- corpo decide (`email`+`password`, `refresh_token`, `id_token`, `client_id`+`client_secret`)
+- [x] JWT RS256 (`TokenIssuer`), refresh token opaco com rotação e reuse-detection
 - [x] `client_credentials` (M2M)
-- [x] Login social via Google (Identity Services, conta existente linka por e-mail, e-mail novo cria customer)
-- [x] Self-service: customer vira seller (`PATCH /me`)
+- [x] Login social via Google (Identity Services, linka conta existente por e-mail ou cria `customer`)
+- [x] Cookies `HttpOnly`/`SameSite=Strict` + CSRF double-submit
+- [x] Reset de senha por e-mail (Mailpit em dev, `symfony/mailer`)
+- [x] Logout (revoga a família do refresh token)
+
+### Issue: Segurança e limites de acesso
+
+- [x] Row-Level Security em `users` (`autoschedule_app`, `NOSUPERUSER NOBYPASSRLS`)
+- [x] Rate limiting (Redis, sliding window, policies `general`/`auth`, fail-open)
 - [x] Security headers + CORS
-- [x] Cookies `HttpOnly`/`SameSite=Strict` + CSRF (double-submit `XSRF-TOKEN`)
-- [x] Registro público (`POST /api/register`, role selecionável seller/customer)
-- [x] Reset de senha por e-mail (Mailpit + `symfony/mailer`, template HTML próprio)
-- [x] Logout (`POST /api/logout`, revoga refresh token e limpa cookies)
+- [x] Paginação (`GET /users`)
+- [x] Audit log (`audit_logs`, ator separado do alvo da ação)
 
-### Entregue além do escopo original — pré-requisitos do domínio de concessionária
+### Issue: Ciclo de vida da conta (lixeira)
 
-Concessionária precisa de foto (→ MinIO) e a lixeira com purge após 30 dias precisa de tarefa agendada de verdade (→ Scheduler/Worker), então essas duas peças de infraestrutura entram antes do domínio em si. Ordem: MinIO → Scheduler/Worker → desativação de conta (User) → Concessionária → Endereço (ViaCEP + mapa).
+- [x] Estados `active`/`trashed`/`deleted`, reversível por 30 dias
+- [x] `DELETE /me` move pra lixeira e revoga toda sessão ativa
+- [x] Login restaura automaticamente dentro da janela
+- [x] `POST /users/{id}/restore`/`purge` (admin) e `/me/purge` (self-service)
+- [x] Rotina agendada purga quem passou dos 30 dias
 
-- [x] `StorageProvider` port + `MinioAdapter` (Flysystem S3, bucket compartilhado de prod provisionado em `infra-k8s`)
-- [x] Tabela `files` (metadado: path/mime/tamanho/checksum/uploaded_by) + `FileUploadService` — backup local até confirmar sucesso no storage, nunca antes
-- [x] Fila (`Queue`/`RedisQueue`, Redis): retry automático, dead-letter (`jobs:failed`) após 3 tentativas
-- [x] Scheduler (`ScheduledTask`, Redis-backed): tarefas periódicas sem duplicar disparo entre réplicas
-- [x] `bin/worker.php`/`bin/scheduler.php`, deployments próprios em k8s (mesma imagem do backend, comando diferente)
-- [x] Envio de e-mail assíncrono de verdade (reset de senha via fila — fecha lacuna que já era regra de negócio documentada e nunca tinha sido implementada)
-- [x] Ciclo de vida de conta (lixeira): `active`/`trashed`/`deleted`, reversível por 30 dias -- `DELETE /me` move pra lixeira, login de novo restaura sozinho, admin restaura/purga explícito (`POST /users/{id}/restore`/`purge`), rotina agendada purga quem passou da janela
-- [x] Modelo pensado pra ser reaproveitado por outras entidades (concessionária, próximo passo)
+## Epic: Armazenamento de arquivos
 
-### Entregue além do escopo original — domínio de Concessionária (backend)
+- [x] `StorageProvider` port + `MinioAdapter` (Flysystem S3)
+- [x] Tabela `files` (metadado: path/mime/tamanho/checksum/uploaded_by)
+- [x] `FileUploadService` -- backup local até o MinIO confirmar sucesso
 
-- [x] `Dealership`/`DealershipImage` (entidade + DTO), `App\Domain\Shared\TrashableStatus` -- enum de ciclo de vida compartilhado entre `User` e `Dealership` (era duplicado 1:1, extraído assim que o segundo domínio expôs a repetição)
-- [x] `dealerships`/`dealership_images` (migrations, RLS: seller só enxerga/altera a própria, admin qualquer uma, só `admin`/`seller` inserem) -- sem tabela de associação seller↔concessionária (`owner_user_id` direto, um seller pode ter mais de uma)
-- [x] Ciclo de vida (lixeira) reaproveitado de `users`: manual (`DELETE /dealerships/{id}`) e em cascata (`trashed_by_owner_deactivation`, dono desativou a conta) -- só a cascata restaura sozinha quando o dono loga de novo; `restore`/`purge` explícitos, mesma rotina agendada genérica dos dois domínios
-- [x] `AuditLogger` generalizado (`auditableType` explícito em vez de assumir sempre `User`) -- gap real de arquitetura, achado ao tentar auditar a primeira entidade que não é usuário
-- [x] `PurgeTrashedEntitiesTask` genérica (`Infrastructure/Scheduler`) substitui as duas `PurgeTrashedXxxTask` quase-idênticas (usuário e concessionária) por uma só, parametrizada por closures tipadas por domínio
-- [x] Galeria de fotos (MinIO, reaproveita `FileUploadService` do PR de storage) -- posição calculada automaticamente, upload/remoção
-- [x] Multipart upload no `Request` (`$_FILES` → `UploadedFile`), primeira vez que a aplicação aceita isso
-- [x] Listagem paginada tanto pro admin quanto pro seller (gap encontrado em revisão -- só o admin paginava antes)
-- [x] Suíte de teste (domínio, repositório, RLS, rotina de purge); `DealershipController` ainda sem suíte própria, só verificação manual (ver `docs/test-catalog.md`)
-- [ ] Frontend (telas de seller/admin, upload de foto, E2E) -- próximo passo dentro do mesmo PR
+## Epic: Processamento assíncrono
 
-### Dia 3 — API e regras de negócio
+- [x] Fila (`Queue`/`RedisQueue`) com retry e dead-letter após 3 tentativas
+- [x] Scheduler (`ScheduledTask`, estado em Redis -- sobrevive restart, não duplica disparo entre réplicas)
+- [x] `bin/worker.php`/`bin/scheduler.php`, deployments próprios no k8s
+- [x] Envio de e-mail de fato assíncrono (reset de senha via fila)
 
-- [x] Definir contratos da API (`GET /api` funciona como catálogo: lista endpoint, método, descrição e campos aceitos por role)
-- [ ] Implementar API REST (feito para usuário/auth; pendente pro domínio de veículo/agendamento)
-- [ ] Implementar endpoint de detalhes do veículo
-- [ ] Implementar endpoint de datas disponíveis
-- [ ] Implementar endpoint de horários disponíveis
-- [ ] Implementar endpoint de criação de agendamento
-- [x] Implementar validações (`Validator`, aplicado em toda rota de usuário/auth)
-- [ ] Impedir conflitos de agendamento
-- [x] Implementar tratamento de erros (`ExceptionHandler` central, `DomainException` tipado)
-- [x] Padronizar respostas da API (`Response::success/error/paginated`)
-- [x] Criar testes unitários (escopo de usuário/auth)
-- [x] Criar testes de integração (escopo de usuário/auth; Postgres/Redis reais via docker-compose)
+## Epic: Concessionária
 
-### Dia 4 — Aplicação frontend
+### Issue: Domínio
 
-- [ ] Criar página de agendamento
-- [ ] Implementar detalhes do veículo
-- [ ] Implementar seleção de data
-- [ ] Implementar carregamento das datas disponíveis
-- [ ] Implementar carregamento dos horários disponíveis
-- [ ] Implementar seleção de horário
-- [ ] Implementar formulário do cliente
-- [ ] Integrar frontend com a API
-- [ ] Implementar estados de carregamento
-- [ ] Implementar tratamento de erros
-- [ ] Implementar tela de confirmação
-- [ ] Ajustar responsividade
+- [x] `Dealership`/`DealershipImage`, dono via `owner_user_id` (sem tabela de associação)
+- [x] CRUD (`GET`/`POST /dealerships`, `PATCH`/`DELETE /dealerships/{id}`) -- seller só as próprias, admin qualquer uma
+- [x] RLS em `dealerships`
+- [x] Galeria de fotos (upload/remoção, MinIO)
 
-### Dia 5 — Integração e infraestrutura
+### Issue: Ciclo de vida
 
-- [ ] Finalizar funcionalidades pendentes
-- [ ] Revisar regras de negócio
-- [ ] Revisar API
-- [ ] Revisar banco de dados
-- [x] Ampliar cobertura de testes (suíte E2E com Playwright: login, registro, reset de senha via Mailpit real, logout, self-upgrade, teclado)
-- [x] Configurar análise estática (PHPStan nível 10, PHP-CS-Fixer, Rector no backend; ESLint type-aware + Prettier no frontend)
-- [x] Configurar lint e formatação (mesma entrega acima)
-- [x] Revisar acessibilidade (WCAG 2.1 AA via axe-core + navegação por teclado -- achou e corrigiu contraste insuficiente no botão "Cadastrar")
-- [ ] Revisar experiência do usuário
-- [ ] Validar fluxo completo
-- [ ] Corrigir problemas encontrados
-- [x] Configurar pipeline de CI (GitHub Actions: backend/frontend/phpunit/e2e/load-test/build-and-push)
-- [x] Configurar build das imagens
-- [x] Configurar publicação das imagens no registry (GHCR)
-- [x] Estruturar manifests Kubernetes (`infra/k8s`: backend, frontend, ingressroute, sealed-secret, kustomization)
-- [x] Configurar repositório GitOps (monorepo — ArgoCD aponta pro próprio `infra/k8s`, sem repo separado)
-- [x] Configurar ArgoCD (Application `autoschedule`, auto-sync + prune + selfHeal, image-updater por digest)
-- [x] Automatizar deploy no Kubernetes (merge na `main` → build-and-push → image-updater → ArgoCD sync, sem passo manual)
+- [x] Mesmo modelo de lixeira da conta, reaproveitado (`TrashableStatus` compartilhado)
+- [x] Lixeira manual e em cascata (conta do dono desativada), só a cascata restaura sozinha
+- [x] `AuditLogger` generalizado pra qualquer `auditableType`, não só `User`
+- [x] Rotina de purga genérica (`PurgeTrashedEntitiesTask`), reaproveitada entre usuário e concessionária
+- [x] Listagem paginada tanto pro admin quanto pro seller
 
-### Dia 6 — Estabilização e validação
+### Issue: Frontend
 
-- [x] Validar fluxo completo de CI/CD (confirmado em prod: PR #26 mergeada, pipeline verde, ArgoCD sincronizou sozinho)
-- [x] Validar deploy através do ArgoCD (`autoschedule-backend`/`autoschedule-frontend` `1/1 Running` no namespace `apps`, Application Synced/Healthy)
-- [ ] Revisar configuração Docker
-- [ ] Revisar manifests Kubernetes
-- [ ] Revisar configuração do GitOps
-- [ ] Executar testes completos
-- [ ] Executar análise estática
-- [ ] Executar lint e validações de formatação
-- [ ] Validar build das imagens
-- [ ] Validar aplicação em ambiente publicado
-- [ ] Revisar código
-- [ ] Corrigir problemas encontrados
-- [ ] Revisar performance
-- [ ] Revisar segurança
-- [ ] Revisar acessibilidade
-- [ ] Revisar experiência do usuário
+- [ ] Telas de seller (listar/criar/editar/lixeira, upload de foto)
+- [ ] Tela de admin (qualquer concessionária, reassociar dono)
+- [ ] E2E
 
-### Dia 7 — Qualidade final + Release
+## Epic: Endereço
 
-- [ ] Executar testes finais
-- [ ] Executar análise estática final
-- [ ] Executar lint e validações de formatação
-- [ ] Validar build das imagens
-- [ ] Validar pipeline completo
-- [ ] Validar deploy no Kubernetes
-- [ ] Validar fluxo completo em ambiente publicado
-- [ ] Fazer revisão final do código
-- [ ] Corrigir problemas encontrados na validação final
-- [ ] Finalizar documentação do backend
-- [ ] Finalizar documentação do frontend
-- [ ] Finalizar README
-- [ ] Documentar decisões arquiteturais
-- [ ] Revisar instruções de execução
-- [ ] Criar primeiro release
-- [ ] Criar tag da versão
-- [ ] Validar aplicação após o release
+- [ ] Autocomplete de CEP no formulário de concessionária (ViaCEP)
+- [ ] Exibição em mapa pro cliente (Google Maps Embed, read-only)
 
-## Pendente ainda dentro do sprint
+## Epic: Veículo
 
-- [ ] **Migrar pra SSR** (Next.js/Remix ou equivalente), depois do pipeline (Dia 5-7) -- hoje o frontend é SPA 100% client-rendered (`frontend/src/main.tsx` monta tudo via `createRoot`), então um browser com JavaScript desligado (texto puro, "reader-only", Lynx) não vê conteúdo nenhum, só o `<noscript>` de aviso em `index.html`. SSR resolve isso de verdade -- entrega HTML já renderizado no primeiro request, funcional mesmo sem JS.
+- [ ] `Vehicle` (marca/modelo/versão/ano/preço/status), pertence a uma concessionária
+- [ ] Galeria de fotos (mesmo padrão de `dealership_images`)
+- [ ] Busca (PostgreSQL Full Text Search + `pg_trgm`)
+- [ ] CRUD (seller gerencia os das próprias concessionárias, admin qualquer um)
+
+## Epic: Disponibilidade e agendamento
+
+Fluxo do cliente final -- o motivo de tudo acima existir:
+
+### Issue: Disponibilidade
+
+- [ ] Regras recorrentes por concessionária e por veículo (dia da semana + janela de horário)
+- [ ] Exceções pontuais por data (feriado, manutenção, horário especial)
+- [ ] Cálculo do horário efetivo: concessionária ∩ veículo ∩ exceção ∩ sem conflito de agendamento
+
+### Issue: Agendamento do cliente
+
+- [ ] Detalhe do veículo, datas e horários disponíveis
+- [ ] Formulário (nome, e-mail, telefone), sem exigir conta
+- [ ] Criação transacional (valida disponibilidade -> cria/localiza customer -> cria appointment -> audita)
+- [ ] Proteção contra reserva concorrente do mesmo veículo/horário (`409 Conflict`)
+- [ ] Notificação por e-mail (cliente, vendedores da concessionária, admin)
+
+## Epic: Qualidade
+
+- [x] PHPStan nível 10, PHP-CS-Fixer, Rector (backend)
+- [x] ESLint type-aware + Prettier (frontend)
+- [x] Suíte E2E (Playwright): login, registro, reset de senha, logout, self-upgrade, lixeira de conta, teclado, acessibilidade
+- [x] Suíte de carga (k6)
+- [x] Acessibilidade WCAG 2.1 AA (axe-core)
+- [ ] Suíte própria pro `UserController`/`DealershipController` (hoje cobertos indiretamente -- ver `docs/test-catalog.md`)
+- [ ] E2E do domínio de concessionária
+
+## Epic: CI/CD e deploy
+
+- [x] GitHub Actions (backend, frontend, phpunit, e2e, load-test, build-and-push)
+- [x] Publicação das imagens no GHCR
+- [x] Manifests Kubernetes (`infra/k8s`: backend, worker, scheduler, frontend, ingressroute, sealed-secret)
+- [x] GitOps via ArgoCD (auto-sync + prune + selfHeal, image-updater por digest, monorepo sem repositório separado)
+- [x] Deploy validado em produção, sem passo manual entre merge e release
+
+## Pendente fora da sequência acima
+
+- [ ] Migrar o frontend pra SSR (Next.js/Remix ou equivalente) -- hoje é SPA 100% client-rendered (`frontend/src/main.tsx` monta tudo via `createRoot`), então um navegador sem JavaScript não vê conteúdo nenhum além do `<noscript>` de aviso em `index.html`. SSR entrega HTML já renderizado no primeiro request.

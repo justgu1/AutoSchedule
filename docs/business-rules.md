@@ -40,9 +40,9 @@ Só a lixeira em cascata é restaurada automaticamente quando o dono volta a log
 
 Anonimização escruba identificador direto (nome vira "Concessionária removida", endereço/complemento/telefone/`google_place_id` apagados) mas preserva CEP/cidade/estado/geolocalização -- não são dado pessoal, e mantêm o histórico de agendamento localizável.
 
-### Galeria
+### Fotos
 
-Fotos validadas por MIME (`image/jpeg`, `image/png`, `image/webp`) antes do upload pro MinIO, mesmo `FileUploadService` do resto da aplicação. `position` calculada automaticamente (próxima livre), sem endpoint de reordenar ainda.
+Validadas por MIME (`image/jpeg`, `image/png`, `image/webp`) antes do upload pro MinIO, mesmo `FileUploadService` do resto da aplicação. `position` calculada automaticamente (próxima livre), sem endpoint de reordenar ainda.
 
 ## Veículos
 

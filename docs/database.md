@@ -2,16 +2,7 @@
 
 ## Banco de dados
 
-O projeto utiliza PostgreSQL como banco de dados principal.
-
-Principais decisões:
-
-- PostgreSQL;
-- UUID como identificador das entidades;
-- `timestamptz` para datas e horários;
-- `numeric(12,2)` para valores monetários;
-- integridade garantida por constraints e foreign keys;
-- índices definidos conforme os padrões de consulta da aplicação.
+PostgreSQL é o único banco do projeto. `uuid` como identificador (gerado no banco, `gen_random_uuid()`) em vez de serial -- não expõe contagem de linhas, não depende de round-trip pra saber o id antes de inserir. `timestamptz` sempre, nunca `timestamp` sem fuso -- o container roda em UTC e "hoje" muda de acordo com quem pergunta. `numeric(12,2)` pra dinheiro, nunca `float`/`double` (arredondamento binário não é problema que se quer perto de preço).
 
 ## Modelo de dados
 
