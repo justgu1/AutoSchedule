@@ -135,7 +135,8 @@ jobs:
           done
           docker run --rm --network host --entrypoint sh minio/mc -c "
             mc alias set local http://127.0.0.1:9000 admin password &&
-            mc mb --ignore-existing local/autoschedule
+            mc mb --ignore-existing local/autoschedule &&
+            mc anonymous set download local/autoschedule
           "
 
       - name: PHPUnit
