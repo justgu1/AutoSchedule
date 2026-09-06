@@ -18,6 +18,7 @@ use App\Domain\Exceptions\DomainException;
 use App\Domain\Users\Ports\UserRepository;
 use App\Domain\Users\User;
 use App\Domain\Users\UserRole;
+use App\Domain\Users\UserStatus;
 
 /**
  * Orquestra o login (email+senha -> tokens), a renovação via refresh_token, o
@@ -54,10 +55,25 @@ final readonly class OAuthService
             throw new DomainException('Invalid credentials.', DomainErrorType::Unauthorized);
         }
 
-        $tokenPair = $this->issueTokenPair($client, $user->id, $user->role, $client->allowedScopes);
+        $restored = $this->restoreIfTrashed($user, $ipAddress, $userAgent);
+
+        $tokenPair = $this->issueTokenPair($client, $user->id, $user->role, $client->allowedScopes, $restored);
         $this->audit->record(AuditEvent::LoginSucceeded, $user->id, $user->id, [], $ipAddress, $userAgent);
 
         return $tokenPair;
+    }
+
+    /** Login com sucesso é a chance de recuperar a conta -- se ainda não foi anonimizada em definitivo, sai da lixeira aqui, sem exigir passo extra do usuário. Devolve se restaurou, pro token final avisar o frontend. */
+    private function restoreIfTrashed(User $user, string $ipAddress, ?string $userAgent): bool
+    {
+        if ($user->status !== UserStatus::Trashed || $user->anonymizedAt instanceof \DateTimeImmutable) {
+            return false;
+        }
+
+        $this->users->restore($user->id);
+        $this->audit->record(AuditEvent::AccountRestored, $user->id, $user->id, [], $ipAddress, $userAgent);
+
+        return true;
     }
 
     public function refresh(string $clientId, string $rawRefreshToken, string $ipAddress, ?string $userAgent): TokenPair
@@ -130,18 +146,20 @@ final readonly class OAuthService
                 throw new DomainException('Invalid Google credential.', DomainErrorType::Unauthorized);
             }
 
+            $restored = $this->restoreIfTrashed($user, $ipAddress, $userAgent);
             $this->audit->record(AuditEvent::LoginSucceeded, $user->id, $user->id, ['via' => 'google'], $ipAddress, $userAgent);
 
-            return $this->issueTokenPair($client, $user->id, $user->role, $client->allowedScopes);
+            return $this->issueTokenPair($client, $user->id, $user->role, $client->allowedScopes, $restored);
         }
 
         $existingByEmail = $this->users->findByEmail($claims->email);
 
         if ($existingByEmail instanceof \App\Domain\Users\User) {
             $this->identities->insert(UserIdentity::link($existingByEmail->id, 'google', $claims->subject, $claims->email));
+            $restored = $this->restoreIfTrashed($existingByEmail, $ipAddress, $userAgent);
             $this->audit->record(AuditEvent::LoginSucceeded, $existingByEmail->id, $existingByEmail->id, ['via' => 'google', 'linked' => true], $ipAddress, $userAgent);
 
-            return $this->issueTokenPair($client, $existingByEmail->id, $existingByEmail->role, $client->allowedScopes);
+            return $this->issueTokenPair($client, $existingByEmail->id, $existingByEmail->role, $client->allowedScopes, $restored);
         }
 
         // Ninguém sabe/usa essa senha -- só ocupa o campo NOT NULL; login dessa conta é sempre via Google até um reset trocar por uma real.
@@ -191,7 +209,7 @@ final readonly class OAuthService
     }
 
     /** @param list<string> $scopes */
-    private function issueTokenPair(OAuthClient $client, string $userId, UserRole $role, array $scopes): TokenPair
+    private function issueTokenPair(OAuthClient $client, string $userId, UserRole $role, array $scopes, bool $accountRestored = false): TokenPair
     {
         $accessToken = $this->tokens->issueAccessToken(
             AccessTokenClaims::issue($userId, $client->clientId, $role, $scopes, $this->accessTokenTtl),
@@ -200,7 +218,7 @@ final readonly class OAuthService
         [$rawRefreshToken, $refreshToken] = RefreshToken::issue($client->id, $userId, $scopes, $this->refreshTokenTtl);
         $this->refreshTokens->insert($refreshToken);
 
-        return new TokenPair($accessToken, $this->accessTokenTtl, $scopes, $rawRefreshToken);
+        return new TokenPair($accessToken, $this->accessTokenTtl, $scopes, $rawRefreshToken, $accountRestored);
     }
 
     private function requireClient(string $clientId, GrantType $grantType): OAuthClient

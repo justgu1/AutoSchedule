@@ -14,4 +14,7 @@ enum AuditEvent: string
     case ProfileUpdated = 'user.profile_updated';
     case PasswordChanged = 'user.password_changed';
     case AccountDeleted = 'user.deleted';
+    case AccountTrashed = 'user.trashed';
+    case AccountRestored = 'user.restored';
+    case AccountPurged = 'user.purged';
 }

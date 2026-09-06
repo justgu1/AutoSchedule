@@ -3,26 +3,30 @@ import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import { useMutation } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import { FormError } from '../components/FormError';
 import { FormTextField } from '../components/FormTextField';
 import { GoogleSignInButton } from '../components/GoogleSignInButton';
 import { SubmitButton } from '../components/SubmitButton';
+import { Toast } from '../components/Toast';
 import { ApiError } from '../lib/apiClient';
 import { login, loginWithGoogle } from '../lib/auth';
 
 export function LoginPage() {
     const navigate = useNavigate();
+    const location = useLocation();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [noticeOpen, setNoticeOpen] = useState(Boolean((location.state as { message?: string } | null)?.message));
+    const notice = (location.state as { message?: string } | null)?.message ?? '';
 
     const mutation = useMutation({
         mutationFn: () => login(email, password),
-        onSuccess: () => navigate('/me'),
+        onSuccess: (result) => navigate('/me', { state: { accountRestored: result.accountRestored } }),
     });
     const googleMutation = useMutation({
         mutationFn: (idToken: string) => loginWithGoogle(idToken),
-        onSuccess: () => navigate('/me'),
+        onSuccess: (result) => navigate('/me', { state: { accountRestored: result.accountRestored } }),
     });
 
     function handleSubmit(event: FormEvent) {
@@ -72,6 +76,7 @@ export function LoginPage() {
                 <GoogleSignInButton onCredential={(idToken) => googleMutation.mutate(idToken)} />
                 <FormError message={googleError?.message} />
             </Stack>
+            <Toast open={noticeOpen} message={notice} onClose={() => setNoticeOpen(false)} />
         </>
     );
 }

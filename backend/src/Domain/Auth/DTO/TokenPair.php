@@ -12,6 +12,8 @@ final readonly class TokenPair
         /** @var list<string> */
         public array $scopes,
         public ?string $refreshToken = null,
+        /** Login restaurou uma conta que estava na lixeira -- frontend avisa o usuário disso. */
+        public bool $accountRestored = false,
     ) {
     }
 }

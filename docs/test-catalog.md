@@ -75,15 +75,19 @@ Domínio ainda não implementado (`Worklist.md`, Dia 2/3/4) -- nenhum teste exis
 
 Domínio ainda não implementado -- mesma situação de Veículos/Agendamento acima.
 
-## LGPD
-
-Não é uma seção própria em `business-rules.md` hoje (implícito na regra de "direito ao esquecimento" documentada no docblock de `UserController::destroy()`), mas rastreado aqui por ser requisito explícito de conformidade:
+## Ciclo de vida da conta (lixeira)
 
 | Regra | Testes |
 |---|---|
-| Exclusão de conta anonimiza PII (nome, e-mail, telefone) e faz soft-delete -- nunca hard-delete | `UserTest::anonymized_remove_pii_mas_preserva_id_role_e_timestamps`; `PostgresUserRepositoryTest::anonymize_and_soft_delete_escruba_a_pii_na_linha_persistida`, `::anonymize_and_soft_delete_some_das_buscas`, `::anonymize_and_soft_delete_e_um_no_op_quando_usuario_nao_existe` |
-| Registro de auditoria (`audit_logs`) preserva histórico mesmo após exclusão do usuário (id/role/timestamps mantidos) | `UserTest::anonymized_remove_pii_mas_preserva_id_role_e_timestamps` (mesma base -- id/role/createdAt sobrevivem à anonimização, permitindo que `audit_logs` continue referenciando a linha) |
-| Exclusão revoga todo refresh token do usuário -- ninguém continua logado depois | Garantido por `UserController::destroy()` chamar `revokeAllForUser`; coberto indiretamente por `PostgresRefreshTokenRepositoryTest::revoke_all_for_user_revoga_todo_token_ativo_do_usuario_em_qualquer_familia` |
+| `DELETE /me` move pra `trashed` (não anonimiza na hora), revoga todo refresh token do usuário -- ninguém continua logado depois | `PostgresUserRepositoryTest::trash_move_pra_status_trashed_e_seta_deleted_at_sem_apagar_pii`; revogação garantida por `UserController::destroy()` chamar `revokeAllForUser`, coberta indiretamente por `PostgresRefreshTokenRepositoryTest::revoke_all_for_user_revoga_todo_token_ativo_do_usuario_em_qualquer_familia`; E2E: `account-trash.spec.ts > desativar a conta -> logar de novo -> conta restaurada` |
+| Conta `trashed` ainda bloqueia reuso do e-mail (ninguém mais se registra com ele até a purge rodar) | `PostgresUserRepositoryTest::trashed_ainda_e_encontrado_por_email_e_bloqueia_reuso_do_email` |
+| Login com sucesso restaura a conta `trashed` automaticamente (senha ou Google), antes de emitir o token | `OAuthServiceTest::login_with_password_restaura_conta_trashed_e_audita_antes_do_login`, `::login_with_google_restaura_conta_trashed_da_identidade_ja_linkada`; E2E: `account-trash.spec.ts` (fluxo completo, sem passo extra do usuário) |
+| Restore só funciona antes da anonimização definitiva (`isEligibleForRestore`) | `UserTest::is_eligible_for_restore_permite_so_trashed_ainda_nao_anonimizado`; `PostgresUserRepositoryTest::restore_volta_status_active_e_limpa_deleted_at` |
+| Purge (`POST /me/purge` ou rotina agendada) anonimiza PII (nome, e-mail, telefone) e marca `deleted` -- nunca hard-delete, nunca antes dos 30 dias sem ação explícita | `UserTest::anonymized_remove_pii_mas_preserva_id_role_e_timestamps`; `PostgresUserRepositoryTest::anonymize_and_soft_delete_escruba_a_pii_na_linha_persistida`, `::anonymize_and_soft_delete_some_das_buscas`, `::anonymize_and_soft_delete_e_um_no_op_quando_usuario_nao_existe` |
+| Elegibilidade de purge exige `trashed` há mais de 30 dias e ainda não anonimizado | `UserTest::is_eligible_for_purge_exige_trashed_ha_mais_de_grace_days_e_ainda_nao_anonimizado`; `PostgresUserRepositoryTest::find_purge_eligible_so_traz_trashed_ha_mais_de_grace_days_e_ainda_nao_anonimizado` |
+| Rotina agendada (`PurgeTrashedUsersTask`) só purga quem é elegível, audita cada purge, não é no-op quando não há ninguém | `PurgeTrashedUsersTaskTest` (3 casos) |
+| Registro de auditoria (`audit_logs`) preserva histórico mesmo após a conta ser purgada (id/role/timestamps mantidos) | `UserTest::anonymized_remove_pii_mas_preserva_id_role_e_timestamps` (id/role/createdAt sobrevivem à anonimização, permitindo que `audit_logs` continue referenciando a linha) |
+| Trava do último admin só considera admin `active` (um `trashed` não protege ninguém) | `PostgresUserRepositoryTest::count_by_role_nao_conta_admin_trashed` |
 
 ## Acessibilidade (WCAG 2.1 AA)
 
@@ -101,4 +105,4 @@ Não é seção de `business-rules.md` (é requisito não-funcional, não regra 
 
 Revisão desta sessão encontrou pontos sem teste automatizado direto -- documentados aqui em vez de silenciosamente ignorados:
 
-- `UserController` (e `OAuthController`) não tem suíte de teste própria -- toda regra de negócio que vive puramente no controller (ex: a trava do último admin em `assertNotLastAdmin()`, o dispatch por corpo em `updatePassword()`) só é coberta indiretamente (pelos testes de domínio que ele orquestra) ou por verificação manual via curl, documentada nas sessões de implementação. Corrigir isso é trabalho de teste novo, não de catálogo -- fica registrado aqui como próximo passo.
+- `UserController` (e `OAuthController`) não tem suíte de teste própria -- toda regra de negócio que vive puramente no controller (ex: a trava do último admin em `assertNotLastAdmin()`, o dispatch por corpo em `updatePassword()`, `destroy()`/`restore()`/`purge()`) só é coberta indiretamente (pelos testes de domínio/repositório que ele orquestra) ou por verificação manual via curl, documentada nas sessões de implementação. Corrigir isso é trabalho de teste novo, não de catálogo -- fica registrado aqui como próximo passo.

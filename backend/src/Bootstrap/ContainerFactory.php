@@ -42,6 +42,7 @@ use App\Infrastructure\Redis\RedisConnection;
 use App\Infrastructure\Scheduler\Scheduler;
 use App\Infrastructure\Storage\MinioAdapter;
 use App\Infrastructure\Users\PostgresUserRepository;
+use App\Infrastructure\Users\Scheduler\PurgeTrashedUsersTask;
 
 /**
  * Monta o Container com todos os bindings da aplicação -- único lugar que
@@ -159,7 +160,9 @@ final class ContainerFactory
         // Cada domínio registra sua própria ScheduledTask aqui conforme for implementada.
         $container->set(Scheduler::class, static fn (Container $c): Scheduler => new Scheduler(
             redis: $c->get(RedisConnection::class),
-            tasks: [],
+            tasks: [
+                new PurgeTrashedUsersTask($c->get(UserRepository::class), $c->get(AuditLogger::class)),
+            ],
         ));
         $container->set(PaginationPolicy::class, static function () use ($app): PaginationPolicy {
             $config = $app->config('pagination');

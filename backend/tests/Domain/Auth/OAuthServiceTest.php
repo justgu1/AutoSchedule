@@ -24,6 +24,7 @@ use App\Domain\Exceptions\DomainException;
 use App\Domain\Users\Ports\UserRepository;
 use App\Domain\Users\User;
 use App\Domain\Users\UserRole;
+use App\Domain\Users\UserStatus;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -63,10 +64,25 @@ final class OAuthServiceTest extends TestCase
 
         $this->assertNotSame('', $tokenPair->accessToken);
         $this->assertNotNull($tokenPair->refreshToken);
+        $this->assertFalse($tokenPair->accountRestored);
         $this->assertSame([AuditEvent::LoginSucceeded], $this->audit->events);
         // Actor e target são a mesma pessoa: quem logou é quem "sofreu" o evento.
         $this->assertSame($this->customer->id, $this->audit->calls[0]['actorId']);
         $this->assertSame($this->customer->id, $this->audit->calls[0]['targetUserId']);
+    }
+
+    #[Test]
+    public function login_with_password_restaura_conta_trashed_e_audita_antes_do_login(): void
+    {
+        $this->users->trash($this->customer->id);
+
+        $tokenPair = $this->makeService()->loginWithPassword('autoschedule-web', 'ada@example.com', 'correct-password', '127.0.0.1', 'phpunit');
+
+        $restored = $this->users->findById($this->customer->id);
+        assert($restored instanceof \App\Domain\Users\User);
+        $this->assertSame(UserStatus::Active, $restored->status);
+        $this->assertTrue($tokenPair->accountRestored);
+        $this->assertSame([AuditEvent::AccountRestored, AuditEvent::LoginSucceeded], $this->audit->events);
     }
 
     #[Test]
@@ -196,6 +212,22 @@ final class OAuthServiceTest extends TestCase
         $this->assertNotSame('', $tokenPair->accessToken);
         $this->assertSame([AuditEvent::LoginSucceeded], $this->audit->events);
         $this->assertSame($this->customer->id, $this->audit->calls[0]['actorId']);
+    }
+
+    #[Test]
+    public function login_with_google_restaura_conta_trashed_da_identidade_ja_linkada(): void
+    {
+        $this->identities->insert(UserIdentity::link($this->customer->id, 'google', 'google-sub-1', 'ada@example.com'));
+        $this->googleVerifier->nextClaims = new GoogleIdentityClaims('google-sub-1', 'ada@example.com', true, 'Ada');
+        $this->users->trash($this->customer->id);
+
+        $tokenPair = $this->makeService()->loginWithGoogle('autoschedule-web', 'fake-id-token', '127.0.0.1', 'phpunit');
+
+        $restored = $this->users->findById($this->customer->id);
+        assert($restored instanceof \App\Domain\Users\User);
+        $this->assertSame(UserStatus::Active, $restored->status);
+        $this->assertTrue($tokenPair->accountRestored);
+        $this->assertSame([AuditEvent::AccountRestored, AuditEvent::LoginSucceeded], $this->audit->events);
     }
 
     #[Test]
@@ -440,6 +472,47 @@ final class InMemoryUserRepository implements UserRepository
     public function anonymizeAndSoftDelete(string $id): void
     {
         unset($this->byId[$id]);
+    }
+
+    public function trash(string $id): void
+    {
+        if (($user = $this->byId[$id] ?? null) instanceof User) {
+            $this->byId[$id] = $this->withStatus($user, UserStatus::Trashed, new \DateTimeImmutable());
+        }
+    }
+
+    public function restore(string $id): void
+    {
+        if (($user = $this->byId[$id] ?? null) instanceof User) {
+            $this->byId[$id] = $this->withStatus($user, UserStatus::Active, null);
+        }
+    }
+
+    public function findPurgeEligible(int $graceDays, \DateTimeImmutable $now): array
+    {
+        return array_values(array_filter(
+            $this->byId,
+            static fn (User $user): bool => $user->isEligibleForPurge($graceDays, $now),
+        ));
+    }
+
+    private function withStatus(User $user, UserStatus $status, ?\DateTimeImmutable $deletedAt): User
+    {
+        return new User(
+            id: $user->id,
+            name: $user->name,
+            email: $user->email,
+            phone: $user->phone,
+            passwordHash: $user->passwordHash,
+            role: $user->role,
+            passwordSetAt: $user->passwordSetAt,
+            emailVerifiedAt: $user->emailVerifiedAt,
+            createdAt: $user->createdAt,
+            updatedAt: new \DateTimeImmutable(),
+            deletedAt: $deletedAt,
+            status: $status,
+            anonymizedAt: $user->anonymizedAt,
+        );
     }
 
     public function findPage(int $limit, int $offset): array
