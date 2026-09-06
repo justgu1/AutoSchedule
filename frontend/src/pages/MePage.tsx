@@ -3,7 +3,10 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { ConfirmDialog } from '../components/ConfirmDialog';
+import { Toast } from '../components/Toast';
 import { becomeSeller, deactivateAccount, getMe } from '../lib/auth';
 
 const ROLE_LABEL: Record<string, string> = {
@@ -16,6 +19,12 @@ const ROLE_LABEL: Record<string, string> = {
 export function MePage() {
     const queryClient = useQueryClient();
     const navigate = useNavigate();
+    const location = useLocation();
+    const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
+    // Estado de navegação (não a URL) -- some sozinho se a página for recarregada, não fica preso no histórico.
+    const [restoredNoticeOpen, setRestoredNoticeOpen] = useState(
+        Boolean((location.state as { accountRestored?: boolean } | null)?.accountRestored),
+    );
     const { data: me } = useQuery({ queryKey: ['me'], queryFn: getMe });
     const becomeSellerMutation = useMutation({
         mutationFn: becomeSeller,
@@ -25,18 +34,15 @@ export function MePage() {
         mutationFn: deactivateAccount,
         onSuccess: () => {
             queryClient.removeQueries({ queryKey: ['me'] });
-            void navigate('/login', { replace: true });
+            void navigate('/login', {
+                replace: true,
+                state: { message: 'Sua conta foi desativada com sucesso. Faça login em até 30 dias para restaurá-la.' },
+            });
         },
     });
 
     if (!me) {
         return null;
-    }
-
-    function handleDeactivate() {
-        if (window.confirm('Desativar sua conta? Você pode recuperá-la fazendo login de novo em até 30 dias.')) {
-            deactivateMutation.mutate();
-        }
     }
 
     return (
@@ -65,10 +71,25 @@ export function MePage() {
                 variant="outlined"
                 color="error"
                 disabled={deactivateMutation.isPending}
-                onClick={handleDeactivate}
+                onClick={() => setConfirmDeactivateOpen(true)}
             >
                 Desativar minha conta
             </Button>
+            <ConfirmDialog
+                open={confirmDeactivateOpen}
+                title="Desativar sua conta?"
+                description="Você pode recuperá-la fazendo login de novo em até 30 dias. Depois disso, ela é apagada em definitivo."
+                confirmLabel="Desativar"
+                confirmColor="error"
+                loading={deactivateMutation.isPending}
+                onConfirm={() => deactivateMutation.mutate()}
+                onCancel={() => setConfirmDeactivateOpen(false)}
+            />
+            <Toast
+                open={restoredNoticeOpen}
+                message="Sua conta estava desativada e foi restaurada automaticamente."
+                onClose={() => setRestoredNoticeOpen(false)}
+            />
         </Paper>
     );
 }

@@ -64,6 +64,7 @@ final class OAuthServiceTest extends TestCase
 
         $this->assertNotSame('', $tokenPair->accessToken);
         $this->assertNotNull($tokenPair->refreshToken);
+        $this->assertFalse($tokenPair->accountRestored);
         $this->assertSame([AuditEvent::LoginSucceeded], $this->audit->events);
         // Actor e target são a mesma pessoa: quem logou é quem "sofreu" o evento.
         $this->assertSame($this->customer->id, $this->audit->calls[0]['actorId']);
@@ -75,11 +76,12 @@ final class OAuthServiceTest extends TestCase
     {
         $this->users->trash($this->customer->id);
 
-        $this->makeService()->loginWithPassword('autoschedule-web', 'ada@example.com', 'correct-password', '127.0.0.1', 'phpunit');
+        $tokenPair = $this->makeService()->loginWithPassword('autoschedule-web', 'ada@example.com', 'correct-password', '127.0.0.1', 'phpunit');
 
         $restored = $this->users->findById($this->customer->id);
         assert($restored instanceof \App\Domain\Users\User);
         $this->assertSame(UserStatus::Active, $restored->status);
+        $this->assertTrue($tokenPair->accountRestored);
         $this->assertSame([AuditEvent::AccountRestored, AuditEvent::LoginSucceeded], $this->audit->events);
     }
 
@@ -219,11 +221,12 @@ final class OAuthServiceTest extends TestCase
         $this->googleVerifier->nextClaims = new GoogleIdentityClaims('google-sub-1', 'ada@example.com', true, 'Ada');
         $this->users->trash($this->customer->id);
 
-        $this->makeService()->loginWithGoogle('autoschedule-web', 'fake-id-token', '127.0.0.1', 'phpunit');
+        $tokenPair = $this->makeService()->loginWithGoogle('autoschedule-web', 'fake-id-token', '127.0.0.1', 'phpunit');
 
         $restored = $this->users->findById($this->customer->id);
         assert($restored instanceof \App\Domain\Users\User);
         $this->assertSame(UserStatus::Active, $restored->status);
+        $this->assertTrue($tokenPair->accountRestored);
         $this->assertSame([AuditEvent::AccountRestored, AuditEvent::LoginSucceeded], $this->audit->events);
     }
 

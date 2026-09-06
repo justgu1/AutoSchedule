@@ -156,6 +156,7 @@ final readonly class OAuthController
             'expires_in' => $tokenPair->expiresIn,
             'refresh_token' => $tokenPair->refreshToken,
             'scope' => implode(' ', $tokenPair->scopes),
+            'account_restored' => $tokenPair->accountRestored,
         ]);
 
         $response = $response->withCookie(
