@@ -6,6 +6,13 @@ COPY frontend/package*.json ./
 RUN npm ci
 
 COPY frontend/ ./
+
+# Vite baker VITE_* no build (não em runtime) -- sem isso aqui, o client id do
+# Google não fica no bundle e o botão de login social nunca aparece em
+# produção, mesmo com GOOGLE_CLIENT_ID certo no backend/k8s.
+ARG VITE_GOOGLE_CLIENT_ID
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+
 RUN npm run build
 
 FROM nginx:1.29-alpine
