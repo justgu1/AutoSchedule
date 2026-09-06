@@ -37,4 +37,28 @@ final class ApplicationTest extends TestCase
 
         $this->assertSame('fallback', $app->config('does-not-exist', 'fallback'));
     }
+
+    /**
+     * Regressão: secret selado (SealedSecret/kubeseal) com `\n` sobrando (ex:
+     * gerado com `echo` em vez de `printf`) já derrubou login do Google e
+     * autenticação do Postgres/Redis em produção -- comparação/parse contra
+     * um valor externo limpo nunca batia. `Application` corta espaço em
+     * branco de todo valor de config na raiz, então nenhuma env var
+     * individual precisa se preocupar com isso de novo.
+     */
+    #[Test]
+    public function config_corta_espaco_em_branco_de_valores_string_incluindo_aninhados(): void
+    {
+        putenv('GOOGLE_CLIENT_ID=client-id-com-newline' . "\n");
+
+        try {
+            $app = new Application();
+
+            $google = $app->config('google');
+            $this->assertIsArray($google);
+            $this->assertSame('client-id-com-newline', $google['client_id']);
+        } finally {
+            putenv('GOOGLE_CLIENT_ID');
+        }
+    }
 }
