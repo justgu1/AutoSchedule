@@ -23,11 +23,36 @@ final class Application
             }
         }
 
+        // Secrets selados (SealedSecret/kubeseal) e outras fontes de env
+        // costumam carregar um `\n` sobrando quando o valor original foi
+        // gerado com `echo` em vez de `printf`/`echo -n`. Em vez de depender
+        // de cada fonte de env estar sempre byte-perfeita, corta espaço em
+        // branco nas bordas de todo valor de config aqui, uma vez só --
+        // string comparada/parseada contra um valor externo limpo (ex: aud
+        // claim de um JWT, DSN do mailer) nunca mais quebra por causa disso.
+        $this->config = $this->trimStrings($this->config);
+
         date_default_timezone_set($this->config['timezone']);
     }
 
     public function config(string $key, mixed $default = null): mixed
     {
         return $this->config[$key] ?? $default;
+    }
+
+    /**
+     * @param array<array-key, mixed> $config
+     * @return array<array-key, mixed>
+     */
+    private function trimStrings(array $config): array
+    {
+        return array_map(
+            fn (mixed $value): mixed => match (true) {
+                is_string($value) => trim($value),
+                is_array($value) => $this->trimStrings($value),
+                default => $value,
+            },
+            $config,
+        );
     }
 }
