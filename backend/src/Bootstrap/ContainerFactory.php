@@ -16,6 +16,7 @@ use App\Domain\Auth\Ports\UserIdentityRepository;
 use App\Domain\Files\Ports\FileRepository;
 use App\Domain\Notifications\Ports\MailProvider;
 use App\Domain\Ports\DatabaseConnection;
+use App\Domain\Ports\Queue;
 use App\Domain\Ports\StorageProvider;
 use App\Domain\Users\Ports\UserRepository;
 use App\Infrastructure\Audit\PostgresAuditLogger;
@@ -34,9 +35,11 @@ use App\Infrastructure\Http\Controllers\UserController;
 use App\Infrastructure\Logging\Logger;
 use App\Infrastructure\Mail\SymfonyMailProvider;
 use App\Infrastructure\Pagination\PaginationPolicy;
+use App\Infrastructure\Queue\RedisQueue;
 use App\Infrastructure\RateLimit\RateLimiter;
 use App\Infrastructure\RateLimit\RedisRateLimiter;
 use App\Infrastructure\Redis\RedisConnection;
+use App\Infrastructure\Scheduler\Scheduler;
 use App\Infrastructure\Storage\MinioAdapter;
 use App\Infrastructure\Users\PostgresUserRepository;
 
@@ -147,6 +150,17 @@ final class ContainerFactory
             RateLimiter::class,
             static fn (Container $c): RateLimiter => new RedisRateLimiter($c->get(RedisConnection::class)),
         );
+        $container->set(
+            RedisQueue::class,
+            static fn (Container $c): RedisQueue => new RedisQueue($c->get(RedisConnection::class)),
+        );
+        // Alias pro port -- mesmo singleton de RedisQueue::class.
+        $container->set(Queue::class, static fn (Container $c): Queue => $c->get(RedisQueue::class));
+        // Cada domínio registra sua própria ScheduledTask aqui conforme for implementada.
+        $container->set(Scheduler::class, static fn (Container $c): Scheduler => new Scheduler(
+            redis: $c->get(RedisConnection::class),
+            tasks: [],
+        ));
         $container->set(PaginationPolicy::class, static function () use ($app): PaginationPolicy {
             $config = $app->config('pagination');
 
@@ -182,7 +196,7 @@ final class ContainerFactory
                 audit: $c->get(AuditLogger::class),
                 pagination: $c->get(PaginationPolicy::class),
                 passwordResetTokens: $c->get(PasswordResetTokenRepository::class),
-                mail: $c->get(MailProvider::class),
+                queue: $c->get(Queue::class),
                 passwordResetTtl: $app->config('auth')['password_reset_ttl'],
                 frontendUrl: $mail['frontend_url'],
                 passwordResetTemplatePath: dirname(__DIR__, 2) . '/resources/mail/password-reset.html',

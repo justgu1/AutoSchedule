@@ -62,7 +62,16 @@ Domínio ainda não implementado (`Worklist.md`, Dia 2/3/4) -- nenhum teste exis
 |---|---|
 | Página/tamanho com defaults e teto configuráveis, nunca abaixo de 1 | `PaginationPolicyTest` (4 casos) |
 
-### Notificações, Scheduler, Worker, Busca, Imagens, Integridade
+## Scheduler e Worker
+
+| Regra | Testes |
+|---|---|
+| Tarefa periódica só roda de novo depois do próprio intervalo passar; "último run" sobrevive restart (guardado no Redis, não em memória) | `SchedulerTest` (3 casos: nunca rodou, intervalo não passou, intervalo passou) |
+| Envio de e-mail é assíncrono (enfileira, não manda na hora) | `RedisQueueTest::push_e_pop_entregam_o_mesmo_job`; reset de senha via fila: E2E `password-reset.spec.ts` roda contra o worker real, e-mail chega no Mailpit de verdade (não mock) |
+| Falha reenfileira com `attempts` incrementado; passadas 3 tentativas vira dead-letter | `RedisQueueTest::retry_or_fail_reenfileira_com_attempts_incrementado`, `::retry_or_fail_manda_pra_lista_de_falhas_apos_o_maximo_de_tentativas` |
+| Job resolve suas dependências (`MailProvider`, etc.) via container, sem registro manual por classe | `SendEmailJobTest::handle_repassa_os_dados_do_payload_pro_mail_provider` |
+
+### Busca, Imagens, Integridade
 
 Domínio ainda não implementado -- mesma situação de Veículos/Agendamento acima.
 

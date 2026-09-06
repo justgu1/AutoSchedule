@@ -16,7 +16,7 @@ services:
       context: .
       dockerfile: infra/docker/backend/Dockerfile
     container_name: autoschedule-backend
-    environment:
+    environment: &backend-env
       APP_ENV: ${APP_ENV:-local}
       APP_DEBUG: ${APP_DEBUG:-false}
       APP_TIMEZONE: ${APP_TIMEZONE:-America/Sao_Paulo}
@@ -64,10 +64,10 @@ services:
 
       TEMP_STORAGE_PATH: /var/www/html/storage/tmp
 
-    volumes: # Prefiro que tenhamos um backup dos uploads até o retorno 200 do s3.
+    volumes: &backend-volumes # Prefiro que tenhamos um backup dos uploads até o retorno 200 do s3.
       - backend_tmp:/var/www/html/storage/tmp
 
-    depends_on:
+    depends_on: &backend-depends-on
       postgres:
         condition: service_healthy
       redis:
@@ -77,6 +77,30 @@ services:
       mailpit:
         condition: service_started
 
+    networks:
+      - autoschedule
+
+  worker:
+    build:
+      context: .
+      dockerfile: infra/docker/backend/Dockerfile
+    container_name: autoschedule-worker
+    command: php bin/worker.php
+    environment: *backend-env
+    volumes: *backend-volumes
+    depends_on: *backend-depends-on
+    networks:
+      - autoschedule
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: infra/docker/backend/Dockerfile
+    container_name: autoschedule-scheduler
+    command: php bin/scheduler.php
+    environment: *backend-env
+    volumes: *backend-volumes
+    depends_on: *backend-depends-on
     networks:
       - autoschedule
 

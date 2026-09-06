@@ -25,6 +25,12 @@ parameters:
 			path: src/Application.php
 
 		-
+			message: '#^Anonymous function should return App\\Domain\\Ports\\Queue but returns object\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
 			message: '#^Call to an undefined method object\:\:pdo\(\)\.$#'
 			identifier: method.notFound
 			count: 7
@@ -283,6 +289,12 @@ parameters:
 			path: src/Bootstrap/ContainerFactory.php
 
 		-
+			message: '#^Parameter \#1 \$redis of class App\\Infrastructure\\Queue\\RedisQueue constructor expects App\\Infrastructure\\Redis\\RedisConnection, object given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
 			message: '#^Parameter \#2 \$from of class App\\Infrastructure\\Mail\\SymfonyMailProvider constructor expects string, mixed given\.$#'
 			identifier: argument.type
 			count: 1
@@ -409,12 +421,6 @@ parameters:
 			path: src/Bootstrap/ContainerFactory.php
 
 		-
-			message: '#^Parameter \$mail of class App\\Infrastructure\\Http\\Controllers\\UserController constructor expects App\\Domain\\Notifications\\Ports\\MailProvider, object given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Bootstrap/ContainerFactory.php
-
-		-
 			message: '#^Parameter \$oauth of class App\\Infrastructure\\Http\\Controllers\\OAuthController constructor expects App\\Domain\\Auth\\OAuthService, object given\.$#'
 			identifier: argument.type
 			count: 1
@@ -487,7 +493,19 @@ parameters:
 			path: src/Bootstrap/ContainerFactory.php
 
 		-
+			message: '#^Parameter \$queue of class App\\Infrastructure\\Http\\Controllers\\UserController constructor expects App\\Domain\\Ports\\Queue, object given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
 			message: '#^Parameter \$redis of class App\\Infrastructure\\Auth\\Google\\GoogleJwksIdTokenVerifier constructor expects App\\Infrastructure\\Redis\\RedisConnection, object given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Parameter \$redis of class App\\Infrastructure\\Scheduler\\Scheduler constructor expects App\\Infrastructure\\Redis\\RedisConnection, object given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Bootstrap/ContainerFactory.php
@@ -1289,6 +1307,12 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: src/Infrastructure/Mail/MailTemplate.php
+
+		-
+			message: '#^Parameter \#1 \$json of function json_decode expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Queue/RedisQueue.php
 
 		-
 			message: '#^Cannot cast mixed to int\.$#'
