@@ -72,6 +72,21 @@ spec:
 
             - name: GOOGLE_CLIENT_ID
               valueFrom: { secretKeyRef: { name: autoschedule-secrets, key: GOOGLE_CLIENT_ID } }
+
+            - name: S3_ENDPOINT
+              value: http://minio.shared.svc.cluster.local:9000
+            - name: S3_BUCKET
+              value: autoschedule
+            - name: S3_REGION
+              value: us-east-1
+            - name: S3_PUBLIC_URL
+              value: https://autoschedule.justgui.dev/cdn/autoschedule
+            - name: S3_ACCESS_KEY
+              valueFrom: { secretKeyRef: { name: autoschedule-secrets, key: S3_ACCESS_KEY } }
+            - name: S3_SECRET_KEY
+              valueFrom: { secretKeyRef: { name: autoschedule-secrets, key: S3_SECRET_KEY } }
+            - name: TEMP_STORAGE_PATH
+              value: /var/www/html/storage/tmp
           volumeMounts: &backend-volume-mounts
             - name: jwt-keys
               mountPath: /var/www/html/storage/keys
