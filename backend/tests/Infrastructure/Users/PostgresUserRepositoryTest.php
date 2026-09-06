@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Infrastructure\Users;
 
+use App\Domain\Shared\TrashableStatus;
 use App\Domain\Users\User;
 use App\Domain\Users\UserRole;
-use App\Domain\Users\UserStatus;
 use App\Infrastructure\Database\PostgresConnection;
 use App\Infrastructure\Users\PostgresUserRepository;
 use PHPUnit\Framework\Attributes\Test;
@@ -180,7 +180,7 @@ final class PostgresUserRepositoryTest extends TestCase
 
         $found = $this->repository->findByEmail('ada@example.com');
         $this->assertNotNull($found);
-        $this->assertSame(UserStatus::Trashed, $found->status);
+        $this->assertSame(TrashableStatus::Trashed, $found->status);
         $this->assertTrue($this->repository->existsByEmail('ada@example.com'));
     }
 
@@ -195,7 +195,7 @@ final class PostgresUserRepositoryTest extends TestCase
 
         $restored = $this->repository->findById($user->id);
         assert($restored instanceof \App\Domain\Users\User);
-        $this->assertSame(UserStatus::Active, $restored->status);
+        $this->assertSame(TrashableStatus::Active, $restored->status);
         $this->assertNull($restored->deletedAt);
     }
 

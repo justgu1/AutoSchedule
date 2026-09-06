@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Users;
 
+use App\Domain\Shared\TrashableStatus;
 use App\Domain\Users\Ports\UserRepository;
 use App\Domain\Users\User;
 use App\Domain\Users\UserRole;
-use App\Domain\Users\UserStatus;
 
 final readonly class PostgresUserRepository implements UserRepository
 {
@@ -159,7 +159,7 @@ final readonly class PostgresUserRepository implements UserRepository
             createdAt: new \DateTimeImmutable($row['created_at']),
             updatedAt: new \DateTimeImmutable($row['updated_at']),
             deletedAt: $this->toDateTime($row['deleted_at']),
-            status: UserStatus::from($row['status']),
+            status: TrashableStatus::from($row['status']),
             anonymizedAt: $this->toDateTime($row['anonymized_at']),
         );
     }

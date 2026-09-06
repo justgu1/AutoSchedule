@@ -31,9 +31,27 @@ parameters:
 			path: src/Bootstrap/ContainerFactory.php
 
 		-
+			message: '#^Call to an undefined method object\:\:anonymizeAndSoftDelete\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Call to an undefined method object\:\:findPurgeEligible\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
 			message: '#^Call to an undefined method object\:\:pdo\(\)\.$#'
 			identifier: method.notFound
-			count: 7
+			count: 8
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Call to an undefined method object\:\:update\(\)\.$#'
+			identifier: method.notFound
+			count: 1
 			path: src/Bootstrap/ContainerFactory.php
 
 		-
@@ -277,6 +295,12 @@ parameters:
 			path: src/Bootstrap/ContainerFactory.php
 
 		-
+			message: '#^Parameter \#1 \$pdo of class App\\Infrastructure\\Dealerships\\PostgresDealershipRepository constructor expects PDO, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
 			message: '#^Parameter \#1 \$pdo of class App\\Infrastructure\\Files\\PostgresFileRepository constructor expects PDO, mixed given\.$#'
 			identifier: argument.type
 			count: 1
@@ -290,18 +314,6 @@ parameters:
 
 		-
 			message: '#^Parameter \#1 \$redis of class App\\Infrastructure\\Queue\\RedisQueue constructor expects App\\Infrastructure\\Redis\\RedisConnection, object given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Bootstrap/ContainerFactory.php
-
-		-
-			message: '#^Parameter \#1 \$users of class App\\Infrastructure\\Users\\Scheduler\\PurgeTrashedUsersTask constructor expects App\\Domain\\Users\\Ports\\UserRepository, object given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Bootstrap/ContainerFactory.php
-
-		-
-			message: '#^Parameter \#2 \$audit of class App\\Infrastructure\\Users\\Scheduler\\PurgeTrashedUsersTask constructor expects App\\Domain\\Audit\\Ports\\AuditLogger, object given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Bootstrap/ContainerFactory.php
@@ -343,9 +355,21 @@ parameters:
 			path: src/Bootstrap/ContainerFactory.php
 
 		-
+			message: '#^Parameter \$audit of class App\\Infrastructure\\Http\\Controllers\\DealershipController constructor expects App\\Domain\\Audit\\Ports\\AuditLogger, object given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
 			message: '#^Parameter \$audit of class App\\Infrastructure\\Http\\Controllers\\UserController constructor expects App\\Domain\\Audit\\Ports\\AuditLogger, object given\.$#'
 			identifier: argument.type
 			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Parameter \$audit of class App\\Infrastructure\\Scheduler\\PurgeTrashedEntitiesTask constructor expects App\\Domain\\Audit\\Ports\\AuditLogger, object given\.$#'
+			identifier: argument.type
+			count: 2
 			path: src/Bootstrap/ContainerFactory.php
 
 		-
@@ -379,6 +403,24 @@ parameters:
 			path: src/Bootstrap/ContainerFactory.php
 
 		-
+			message: '#^Parameter \$dealerships of class App\\Domain\\Auth\\OAuthService constructor expects App\\Domain\\Dealerships\\Ports\\DealershipRepository, object given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Parameter \$dealerships of class App\\Infrastructure\\Http\\Controllers\\DealershipController constructor expects App\\Domain\\Dealerships\\Ports\\DealershipRepository, object given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Parameter \$dealerships of class App\\Infrastructure\\Http\\Controllers\\UserController constructor expects App\\Domain\\Dealerships\\Ports\\DealershipRepository, object given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
 			message: '#^Parameter \$driver of class App\\Infrastructure\\Database\\PostgresConnection constructor expects string, mixed given\.$#'
 			identifier: argument.type
 			count: 1
@@ -392,6 +434,12 @@ parameters:
 
 		-
 			message: '#^Parameter \$files of class App\\Infrastructure\\Files\\FileUploadService constructor expects App\\Domain\\Files\\Ports\\FileRepository, object given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Parameter \$files of class App\\Infrastructure\\Http\\Controllers\\DealershipController constructor expects App\\Domain\\Files\\Ports\\FileRepository, object given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Bootstrap/ContainerFactory.php
@@ -434,6 +482,12 @@ parameters:
 
 		-
 			message: '#^Parameter \$oauth of class App\\Infrastructure\\Http\\Controllers\\OAuthController constructor expects App\\Domain\\Auth\\OAuthService, object given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Parameter \$pagination of class App\\Infrastructure\\Http\\Controllers\\DealershipController constructor expects App\\Infrastructure\\Pagination\\PaginationPolicy, object given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Bootstrap/ContainerFactory.php
@@ -505,6 +559,18 @@ parameters:
 			path: src/Bootstrap/ContainerFactory.php
 
 		-
+			message: '#^Parameter \$purge of class App\\Infrastructure\\Scheduler\\PurgeTrashedEntitiesTask constructor expects Closure\(App\\Domain\\Dealerships\\Dealership\)\: void, Closure\(App\\Domain\\Dealerships\\Dealership\)\: mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Parameter \$purge of class App\\Infrastructure\\Scheduler\\PurgeTrashedEntitiesTask constructor expects Closure\(App\\Domain\\Users\\User\)\: void, Closure\(App\\Domain\\Users\\User\)\: mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
 			message: '#^Parameter \$queue of class App\\Infrastructure\\Http\\Controllers\\UserController constructor expects App\\Domain\\Ports\\Queue, object given\.$#'
 			identifier: argument.type
 			count: 1
@@ -565,6 +631,12 @@ parameters:
 			path: src/Bootstrap/ContainerFactory.php
 
 		-
+			message: '#^Parameter \$storage of class App\\Infrastructure\\Http\\Controllers\\DealershipController constructor expects App\\Domain\\Ports\\StorageProvider, object given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
 			message: '#^Parameter \$tempPath of class App\\Infrastructure\\Files\\FileUploadService constructor expects string, mixed given\.$#'
 			identifier: argument.type
 			count: 1
@@ -572,6 +644,12 @@ parameters:
 
 		-
 			message: '#^Parameter \$tokens of class App\\Domain\\Auth\\OAuthService constructor expects App\\Domain\\Auth\\Ports\\TokenIssuer, object given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Parameter \$uploads of class App\\Infrastructure\\Http\\Controllers\\DealershipController constructor expects App\\Infrastructure\\Files\\FileUploadService, object given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Bootstrap/ContainerFactory.php
@@ -883,6 +961,156 @@ parameters:
 			path: src/Infrastructure/Database/MigrationRunner.php
 
 		-
+			message: '#^Cannot call method fetchColumn\(\) on PDOStatement\|false\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Cannot cast mixed to float\.$#'
+			identifier: cast.double
+			count: 2
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Cannot cast mixed to int\.$#'
+			identifier: cast.int
+			count: 1
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \#1 \$callback of function array_map expects \(callable\(mixed\)\: mixed\)\|null, Closure\(array\<string, mixed\>\)\: App\\Domain\\Dealerships\\Dealership given\.$#'
+			identifier: argument.type
+			count: 3
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \#1 \$callback of function array_map expects \(callable\(mixed\)\: mixed\)\|null, Closure\(array\<string, mixed\>\)\: App\\Domain\\Dealerships\\DealershipImage given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \#1 \$datetime of class DateTimeImmutable constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 4
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \#1 \$row of method App\\Infrastructure\\Dealerships\\PostgresDealershipRepository\:\:fromRow\(\) expects array\<string, mixed\>, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \#1 \$row of method App\\Infrastructure\\Dealerships\\PostgresDealershipRepository\:\:imageFromRow\(\) expects array\<string, mixed\>, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \#1 \$value of method App\\Infrastructure\\Dealerships\\PostgresDealershipRepository\:\:toDateTime\(\) expects string\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 2
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \#1 \$value of static method App\\Domain\\Shared\\TrashableStatus\:\:from\(\) expects int\|string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \$address of class App\\Domain\\Dealerships\\Dealership constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \$city of class App\\Domain\\Dealerships\\Dealership constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \$complement of class App\\Domain\\Dealerships\\Dealership constructor expects string\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \$dealershipId of class App\\Domain\\Dealerships\\DealershipImage constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \$fileId of class App\\Domain\\Dealerships\\DealershipImage constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \$googlePlaceId of class App\\Domain\\Dealerships\\Dealership constructor expects string\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \$id of class App\\Domain\\Dealerships\\Dealership constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \$id of class App\\Domain\\Dealerships\\DealershipImage constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \$name of class App\\Domain\\Dealerships\\Dealership constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \$neighborhood of class App\\Domain\\Dealerships\\Dealership constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \$number of class App\\Domain\\Dealerships\\Dealership constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \$ownerUserId of class App\\Domain\\Dealerships\\Dealership constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \$phone of class App\\Domain\\Dealerships\\Dealership constructor expects string\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \$state of class App\\Domain\\Dealerships\\Dealership constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \$zipCode of class App\\Domain\\Dealerships\\Dealership constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
 			message: '#^Parameter \#1 \$finfo of function finfo_close expects finfo, finfo\|false given\.$#'
 			identifier: argument.type
 			count: 1
@@ -965,6 +1193,168 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: src/Infrastructure/Files/PostgresFileRepository.php
+
+		-
+			message: '#^Cannot access property \$role on mixed\.$#'
+			identifier: property.nonObject
+			count: 4
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Cannot access property \$subject on mixed\.$#'
+			identifier: property.nonObject
+			count: 12
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \#1 \$data of static method App\\Infrastructure\\Validation\\Validator\:\:validate\(\) expects array\<string, mixed\>, mixed given\.$#'
+			identifier: argument.type
+			count: 2
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \#1 \$ownerUserId of method App\\Domain\\Dealerships\\Dealership\:\:withOwner\(\) expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \#1 \$ownerUserId of method App\\Domain\\Dealerships\\Ports\\DealershipRepository\:\:countByOwner\(\) expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \#1 \$ownerUserId of method App\\Domain\\Dealerships\\Ports\\DealershipRepository\:\:findByOwner\(\) expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \#2 \$actorId of method App\\Domain\\Audit\\Ports\\AuditLogger\:\:record\(\) expects string\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 8
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \#4 \$uploadedBy of method App\\Infrastructure\\Files\\FileUploadService\:\:upload\(\) expects string\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \$address of method App\\Domain\\Dealerships\\Dealership\:\:withProfile\(\) expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \$address of static method App\\Domain\\Dealerships\\Dealership\:\:register\(\) expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \$city of method App\\Domain\\Dealerships\\Dealership\:\:withProfile\(\) expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \$city of static method App\\Domain\\Dealerships\\Dealership\:\:register\(\) expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \$complement of method App\\Domain\\Dealerships\\Dealership\:\:withProfile\(\) expects string\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \$complement of static method App\\Domain\\Dealerships\\Dealership\:\:register\(\) expects string\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \$name of method App\\Domain\\Dealerships\\Dealership\:\:withProfile\(\) expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \$name of static method App\\Domain\\Dealerships\\Dealership\:\:register\(\) expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \$neighborhood of method App\\Domain\\Dealerships\\Dealership\:\:withProfile\(\) expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \$neighborhood of static method App\\Domain\\Dealerships\\Dealership\:\:register\(\) expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \$number of method App\\Domain\\Dealerships\\Dealership\:\:withProfile\(\) expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \$number of static method App\\Domain\\Dealerships\\Dealership\:\:register\(\) expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \$ownerUserId of static method App\\Domain\\Dealerships\\Dealership\:\:register\(\) expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \$phone of method App\\Domain\\Dealerships\\Dealership\:\:withProfile\(\) expects string\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \$phone of static method App\\Domain\\Dealerships\\Dealership\:\:register\(\) expects string\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \$state of method App\\Domain\\Dealerships\\Dealership\:\:withProfile\(\) expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \$state of static method App\\Domain\\Dealerships\\Dealership\:\:register\(\) expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \$zipCode of method App\\Domain\\Dealerships\\Dealership\:\:withProfile\(\) expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \$zipCode of static method App\\Domain\\Dealerships\\Dealership\:\:register\(\) expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
 
 		-
 			message: '#^Parameter \#1 \$clientId of method App\\Domain\\Auth\\OAuthService\:\:clientCredentials\(\) expects string, mixed given\.$#'
@@ -1195,9 +1585,15 @@ parameters:
 			path: src/Infrastructure/Http/Middleware/RoleMiddleware.php
 
 		-
+			message: '#^Cannot cast mixed to int\.$#'
+			identifier: cast.int
+			count: 2
+			path: src/Infrastructure/Http/Request.php
+
+		-
 			message: '#^Cannot cast mixed to string\.$#'
 			identifier: cast.string
-			count: 3
+			count: 5
 			path: src/Infrastructure/Http/Request.php
 
 		-
@@ -1387,13 +1783,13 @@ parameters:
 			path: src/Infrastructure/Users/PostgresUserRepository.php
 
 		-
-			message: '#^Parameter \#1 \$value of static method App\\Domain\\Users\\UserRole\:\:from\(\) expects int\|string, mixed given\.$#'
+			message: '#^Parameter \#1 \$value of static method App\\Domain\\Shared\\TrashableStatus\:\:from\(\) expects int\|string, mixed given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Infrastructure/Users/PostgresUserRepository.php
 
 		-
-			message: '#^Parameter \#1 \$value of static method App\\Domain\\Users\\UserStatus\:\:from\(\) expects int\|string, mixed given\.$#'
+			message: '#^Parameter \#1 \$value of static method App\\Domain\\Users\\UserRole\:\:from\(\) expects int\|string, mixed given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Infrastructure/Users/PostgresUserRepository.php
@@ -1453,7 +1849,7 @@ parameters:
 			path: tests/Domain/Auth/OAuthServiceTest.php
 
 		-
-			message: '#^Offset int\<0, max\>\|false might not exist on list\<array\{event\: App\\Domain\\Audit\\AuditEvent, actorId\: string\|null, targetUserId\: string\|null\}\>\.$#'
+			message: '#^Offset int\<0, max\>\|false might not exist on list\<array\{event\: App\\Domain\\Audit\\AuditEvent, actorId\: string\|null, auditableType\: string, targetUserId\: string\|null\}\>\.$#'
 			identifier: offsetAccess.notFound
 			count: 1
 			path: tests/Domain/Auth/OAuthServiceTest.php
@@ -1477,9 +1873,15 @@ parameters:
 			path: tests/Infrastructure/Audit/PostgresAuditLoggerTest.php
 
 		-
-			message: '#^Cannot access offset ''auditable_type'' on mixed\.$#'
+			message: '#^Cannot access offset ''auditable_id'' on mixed\.$#'
 			identifier: offsetAccess.nonOffsetAccessible
 			count: 1
+			path: tests/Infrastructure/Audit/PostgresAuditLoggerTest.php
+
+		-
+			message: '#^Cannot access offset ''auditable_type'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 2
 			path: tests/Infrastructure/Audit/PostgresAuditLoggerTest.php
 
 		-
@@ -1509,13 +1911,13 @@ parameters:
 		-
 			message: '#^Cannot access offset ''user_id'' on mixed\.$#'
 			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
+			count: 2
 			path: tests/Infrastructure/Audit/PostgresAuditLoggerTest.php
 
 		-
 			message: '#^Cannot call method fetch\(\) on PDOStatement\|false\.$#'
 			identifier: method.nonObject
-			count: 2
+			count: 3
 			path: tests/Infrastructure/Audit/PostgresAuditLoggerTest.php
 
 		-
@@ -1601,6 +2003,12 @@ parameters:
 			identifier: return.type
 			count: 1
 			path: tests/Infrastructure/Auth/Postgres/PostgresRefreshTokenRepositoryTest.php
+
+		-
+			message: '#^Cannot access offset ''id'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: tests/Infrastructure/Database/DealershipRlsPolicyTest.php
 
 		-
 			message: '#^Cannot call method fetchAll\(\) on PDOStatement\|false\.$#'

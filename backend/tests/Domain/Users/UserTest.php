@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Domain\Users;
 
+use App\Domain\Shared\TrashableStatus;
 use App\Domain\Users\User;
 use App\Domain\Users\UserRole;
-use App\Domain\Users\UserStatus;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -24,7 +24,7 @@ final class UserTest extends TestCase
         $this->assertNotNull($user->passwordSetAt);
         $this->assertNull($user->emailVerifiedAt);
         $this->assertNull($user->deletedAt);
-        $this->assertSame(UserStatus::Active, $user->status);
+        $this->assertSame(TrashableStatus::Active, $user->status);
         $this->assertNull($user->anonymizedAt);
     }
 
@@ -60,7 +60,7 @@ final class UserTest extends TestCase
         $this->assertNotSame('ada@example.com', $anonymized->email);
         $this->assertNull($anonymized->phone);
         $this->assertStringContainsString(substr($user->id, 0, 8), $anonymized->email);
-        $this->assertSame(UserStatus::Deleted, $anonymized->status);
+        $this->assertSame(TrashableStatus::Deleted, $anonymized->status);
         $this->assertNotNull($anonymized->anonymizedAt);
     }
 
@@ -167,7 +167,7 @@ final class UserTest extends TestCase
             createdAt: $user->createdAt,
             updatedAt: $user->updatedAt,
             deletedAt: $deletedAt ?? new \DateTimeImmutable(),
-            status: UserStatus::Trashed,
+            status: TrashableStatus::Trashed,
             anonymizedAt: $anonymizedAt,
         );
     }

@@ -17,4 +17,12 @@ enum AuditEvent: string
     case AccountTrashed = 'user.trashed';
     case AccountRestored = 'user.restored';
     case AccountPurged = 'user.purged';
+    case DealershipCreated = 'dealership.created';
+    case DealershipUpdated = 'dealership.updated';
+    case DealershipTrashed = 'dealership.trashed';
+    case DealershipRestored = 'dealership.restored';
+    case DealershipPurged = 'dealership.purged';
+    case DealershipOwnerReassigned = 'dealership.owner_reassigned';
+    case DealershipImageAdded = 'dealership.image_added';
+    case DealershipImageRemoved = 'dealership.image_removed';
 }

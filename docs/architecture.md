@@ -163,7 +163,7 @@ Sua utilização deve ocorrer conforme a necessidade da aplicação.
 
 ## MinIO
 
-O MinIO armazena as imagens dos veículos.
+O MinIO armazena as imagens de concessionárias e veículos.
 
 ```text
 Upload
@@ -177,7 +177,7 @@ Backend
 MinIO
   │
   ▼
-vehicle_images
+dealership_images / vehicle_images
 ```
 
 O PostgreSQL armazena a referência do objeto, não o conteúdo binário.
@@ -233,10 +233,7 @@ O escopo de um seller é determinado por:
 seller
    │
    ▼
-dealership_user
-   │
-   ▼
-dealership
+dealership (owner_user_id)
    │
    ▼
 vehicles / availability / appointments

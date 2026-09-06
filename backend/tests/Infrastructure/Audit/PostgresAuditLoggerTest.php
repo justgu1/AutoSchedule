@@ -46,7 +46,7 @@ final class PostgresAuditLoggerTest extends TestCase
     {
         $logger = new PostgresAuditLogger($this->connection->pdo(), new NullLogger());
 
-        $logger->record(AuditEvent::LoginFailed, null, null, ['email' => 'ada@example.com'], '203.0.113.9', 'phpunit-agent');
+        $logger->record(AuditEvent::LoginFailed, null, 'User', null, ['email' => 'ada@example.com'], '203.0.113.9', 'phpunit-agent');
 
         $row = $this->connection->pdo()
             ->query('SELECT event, auditable_type, ip_address, user_agent, new_values FROM audit_logs ORDER BY created_at DESC LIMIT 1')
@@ -66,7 +66,7 @@ final class PostgresAuditLoggerTest extends TestCase
         $target = $this->insertUser('target@example.com');
         $logger = new PostgresAuditLogger($this->connection->pdo(), new NullLogger());
 
-        $logger->record(AuditEvent::UserCreated, $admin, $target, ['role' => 'seller'], '203.0.113.9', 'phpunit-agent');
+        $logger->record(AuditEvent::UserCreated, $admin, 'User', $target, ['role' => 'seller'], '203.0.113.9', 'phpunit-agent');
 
         $row = $this->connection->pdo()
             ->query('SELECT actor_id, user_id FROM audit_logs ORDER BY created_at DESC LIMIT 1')
@@ -77,6 +77,25 @@ final class PostgresAuditLoggerTest extends TestCase
     }
 
     #[Test]
+    public function auditable_type_diferente_de_user_nao_preenche_user_id(): void
+    {
+        // user_id tem FK pra `users` -- gravar um id que não é de usuário ali
+        // quebraria a constraint. auditable_id não tem essa restrição.
+        $dealershipId = '00000000-0000-4000-8000-000000000001';
+        $logger = new PostgresAuditLogger($this->connection->pdo(), new NullLogger());
+
+        $logger->record(AuditEvent::DealershipCreated, null, 'Dealership', $dealershipId, [], '203.0.113.9', 'phpunit-agent');
+
+        $row = $this->connection->pdo()
+            ->query('SELECT auditable_type, auditable_id, user_id FROM audit_logs ORDER BY created_at DESC LIMIT 1')
+            ->fetch();
+
+        $this->assertSame('Dealership', $row['auditable_type']);
+        $this->assertSame($dealershipId, $row['auditable_id']);
+        $this->assertNull($row['user_id']);
+    }
+
+    #[Test]
     public function falha_ao_gravar_nao_propaga_excecao(): void
     {
         // PDO quebrado (host inexistente) força o catch a acionar -- é o
@@ -84,7 +103,7 @@ final class PostgresAuditLoggerTest extends TestCase
         $brokenPdo = new \PDO('sqlite::memory:');
         $logger = new PostgresAuditLogger($brokenPdo, new NullLogger());
 
-        $logger->record(AuditEvent::LoginSucceeded, null, null, [], '127.0.0.1', null);
+        $logger->record(AuditEvent::LoginSucceeded, null, 'User', null, [], '127.0.0.1', null);
 
         $this->addToAssertionCount(1);
     }

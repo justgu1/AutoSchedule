@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Bootstrap;
 
 use App\Application;
+use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
 use App\Domain\Auth\OAuthService;
 use App\Domain\Auth\Ports\GoogleIdTokenVerifier;
@@ -13,12 +14,15 @@ use App\Domain\Auth\Ports\PasswordResetTokenRepository;
 use App\Domain\Auth\Ports\RefreshTokenRepository;
 use App\Domain\Auth\Ports\TokenIssuer;
 use App\Domain\Auth\Ports\UserIdentityRepository;
+use App\Domain\Dealerships\Dealership;
+use App\Domain\Dealerships\Ports\DealershipRepository;
 use App\Domain\Files\Ports\FileRepository;
 use App\Domain\Notifications\Ports\MailProvider;
 use App\Domain\Ports\DatabaseConnection;
 use App\Domain\Ports\Queue;
 use App\Domain\Ports\StorageProvider;
 use App\Domain\Users\Ports\UserRepository;
+use App\Domain\Users\User;
 use App\Infrastructure\Audit\PostgresAuditLogger;
 use App\Infrastructure\Auth\Google\GoogleJwksIdTokenVerifier;
 use App\Infrastructure\Auth\Jwt\JwtTokenIssuer;
@@ -28,8 +32,10 @@ use App\Infrastructure\Auth\Postgres\PostgresRefreshTokenRepository;
 use App\Infrastructure\Auth\Postgres\PostgresUserIdentityRepository;
 use App\Infrastructure\Container\Container;
 use App\Infrastructure\Database\PostgresConnection;
+use App\Infrastructure\Dealerships\PostgresDealershipRepository;
 use App\Infrastructure\Files\FileUploadService;
 use App\Infrastructure\Files\PostgresFileRepository;
+use App\Infrastructure\Http\Controllers\DealershipController;
 use App\Infrastructure\Http\Controllers\OAuthController;
 use App\Infrastructure\Http\Controllers\UserController;
 use App\Infrastructure\Logging\Logger;
@@ -39,10 +45,10 @@ use App\Infrastructure\Queue\RedisQueue;
 use App\Infrastructure\RateLimit\RateLimiter;
 use App\Infrastructure\RateLimit\RedisRateLimiter;
 use App\Infrastructure\Redis\RedisConnection;
+use App\Infrastructure\Scheduler\PurgeTrashedEntitiesTask;
 use App\Infrastructure\Scheduler\Scheduler;
 use App\Infrastructure\Storage\MinioAdapter;
 use App\Infrastructure\Users\PostgresUserRepository;
-use App\Infrastructure\Users\Scheduler\PurgeTrashedUsersTask;
 
 /**
  * Monta o Container com todos os bindings da aplicação -- único lugar que
@@ -136,6 +142,10 @@ final class ContainerFactory
             files: $c->get(FileRepository::class),
             tempPath: $app->config('storage')['temp_path'],
         ));
+        $container->set(
+            DealershipRepository::class,
+            static fn (Container $c): DealershipRepository => new PostgresDealershipRepository($c->get(DatabaseConnection::class)->pdo()),
+        );
         $container->set(RedisConnection::class, static function () use ($app): RedisConnection {
             $config = $app->config('redis');
 
@@ -157,13 +167,41 @@ final class ContainerFactory
         );
         // Alias pro port -- mesmo singleton de RedisQueue::class.
         $container->set(Queue::class, static fn (Container $c): Queue => $c->get(RedisQueue::class));
-        // Cada domínio registra sua própria ScheduledTask aqui conforme for implementada.
-        $container->set(Scheduler::class, static fn (Container $c): Scheduler => new Scheduler(
-            redis: $c->get(RedisConnection::class),
-            tasks: [
-                new PurgeTrashedUsersTask($c->get(UserRepository::class), $c->get(AuditLogger::class)),
-            ],
-        ));
+        // Cada domínio com lixeira reversível registra aqui sua própria purga,
+        // reaproveitando a mesma ScheduledTask genérica (App\Infrastructure\Scheduler\PurgeTrashedEntitiesTask).
+        $container->set(Scheduler::class, static function (Container $c): Scheduler {
+            $users = $c->get(UserRepository::class);
+            $dealerships = $c->get(DealershipRepository::class);
+            $audit = $c->get(AuditLogger::class);
+
+            return new Scheduler(
+                redis: $c->get(RedisConnection::class),
+                tasks: [
+                    new PurgeTrashedEntitiesTask(
+                        name: 'purge-trashed-users',
+                        graceDays: 30,
+                        dueIntervalSeconds: 86400,
+                        findEligible: $users->findPurgeEligible(...),
+                        purge: static fn (User $user) => $users->anonymizeAndSoftDelete($user->id),
+                        identify: static fn (User $user): string => $user->id,
+                        audit: $audit,
+                        event: AuditEvent::AccountPurged,
+                        auditableType: 'User',
+                    ),
+                    new PurgeTrashedEntitiesTask(
+                        name: 'purge-trashed-dealerships',
+                        graceDays: 30,
+                        dueIntervalSeconds: 86400,
+                        findEligible: $dealerships->findPurgeEligible(...),
+                        purge: static fn (Dealership $dealership) => $dealerships->update($dealership->anonymized()),
+                        identify: static fn (Dealership $dealership): string => $dealership->id,
+                        audit: $audit,
+                        event: AuditEvent::DealershipPurged,
+                        auditableType: 'Dealership',
+                    ),
+                ],
+            );
+        });
         $container->set(PaginationPolicy::class, static function () use ($app): PaginationPolicy {
             $config = $app->config('pagination');
 
@@ -178,6 +216,7 @@ final class ContainerFactory
                 users: $c->get(UserRepository::class),
                 refreshTokens: $c->get(RefreshTokenRepository::class),
                 identities: $c->get(UserIdentityRepository::class),
+                dealerships: $c->get(DealershipRepository::class),
                 tokens: $c->get(TokenIssuer::class),
                 googleVerifier: $c->get(GoogleIdTokenVerifier::class),
                 audit: $c->get(AuditLogger::class),
@@ -196,6 +235,7 @@ final class ContainerFactory
             return new UserController(
                 users: $c->get(UserRepository::class),
                 refreshTokens: $c->get(RefreshTokenRepository::class),
+                dealerships: $c->get(DealershipRepository::class),
                 audit: $c->get(AuditLogger::class),
                 pagination: $c->get(PaginationPolicy::class),
                 passwordResetTokens: $c->get(PasswordResetTokenRepository::class),
@@ -205,6 +245,14 @@ final class ContainerFactory
                 passwordResetTemplatePath: dirname(__DIR__, 2) . '/resources/mail/password-reset.html',
             );
         });
+        $container->set(DealershipController::class, static fn (Container $c): DealershipController => new DealershipController(
+            dealerships: $c->get(DealershipRepository::class),
+            files: $c->get(FileRepository::class),
+            uploads: $c->get(FileUploadService::class),
+            storage: $c->get(StorageProvider::class),
+            audit: $c->get(AuditLogger::class),
+            pagination: $c->get(PaginationPolicy::class),
+        ));
 
         return $container;
     }

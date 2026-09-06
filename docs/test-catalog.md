@@ -12,7 +12,20 @@ Convenção: `Arquivo::método` para PHPUnit (backend); `arquivo.spec.ts > nome 
 | Self-service só escala `customer` → `seller`, nunca outra transição | `UserTest::is_eligible_for_self_service_role_change_permite_so_customer_virando_seller`, `UserTest::is_eligible_for_self_service_role_change_rejeita_a_partir_de_seller_ou_admin`; E2E: `become-seller.spec.ts > customer pode virar seller pelo próprio perfil` |
 | Admin/CRUD pode trocar pra qualquer role, com trava do último admin | `RlsPolicyTest` (contexto admin), verificação manual documentada nas sessões de implementação -- **sem teste automatizado direto do `UserController::update()` ainda** (ver "Lacunas" no fim deste documento) |
 
-### Veículos, Galeria, Disponibilidade, Exemplo, Exceções, Agendamento, Status, Concorrência, Cliente
+## Concessionária
+
+| Regra | Testes |
+|---|---|
+| Concessionária pertence a exatamente um seller (`owner_user_id`), sem tabela de associação; um seller pode ter mais de uma | `PostgresDealershipRepositoryTest::insere_e_encontra_por_id`, `::find_by_owner_traz_so_as_concessionarias_daquele_dono_nao_deletadas` |
+| Listagem paginada tanto pro admin quanto pro seller (`page`/`per_page`, `meta.total`) | `PostgresDealershipRepositoryTest::find_by_owner_respeita_limit_e_offset`, `::count_by_owner_so_conta_as_do_dono_nao_deletadas` |
+| RLS: seller só enxerga/altera a própria concessionária; admin enxerga qualquer uma; sem contexto, nenhuma linha; só `admin`/`seller` inserem | `DealershipRlsPolicyTest` (5 casos) |
+| Mesmo modelo de lixeira de 3 estados da conta (`active`/`trashed`/`deleted`), reversível 30 dias | `DealershipTest::register_monta_uma_concessionaria_nova_ativa_e_sem_anonimizacao`, `::is_eligible_for_restore_permite_so_trashed_ainda_nao_anonimizado`, `::is_eligible_for_purge_exige_trashed_ha_mais_de_grace_days_e_ainda_nao_anonimizado`; `PostgresDealershipRepositoryTest::trash_move_pra_status_trashed_e_seta_trashed_at`, `::restore_volta_status_active_e_limpa_trashed_at`, `::find_purge_eligible_so_traz_trashed_ha_mais_de_grace_days_e_ainda_nao_anonimizado` |
+| Lixeira em cascata (conta do dono desativada) só restaura automaticamente quem foi trashed por causa dela -- lixeira manual fica parada | `PostgresDealershipRepositoryTest::trash_all_owned_by_so_afeta_as_ativas_e_marca_por_desativacao_do_dono`, `::restore_auto_trashed_owned_by_so_restaura_quem_foi_trashed_por_causa_do_dono` |
+| Purge anonimiza identificador direto mas preserva CEP/cidade/estado/geolocalização; rotina agendada reaproveita a mesma `ScheduledTask` genérica da conta de usuário | `DealershipTest::anonymized_escruba_identificador_direto_mas_preserva_geolocalizacao`; `PurgeTrashedDealershipsTaskTest` (3 casos) |
+| Galeria: posição calculada automaticamente, única por concessionária | `PostgresDealershipRepositoryTest::galeria_insere_encontra_e_calcula_a_proxima_posicao` |
+| Validação de MIME no upload de foto (`image/jpeg`/`image/png`/`image/webp`) | Validação declarada em `DealershipController::addImage()`; **sem teste automatizado direto** -- verificado manualmente via curl (ver "Lacunas" no fim deste documento) |
+
+### Veículos, Galeria (veículo), Disponibilidade, Exemplo, Exceções, Agendamento, Status, Concorrência, Cliente
 
 Domínio ainda não implementado (`Worklist.md`, Dia 2/3/4) -- nenhum teste existe porque nenhum código existe. Não é lacuna de cobertura, é trabalho futuro.
 
@@ -106,3 +119,4 @@ Não é seção de `business-rules.md` (é requisito não-funcional, não regra 
 Revisão desta sessão encontrou pontos sem teste automatizado direto -- documentados aqui em vez de silenciosamente ignorados:
 
 - `UserController` (e `OAuthController`) não tem suíte de teste própria -- toda regra de negócio que vive puramente no controller (ex: a trava do último admin em `assertNotLastAdmin()`, o dispatch por corpo em `updatePassword()`, `destroy()`/`restore()`/`purge()`) só é coberta indiretamente (pelos testes de domínio/repositório que ele orquestra) ou por verificação manual via curl, documentada nas sessões de implementação. Corrigir isso é trabalho de teste novo, não de catálogo -- fica registrado aqui como próximo passo.
+- `DealershipController` também não tem suíte própria -- mesma situação: orquestração (dono automático na criação por seller vs `owner_user_id` obrigatório por admin, reassociação de dono via `PATCH`, validação de MIME no upload de foto) só é coberta indiretamente pelos testes de domínio/repositório/RLS, mais verificação manual via curl (create/list/show/update/upload/remove/trash/restore/purge, isolamento entre sellers). Mesmo próximo passo do item acima.

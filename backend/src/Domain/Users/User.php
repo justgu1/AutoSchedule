@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Users;
 
+use App\Domain\Shared\TrashableStatus;
 use App\Domain\Support\Uuid;
 
 final readonly class User
@@ -20,7 +21,7 @@ final readonly class User
         public \DateTimeImmutable $createdAt,
         public \DateTimeImmutable $updatedAt,
         public ?\DateTimeImmutable $deletedAt,
-        public UserStatus $status,
+        public TrashableStatus $status,
         public ?\DateTimeImmutable $anonymizedAt,
     ) {
     }
@@ -47,7 +48,7 @@ final readonly class User
             createdAt: $now,
             updatedAt: $now,
             deletedAt: null,
-            status: UserStatus::Active,
+            status: TrashableStatus::Active,
             anonymizedAt: null,
         );
     }
@@ -133,13 +134,13 @@ final readonly class User
     /** Só dá pra restaurar da lixeira antes da anonimização definitiva ter rodado. */
     public function isEligibleForRestore(): bool
     {
-        return $this->status === UserStatus::Trashed && !$this->anonymizedAt instanceof \DateTimeImmutable;
+        return $this->status === TrashableStatus::Trashed && !$this->anonymizedAt instanceof \DateTimeImmutable;
     }
 
     /** Passou da janela de recuperação (30 dias) sem ser restaurado -- elegível pra rotina de purge. */
     public function isEligibleForPurge(int $graceDays, \DateTimeImmutable $now): bool
     {
-        if ($this->status !== UserStatus::Trashed || $this->anonymizedAt instanceof \DateTimeImmutable || !$this->deletedAt instanceof \DateTimeImmutable) {
+        if ($this->status !== TrashableStatus::Trashed || $this->anonymizedAt instanceof \DateTimeImmutable || !$this->deletedAt instanceof \DateTimeImmutable) {
             return false;
         }
 
@@ -169,7 +170,7 @@ final readonly class User
             createdAt: $this->createdAt,
             updatedAt: $this->updatedAt,
             deletedAt: $this->deletedAt,
-            status: UserStatus::Deleted,
+            status: TrashableStatus::Deleted,
             anonymizedAt: new \DateTimeImmutable(),
         );
     }

@@ -100,6 +100,19 @@ Concessionária precisa de foto (→ MinIO) e a lixeira com purge após 30 dias 
 - [x] Ciclo de vida de conta (lixeira): `active`/`trashed`/`deleted`, reversível por 30 dias -- `DELETE /me` move pra lixeira, login de novo restaura sozinho, admin restaura/purga explícito (`POST /users/{id}/restore`/`purge`), rotina agendada purga quem passou da janela
 - [x] Modelo pensado pra ser reaproveitado por outras entidades (concessionária, próximo passo)
 
+### Entregue além do escopo original — domínio de Concessionária (backend)
+
+- [x] `Dealership`/`DealershipImage` (entidade + DTO), `App\Domain\Shared\TrashableStatus` -- enum de ciclo de vida compartilhado entre `User` e `Dealership` (era duplicado 1:1, extraído assim que o segundo domínio expôs a repetição)
+- [x] `dealerships`/`dealership_images` (migrations, RLS: seller só enxerga/altera a própria, admin qualquer uma, só `admin`/`seller` inserem) -- sem tabela de associação seller↔concessionária (`owner_user_id` direto, um seller pode ter mais de uma)
+- [x] Ciclo de vida (lixeira) reaproveitado de `users`: manual (`DELETE /dealerships/{id}`) e em cascata (`trashed_by_owner_deactivation`, dono desativou a conta) -- só a cascata restaura sozinha quando o dono loga de novo; `restore`/`purge` explícitos, mesma rotina agendada genérica dos dois domínios
+- [x] `AuditLogger` generalizado (`auditableType` explícito em vez de assumir sempre `User`) -- gap real de arquitetura, achado ao tentar auditar a primeira entidade que não é usuário
+- [x] `PurgeTrashedEntitiesTask` genérica (`Infrastructure/Scheduler`) substitui as duas `PurgeTrashedXxxTask` quase-idênticas (usuário e concessionária) por uma só, parametrizada por closures tipadas por domínio
+- [x] Galeria de fotos (MinIO, reaproveita `FileUploadService` do PR de storage) -- posição calculada automaticamente, upload/remoção
+- [x] Multipart upload no `Request` (`$_FILES` → `UploadedFile`), primeira vez que a aplicação aceita isso
+- [x] Listagem paginada tanto pro admin quanto pro seller (gap encontrado em revisão -- só o admin paginava antes)
+- [x] Suíte de teste (domínio, repositório, RLS, rotina de purge); `DealershipController` ainda sem suíte própria, só verificação manual (ver `docs/test-catalog.md`)
+- [ ] Frontend (telas de seller/admin, upload de foto, E2E) -- próximo passo dentro do mesmo PR
+
 ### Dia 3 — API e regras de negócio
 
 - [x] Definir contratos da API (`GET /api` funciona como catálogo: lista endpoint, método, descrição e campos aceitos por role)

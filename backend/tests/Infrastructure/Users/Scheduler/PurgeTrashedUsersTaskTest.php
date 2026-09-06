@@ -8,8 +8,8 @@ use App\Domain\Audit\AuditEvent;
 use App\Domain\Users\User;
 use App\Domain\Users\UserRole;
 use App\Infrastructure\Database\PostgresConnection;
+use App\Infrastructure\Scheduler\PurgeTrashedEntitiesTask;
 use App\Infrastructure\Users\PostgresUserRepository;
-use App\Infrastructure\Users\Scheduler\PurgeTrashedUsersTask;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Tests\Domain\Auth\FakeAuditLogger;
@@ -20,7 +20,9 @@ final class PurgeTrashedUsersTaskTest extends TestCase
     private \PDO $pdo;
     private PostgresUserRepository $repository;
     private FakeAuditLogger $audit;
-    private PurgeTrashedUsersTask $task;
+
+    /** @var PurgeTrashedEntitiesTask<User> */
+    private PurgeTrashedEntitiesTask $task;
 
     protected function setUp(): void
     {
@@ -36,7 +38,18 @@ final class PurgeTrashedUsersTaskTest extends TestCase
         $this->pdo->beginTransaction();
         $this->repository = new PostgresUserRepository($this->pdo);
         $this->audit = new FakeAuditLogger();
-        $this->task = new PurgeTrashedUsersTask($this->repository, $this->audit);
+        $repository = $this->repository;
+        $this->task = new PurgeTrashedEntitiesTask(
+            name: 'purge-trashed-users',
+            graceDays: 30,
+            dueIntervalSeconds: 86400,
+            findEligible: $repository->findPurgeEligible(...),
+            purge: static fn (User $user) => $repository->anonymizeAndSoftDelete($user->id),
+            identify: static fn (User $user): string => $user->id,
+            audit: $this->audit,
+            event: AuditEvent::AccountPurged,
+            auditableType: 'User',
+        );
     }
 
     protected function tearDown(): void
@@ -76,6 +89,7 @@ final class PurgeTrashedUsersTaskTest extends TestCase
 
         $this->assertSame([AuditEvent::AccountPurged], $this->audit->events);
         $this->assertSame($longTrashed->id, $this->audit->calls[0]['targetUserId']);
+        $this->assertSame('User', $this->audit->calls[0]['auditableType']);
     }
 
     #[Test]

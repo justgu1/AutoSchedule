@@ -19,12 +19,15 @@ use App\Domain\Auth\RefreshToken;
 use App\Domain\Auth\UserIdentity;
 use App\Domain\Auth\ValueObjects\AccessTokenClaims;
 use App\Domain\Auth\ValueObjects\GoogleIdentityClaims;
+use App\Domain\Dealerships\Dealership;
+use App\Domain\Dealerships\DealershipImage;
+use App\Domain\Dealerships\Ports\DealershipRepository;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
+use App\Domain\Shared\TrashableStatus;
 use App\Domain\Users\Ports\UserRepository;
 use App\Domain\Users\User;
 use App\Domain\Users\UserRole;
-use App\Domain\Users\UserStatus;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -80,7 +83,7 @@ final class OAuthServiceTest extends TestCase
 
         $restored = $this->users->findById($this->customer->id);
         assert($restored instanceof \App\Domain\Users\User);
-        $this->assertSame(UserStatus::Active, $restored->status);
+        $this->assertSame(TrashableStatus::Active, $restored->status);
         $this->assertTrue($tokenPair->accountRestored);
         $this->assertSame([AuditEvent::AccountRestored, AuditEvent::LoginSucceeded], $this->audit->events);
     }
@@ -132,6 +135,7 @@ final class OAuthServiceTest extends TestCase
             users: $this->users,
             refreshTokens: $this->refreshTokens,
             identities: $this->identities,
+            dealerships: new InMemoryDealershipRepository(),
             tokens: new FakeTokenIssuer(),
             googleVerifier: $this->googleVerifier,
             audit: $this->audit,
@@ -225,7 +229,7 @@ final class OAuthServiceTest extends TestCase
 
         $restored = $this->users->findById($this->customer->id);
         assert($restored instanceof \App\Domain\Users\User);
-        $this->assertSame(UserStatus::Active, $restored->status);
+        $this->assertSame(TrashableStatus::Active, $restored->status);
         $this->assertTrue($tokenPair->accountRestored);
         $this->assertSame([AuditEvent::AccountRestored, AuditEvent::LoginSucceeded], $this->audit->events);
     }
@@ -288,6 +292,7 @@ final class OAuthServiceTest extends TestCase
             users: $this->users,
             refreshTokens: $this->refreshTokens,
             identities: $this->identities,
+            dealerships: new InMemoryDealershipRepository(),
             tokens: new FakeTokenIssuer(),
             googleVerifier: $this->googleVerifier,
             audit: $this->audit,
@@ -355,6 +360,7 @@ final class OAuthServiceTest extends TestCase
             users: $this->users,
             refreshTokens: $this->refreshTokens,
             identities: $this->identities,
+            dealerships: new InMemoryDealershipRepository(),
             tokens: new FakeTokenIssuer(),
             googleVerifier: $this->googleVerifier,
             audit: $this->audit,
@@ -383,6 +389,7 @@ final class OAuthServiceTest extends TestCase
             users: $this->users,
             refreshTokens: $this->refreshTokens,
             identities: $this->identities,
+            dealerships: new InMemoryDealershipRepository(),
             tokens: new FakeTokenIssuer(),
             googleVerifier: $this->googleVerifier,
             audit: $this->audit,
@@ -398,6 +405,7 @@ final class OAuthServiceTest extends TestCase
             users: $this->users,
             refreshTokens: $this->refreshTokens,
             identities: $this->identities,
+            dealerships: new InMemoryDealershipRepository(),
             tokens: new FakeTokenIssuer(),
             googleVerifier: $this->googleVerifier,
             audit: $this->audit,
@@ -477,14 +485,14 @@ final class InMemoryUserRepository implements UserRepository
     public function trash(string $id): void
     {
         if (($user = $this->byId[$id] ?? null) instanceof User) {
-            $this->byId[$id] = $this->withStatus($user, UserStatus::Trashed, new \DateTimeImmutable());
+            $this->byId[$id] = $this->withStatus($user, TrashableStatus::Trashed, new \DateTimeImmutable());
         }
     }
 
     public function restore(string $id): void
     {
         if (($user = $this->byId[$id] ?? null) instanceof User) {
-            $this->byId[$id] = $this->withStatus($user, UserStatus::Active, null);
+            $this->byId[$id] = $this->withStatus($user, TrashableStatus::Active, null);
         }
     }
 
@@ -496,7 +504,7 @@ final class InMemoryUserRepository implements UserRepository
         ));
     }
 
-    private function withStatus(User $user, UserStatus $status, ?\DateTimeImmutable $deletedAt): User
+    private function withStatus(User $user, TrashableStatus $status, ?\DateTimeImmutable $deletedAt): User
     {
         return new User(
             id: $user->id,
@@ -612,14 +620,14 @@ final class FakeAuditLogger implements AuditLogger
     /** @var list<AuditEvent> */
     public array $events = [];
 
-    /** @var list<array{event: AuditEvent, actorId: ?string, targetUserId: ?string}> */
+    /** @var list<array{event: AuditEvent, actorId: ?string, auditableType: string, targetUserId: ?string}> */
     public array $calls = [];
 
     /** @param array<string, mixed> $context */
-    public function record(AuditEvent $event, ?string $actorId, ?string $targetUserId, array $context, string $ipAddress, ?string $userAgent): void
+    public function record(AuditEvent $event, ?string $actorId, string $auditableType, ?string $auditableId, array $context, string $ipAddress, ?string $userAgent): void
     {
         $this->events[] = $event;
-        $this->calls[] = ['event' => $event, 'actorId' => $actorId, 'targetUserId' => $targetUserId];
+        $this->calls[] = ['event' => $event, 'actorId' => $actorId, 'auditableType' => $auditableType, 'targetUserId' => $auditableId];
     }
 }
 
@@ -666,5 +674,86 @@ final class FakeGoogleIdTokenVerifier implements GoogleIdTokenVerifier
     public function verify(string $idToken): GoogleIdentityClaims
     {
         return $this->nextClaims ?? throw new DomainException('Invalid Google credential.', DomainErrorType::Unauthorized);
+    }
+}
+
+/** OAuthService só chama restoreAutoTrashedOwnedBy() no caminho de restore -- os testes daqui não afirmam nada sobre concessionária, só precisam do contrato satisfeito. */
+final class InMemoryDealershipRepository implements DealershipRepository
+{
+    public function findById(string $id): ?Dealership
+    {
+        return null;
+    }
+
+    public function insert(Dealership $dealership): void
+    {
+    }
+
+    public function update(Dealership $dealership): void
+    {
+    }
+
+    public function findByOwner(string $ownerUserId, int $limit, int $offset): array
+    {
+        return [];
+    }
+
+    public function countByOwner(string $ownerUserId): int
+    {
+        return 0;
+    }
+
+    public function findPage(int $limit, int $offset): array
+    {
+        return [];
+    }
+
+    public function count(): int
+    {
+        return 0;
+    }
+
+    public function trash(string $id, bool $byOwnerDeactivation): void
+    {
+    }
+
+    public function restore(string $id): void
+    {
+    }
+
+    public function findPurgeEligible(int $graceDays, \DateTimeImmutable $now): array
+    {
+        return [];
+    }
+
+    public function trashAllOwnedBy(string $ownerUserId): void
+    {
+    }
+
+    public function restoreAutoTrashedOwnedBy(string $ownerUserId): void
+    {
+    }
+
+    public function insertImage(DealershipImage $image): void
+    {
+    }
+
+    public function deleteImage(string $imageId): void
+    {
+    }
+
+    public function findImageById(string $imageId): ?DealershipImage
+    {
+        return null;
+    }
+
+    public function findImagesByDealership(string $dealershipId): array
+    {
+        return [];
+    }
+
+    public function nextImagePosition(string $dealershipId): int
+    {
+        return 0;
     }
 }

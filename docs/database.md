@@ -28,6 +28,12 @@ Enum user_status {
   deleted
 }
 
+Enum dealership_status {
+  active
+  trashed
+  deleted
+}
+
 Enum vehicle_status {
   available
   sold
@@ -60,6 +66,7 @@ Table users {
 
 Table dealerships {
   id uuid [pk]
+  owner_user_id uuid [not null]
   name varchar(160) [not null]
   zip_code varchar(10) [not null]
   address varchar(255) [not null]
@@ -72,20 +79,32 @@ Table dealerships {
   longitude decimal(10,7)
   google_place_id varchar(255)
   phone varchar(20)
+  status dealership_status [not null, default: 'active']
+  trashed_by_owner_deactivation boolean [not null, default: false]
+  trashed_at timestamptz
+  anonymized_at timestamptz
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
-  deleted_at timestamptz
 }
 
-Table dealership_user {
+Table dealership_images {
+  id uuid [pk]
   dealership_id uuid [not null]
-  user_id uuid [not null]
+  file_id uuid [not null]
+  position smallint [not null]
   created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
 
-  indexes {
-    (dealership_id, user_id) [pk]
-    (user_id, dealership_id)
-  }
+Table files {
+  id uuid [pk]
+  path varchar(500) [not null, unique]
+  original_name varchar(255) [not null]
+  mime_type varchar(100) [not null]
+  size_bytes bigint [not null]
+  checksum varchar(64) [not null]
+  uploaded_by uuid
+  created_at timestamptz [not null]
 }
 
 Table vehicles {
@@ -176,8 +195,10 @@ Table audit_logs {
   created_at timestamptz [not null]
 }
 
-Ref: dealership_user.dealership_id > dealerships.id
-Ref: dealership_user.user_id > users.id
+Ref: dealerships.owner_user_id > users.id
+Ref: dealership_images.dealership_id > dealerships.id
+Ref: dealership_images.file_id > files.id
+Ref: files.uploaded_by > users.id
 Ref: vehicles.dealership_id > dealerships.id
 Ref: vehicle_images.vehicle_id > vehicles.id
 Ref: dealership_availability_rules.dealership_id > dealerships.id
@@ -190,9 +211,11 @@ Ref: audit_logs.user_id > users.id
 Ref: audit_logs.actor_id > users.id
 ```
 
-## Galeria de veículos
+## Galeria (concessionária e veículo)
 
 As imagens são armazenadas no MinIO. O PostgreSQL mantém somente a referência ao objeto e sua posição na galeria.
+
+`dealership_images` referencia `files` (metadado genérico de upload, reaproveitado por qualquer domínio); `vehicle_images` guarda o `path` direto -- domínio de veículo ainda não migrou pro mesmo padrão.
 
 ```text
 position = 0 → primeira imagem
@@ -210,15 +233,21 @@ A senha em texto puro nunca deve ser persistida ou registrada em logs.
 
 ## Ciclo de vida (lixeira)
 
-`status` (`active`/`trashed`/`deleted`) é a fonte de verdade do ciclo de vida -- `deleted_at` marca quando entrou na lixeira (não é mais "deletado = deleted_at preenchido" sozinho). `anonymized_at` marca quando a anonimização definitiva rodou, idempotência da rotina de purge.
+`status` (`active`/`trashed`/`deleted`) é a fonte de verdade do ciclo de vida -- `deleted_at`/`trashed_at` marca quando entrou na lixeira (não é mais "deletado = deleted_at preenchido" sozinho). `anonymized_at` marca quando a anonimização definitiva rodou, idempotência da rotina de purge.
 
-Índice em `status` (`users_status_idx`) -- toda query de listagem/login filtra por ele.
+O mesmo modelo de três estados vale pra `users` e `dealerships` -- na aplicação os dois reaproveitam o mesmo enum PHP (`App\Domain\Shared\TrashableStatus`), só o tipo `ENUM` do Postgres é duplicado por tabela (`user_status`/`dealership_status`) porque cada `CREATE TYPE` é local à tabela que o usa.
+
+`dealerships.trashed_by_owner_deactivation` diferencia lixeira manual (o seller apagou a própria concessionária) de lixeira em cascata (o seller desativou a conta) -- só a segunda é restaurada automaticamente quando o seller volta a logar.
+
+Índice em `status` (`users_status_idx`/`dealerships_status_idx`) -- toda query de listagem/login filtra por ele.
 
 Convenção de visibilidade nas queries:
 
 ```text
-findByEmail/findById/existsByEmail/findPage/count  -> status <> 'deleted'  (mostra active + trashed)
-countByRole (trava do último admin)                -> status = 'active'   (só ativo protege)
+users:       findByEmail/findById/existsByEmail/findPage/count       -> status <> 'deleted'  (mostra active + trashed)
+users:       countByRole (trava do último admin)                     -> status = 'active'    (só ativo protege)
+dealerships: findByOwner/findPage/count/countByOwner                 -> status <> 'deleted'  (mostra active + trashed)
+dealerships: findById                                                -> sem filtro           (admin/restore/purge acham mesmo depois de anonimizado)
 ```
 
 ## Auditoria
@@ -260,11 +289,14 @@ WHERE deleted_at IS NULL
 
 ## Imagens
 
-Cada posição da galeria deve ser única dentro de um veículo:
+Cada posição da galeria deve ser única dentro de um veículo ou de uma concessionária:
 
 ```sql
 CREATE UNIQUE INDEX vehicle_images_position_unique
 ON vehicle_images (vehicle_id, position);
+
+CREATE UNIQUE INDEX dealership_images_position_unique
+ON dealership_images (dealership_id, position);
 ```
 
 ## Busca
@@ -299,7 +331,7 @@ O banco deve garantir, sempre que possível:
 
 - e-mail único;
 - integridade das foreign keys;
-- associação única entre usuário e concessionária;
+- cada concessionária pertence a exatamente um seller (`owner_user_id` `NOT NULL`, sem tabela de associação);
 - posições únicas na galeria;
 - intervalos de disponibilidade válidos;
 - valores válidos para status e papéis;
