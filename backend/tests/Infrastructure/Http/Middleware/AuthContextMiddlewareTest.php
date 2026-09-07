@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace Tests\Infrastructure\Http\Middleware;
 
-use App\Domain\Auth\Ports\TokenIssuer;
 use App\Domain\Auth\ValueObjects\AccessTokenClaims;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
 use App\Domain\User\UserRole;
 use App\Infrastructure\Database\PostgresConnection;
+use App\Infrastructure\Http\HttpMethod;
 use App\Infrastructure\Http\JsonResponse;
 use App\Infrastructure\Http\Middleware\AuthContextMiddleware;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
-use App\Infrastructure\Http\Router;
+use App\Infrastructure\Http\Route;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -31,18 +31,14 @@ final class AuthContextMiddlewareTest extends TestCase
     }
 
     #[Test]
-    public function sem_bearer_e_rota_publica_comum_segue_direto_sem_transacao(): void
+    public function rota_publica_comum_segue_direto_sem_abrir_transacao(): void
     {
-        $router = new Router();
-        $router->get('/api/me', static fn (): Response => new JsonResponse([]));
-        $middleware = new AuthContextMiddleware(new FakeTokenIssuer(), $this->connection, $router);
         $inTransaction = null;
 
-        $response = $middleware->handle(
-            new Request(method: 'GET', path: '/api/me'),
+        $response = $this->middleware()->handle(
+            $this->request($this->route()),
             function (Request $request) use (&$inTransaction): Response {
                 $inTransaction = $this->connection->pdo()->inTransaction();
-                $this->assertNull($request->attribute('auth'));
 
                 return new JsonResponse(['ok' => true]);
             },
@@ -53,23 +49,19 @@ final class AuthContextMiddlewareTest extends TestCase
     }
 
     #[Test]
-    public function com_bearer_valido_anexa_claims_e_seta_o_contexto_do_rls(): void
+    public function com_claims_seta_identidade_e_role_no_rls(): void
     {
-        $claims = AccessTokenClaims::issue('11111111-1111-4111-8111-111111111111', 'autoschedule-web', UserRole::Customer, [], 900);
-        $middleware = new AuthContextMiddleware(new FakeTokenIssuer(['valid-token' => $claims]), $this->connection, new Router());
         $seenUserId = null;
         $seenRole = null;
 
-        $middleware->handle(
-            new Request(method: 'GET', path: '/api/me', headers: ['authorization' => 'Bearer valid-token']),
-            function (Request $request) use (&$seenUserId, &$seenRole, $claims): Response {
+        $this->middleware()->handle(
+            $this->request($this->route())->withAttribute('auth', $this->claims(UserRole::Customer)),
+            function (Request $request) use (&$seenUserId, &$seenRole): Response {
                 $pdo = $this->connection->pdo();
                 $seenUserId = $pdo->query("SELECT current_setting('app.current_user_id', true)")->fetchColumn();
                 $seenRole = $pdo->query("SELECT current_setting('app.current_user_role', true)")->fetchColumn();
 
-                $this->assertSame($claims, $request->attribute('auth'));
-
-                return new JsonResponse(['ok' => true]);
+                return new JsonResponse([]);
             },
         );
 
@@ -77,56 +69,16 @@ final class AuthContextMiddlewareTest extends TestCase
         $this->assertSame('customer', $seenRole);
     }
 
+    /** O rate limit já contou a tentativa quando isto roda, então recusar aqui não abre buraco de cota. */
     #[Test]
-    public function sem_header_authorization_cai_pro_cookie_access_token(): void
+    public function relanca_a_falha_de_token_guardada_pelo_authenticate(): void
     {
-        $claims = AccessTokenClaims::issue('11111111-1111-4111-8111-111111111111', 'autoschedule-web', UserRole::Customer, [], 900);
-        $middleware = new AuthContextMiddleware(new FakeTokenIssuer(['valid-token' => $claims]), $this->connection, new Router());
-
-        $middleware->handle(
-            new Request(method: 'GET', path: '/api/me', cookies: ['access_token' => 'valid-token']),
-            function (Request $request) use ($claims): Response {
-                $this->assertSame($claims, $request->attribute('auth'));
-
-                return new JsonResponse(['ok' => true]);
-            },
-        );
-    }
-
-    #[Test]
-    public function header_authorization_tem_prioridade_sobre_o_cookie(): void
-    {
-        $headerClaims = AccessTokenClaims::issue('11111111-1111-4111-8111-111111111111', 'autoschedule-web', UserRole::Admin, [], 900);
-        $middleware = new AuthContextMiddleware(
-            new FakeTokenIssuer(['header-token' => $headerClaims]),
-            $this->connection,
-            new Router(),
-        );
-
-        $middleware->handle(
-            new Request(
-                method: 'GET',
-                path: '/api/me',
-                headers: ['authorization' => 'Bearer header-token'],
-                cookies: ['access_token' => 'cookie-token-que-nao-existe-no-fake'],
-            ),
-            function (Request $request) use ($headerClaims): Response {
-                $this->assertSame($headerClaims, $request->attribute('auth'));
-
-                return new JsonResponse(['ok' => true]);
-            },
-        );
-    }
-
-    #[Test]
-    public function com_bearer_invalido_lanca_excecao_e_nao_chama_next(): void
-    {
-        $middleware = new AuthContextMiddleware(new FakeTokenIssuer(), $this->connection, new Router());
         $nextCalled = false;
+        $failure = new DomainException('Invalid or expired access token.', DomainErrorType::Unauthorized);
 
         try {
-            $middleware->handle(
-                new Request(method: 'GET', path: '/api/me', headers: ['authorization' => 'Bearer garbage']),
+            $this->middleware()->handle(
+                $this->request($this->route())->withAttribute('auth_error', $failure),
                 function (Request $request) use (&$nextCalled): Response {
                     $nextCalled = true;
 
@@ -142,90 +94,78 @@ final class AuthContextMiddlewareTest extends TestCase
     }
 
     #[Test]
-    public function sem_bearer_em_rota_service_context_seta_o_contexto_de_servico(): void
+    public function rota_de_service_context_sem_claims_seta_o_contexto_de_servico(): void
     {
-        $router = new Router();
-        $router->post('/api/oauth/token', static fn (): Response => new JsonResponse([]), serviceContext: true);
-        $middleware = new AuthContextMiddleware(new FakeTokenIssuer(), $this->connection, $router);
-        $seenContext = null;
+        $seen = null;
 
-        $middleware->handle(
-            new Request(method: 'POST', path: '/api/oauth/token'),
-            function (Request $request) use (&$seenContext): Response {
-                $seenContext = $this->connection->pdo()
-                    ->query("SELECT current_setting('app.is_service_context', true)")
-                    ->fetchColumn();
+        $this->middleware()->handle(
+            $this->request($this->route()->serviceContext()),
+            function (Request $request) use (&$seen): Response {
+                $seen = $this->connection->pdo()->query("SELECT current_setting('app.is_service_context', true)")->fetchColumn();
 
-                return new JsonResponse(['ok' => true]);
+                return new JsonResponse([]);
             },
         );
 
-        $this->assertSame('true', $seenContext);
+        $this->assertSame('true', $seen);
     }
 
     #[Test]
-    public function sem_bearer_em_rota_public_read_seta_o_contexto_de_leitura_publica(): void
+    public function rota_de_leitura_publica_sem_claims_seta_a_flag_publica(): void
     {
-        $router = new Router();
-        $router->get('/api/dealerships/{id}', static fn (): Response => new JsonResponse([]), publicRead: true);
-        $middleware = new AuthContextMiddleware(new FakeTokenIssuer(), $this->connection, $router);
-        $seenContext = null;
+        $seen = null;
 
-        $middleware->handle(
-            new Request(method: 'GET', path: '/api/dealerships/abc'),
-            function (Request $request) use (&$seenContext): Response {
-                $seenContext = $this->connection->pdo()
-                    ->query("SELECT current_setting('app.is_public_read', true)")
-                    ->fetchColumn();
+        $this->middleware()->handle(
+            $this->request($this->route()->publicRead()),
+            function (Request $request) use (&$seen): Response {
+                $seen = $this->connection->pdo()->query("SELECT current_setting('app.is_public_read', true)")->fetchColumn();
 
-                return new JsonResponse(['ok' => true]);
+                return new JsonResponse([]);
             },
         );
 
-        $this->assertSame('true', $seenContext);
+        $this->assertSame('true', $seen);
     }
 
     /** As duas marcas ficam setadas ao mesmo tempo, que é o que deixa o seller autenticado ver o perfil público alheio. */
     #[Test]
-    public function com_bearer_valido_em_rota_public_read_seta_os_dois_contextos_juntos(): void
+    public function leitura_publica_com_claims_seta_os_dois_contextos_juntos(): void
     {
-        $claims = AccessTokenClaims::issue('11111111-1111-4111-8111-111111111111', 'autoschedule-web', UserRole::Seller, [], 900);
-        $router = new Router();
-        $router->get('/api/dealerships/{id}', static fn (): Response => new JsonResponse([]), publicRead: true);
-        $middleware = new AuthContextMiddleware(new FakeTokenIssuer(['valid-token' => $claims]), $this->connection, $router);
         $seenUserId = null;
         $seenPublicRead = null;
 
-        $middleware->handle(
-            new Request(method: 'GET', path: '/api/dealerships/abc', headers: ['authorization' => 'Bearer valid-token']),
+        $this->middleware()->handle(
+            $this->request($this->route()->publicRead())->withAttribute('auth', $this->claims(UserRole::Seller)),
             function (Request $request) use (&$seenUserId, &$seenPublicRead): Response {
                 $pdo = $this->connection->pdo();
                 $seenUserId = $pdo->query("SELECT current_setting('app.current_user_id', true)")->fetchColumn();
                 $seenPublicRead = $pdo->query("SELECT current_setting('app.is_public_read', true)")->fetchColumn();
 
-                return new JsonResponse(['ok' => true]);
+                return new JsonResponse([]);
             },
         );
 
         $this->assertSame('11111111-1111-4111-8111-111111111111', $seenUserId);
         $this->assertSame('true', $seenPublicRead);
     }
-}
 
-final readonly class FakeTokenIssuer implements TokenIssuer
-{
-    /** @param array<string, AccessTokenClaims> $tokens */
-    public function __construct(private array $tokens = [])
+    private function middleware(): AuthContextMiddleware
     {
+        return new AuthContextMiddleware($this->connection);
     }
 
-    public function issueAccessToken(AccessTokenClaims $claims): string
+    private function route(): Route
     {
-        throw new \LogicException('Not used in this test.');
+        return new Route(HttpMethod::Get, '/api/me', static fn (Request $request): Response => new JsonResponse([]));
     }
 
-    public function decodeAccessToken(string $token): AccessTokenClaims
+    private function request(Route $route): Request
     {
-        return $this->tokens[$token] ?? throw new DomainException('Invalid or expired access token.', DomainErrorType::Unauthorized);
+        return new Request(method: 'GET', path: $route->path)->withAttribute('route', $route);
+    }
+
+    private function claims(UserRole $role): AccessTokenClaims
+    {
+        return AccessTokenClaims::issue('11111111-1111-4111-8111-111111111111', 'autoschedule-web', $role, [], 900);
     }
 }

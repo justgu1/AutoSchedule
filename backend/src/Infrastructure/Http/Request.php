@@ -139,6 +139,31 @@ final class Request
         return $this->files[$name] ?? null;
     }
 
+    /** Header vence o cookie: quem manda o Bearer na mão está dizendo que não depende de credencial ambiente. */
+    public function bearerToken(): ?string
+    {
+        $header = $this->header('authorization');
+
+        if ($header !== null && str_starts_with($header, 'Bearer ')) {
+            return substr($header, 7);
+        }
+
+        return $this->cookie('access_token');
+    }
+
+    public function usesCookieAuth(): bool
+    {
+        return $this->header('authorization') === null && $this->cookie('access_token') !== null;
+    }
+
+    /** Casada uma vez por `ResolveRouteMiddleware`; null quando nenhuma rota bate. */
+    public function route(): ?Route
+    {
+        $route = $this->attributes['route'] ?? null;
+
+        return $route instanceof Route ? $route : null;
+    }
+
     public function attribute(string $key, mixed $default = null): mixed
     {
         return $this->attributes[$key] ?? $default;

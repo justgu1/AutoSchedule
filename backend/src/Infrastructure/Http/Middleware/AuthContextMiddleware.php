@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Http\Middleware;
 
-use App\Domain\Auth\Ports\TokenIssuer;
+use App\Domain\Auth\ValueObjects\AccessTokenClaims;
 use App\Infrastructure\Database\DatabaseConnection;
 use App\Infrastructure\Http\Middleware;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
-use App\Infrastructure\Http\Router;
 
 /**
  * As três marcas de contexto do RLS são compostas, não alternativas: um seller autenticado numa leitura
@@ -17,32 +16,32 @@ use App\Infrastructure\Http\Router;
  */
 final readonly class AuthContextMiddleware implements Middleware
 {
-    public function __construct(
-        private TokenIssuer $tokens,
-        private DatabaseConnection $connection,
-        private Router $router,
-    ) {
+    public function __construct(private DatabaseConnection $connection)
+    {
     }
 
     public function handle(Request $request, \Closure $next): Response
     {
-        $token = $this->extractToken($request);
-        $claims = null;
+        // O rate limit já contou a tentativa, então agora dá pra recusar o token inválido.
+        $failure = $request->attribute('auth_error');
 
-        if ($token !== null) {
-            $claims = $this->tokens->decodeAccessToken($token);
-            $request = $request->withAttribute('auth', $claims);
+        if ($failure instanceof \Throwable) {
+            throw $failure;
         }
 
-        $isServiceContext = !$claims instanceof \App\Domain\Auth\ValueObjects\AccessTokenClaims && $this->router->isServiceContext($request->method(), $request->path());
-        $isPublicRead = $this->router->isPublicRead($request->method(), $request->path());
+        $claims = $request->attribute('auth');
+        $authenticated = $claims instanceof AccessTokenClaims;
+        $route = $request->route();
 
-        if (!$claims instanceof \App\Domain\Auth\ValueObjects\AccessTokenClaims && !$isServiceContext && !$isPublicRead) {
+        $isServiceContext = !$authenticated && ($route?->needsServiceContext() ?? false);
+        $isPublicRead = $route?->allowsPublicRead() ?? false;
+
+        if (!$authenticated && !$isServiceContext && !$isPublicRead) {
             return $next($request);
         }
 
         return $this->runInTransaction($request, $next, static function (\PDO $pdo) use ($claims, $isServiceContext, $isPublicRead): void {
-            if ($claims instanceof \App\Domain\Auth\ValueObjects\AccessTokenClaims) {
+            if ($claims instanceof AccessTokenClaims) {
                 $pdo->exec('SET LOCAL app.current_user_id = ' . $pdo->quote($claims->subject));
                 $pdo->exec('SET LOCAL app.current_user_role = ' . $pdo->quote($claims->role?->value ?? ''));
             }
@@ -55,17 +54,6 @@ final readonly class AuthContextMiddleware implements Middleware
                 $pdo->exec("SET LOCAL app.is_public_read = 'true'");
             }
         });
-    }
-
-    private function extractToken(Request $request): ?string
-    {
-        $header = $request->header('authorization');
-
-        if ($header !== null && str_starts_with($header, 'Bearer ')) {
-            return substr($header, 7);
-        }
-
-        return $request->cookie('access_token');
     }
 
     private function runInTransaction(Request $request, \Closure $next, \Closure $setContext): Response

@@ -21,7 +21,7 @@ final readonly class CsrfMiddleware implements Middleware
 
     public function handle(Request $request, \Closure $next): Response
     {
-        $usingCookieAuth = $request->header('authorization') === null && $request->cookie('access_token') !== null;
+        $usingCookieAuth = $request->usesCookieAuth();
 
         if ($usingCookieAuth && !in_array($request->method(), self::SAFE_METHODS, true)) {
             $cookie = $request->cookie('XSRF-TOKEN');
