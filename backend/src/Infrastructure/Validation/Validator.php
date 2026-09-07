@@ -4,20 +4,21 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Validation;
 
+use App\Application\Shared\ValidatedInput;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
 
 final class Validator
 {
     /**
-     * @param array<string, mixed> $data
+     * @param mixed $data corpo cru da request -- qualquer coisa que não seja um array vira "nenhum campo enviado"
      * @param array<string, string> $rules campo => regras separadas por "|", ex. "required|email"
-     * @return array<string, mixed> só os campos declarados em $rules, como recebidos (sem conversão)
      *
      * @throws DomainException quando alguma regra falha, uma mensagem por campo (primeira falha vence)
      */
-    public static function validate(array $data, array $rules): array
+    public static function validate(mixed $data, array $rules): ValidatedInput
     {
+        $data = is_array($data) ? $data : [];
         $errors = [];
         $validated = [];
 
@@ -43,7 +44,7 @@ final class Validator
             throw new DomainException('Invalid data.', DomainErrorType::Validation, $errors);
         }
 
-        return $validated;
+        return new ValidatedInput($validated);
     }
 
     /** @return array{0: string, 1: ?string} */

@@ -4,28 +4,23 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Http\Controllers;
 
-use App\Domain\Audit\AuditEvent;
-use App\Domain\Audit\Ports\AuditLogger;
-use App\Domain\Dealerships\Dealership;
-use App\Domain\Dealerships\DTO\DealershipProfile;
-use App\Domain\Dealerships\DTO\PublicDealershipProfile;
-use App\Domain\Dealerships\Ports\DealershipRepository;
+use App\Application\Dealership\CreateDealership;
+use App\Application\Dealership\DTO\DealershipProfile;
+use App\Application\Dealership\EnqueueDealershipPhoto;
+use App\Application\Dealership\ListDealerships;
+use App\Application\Dealership\PurgeDealership;
+use App\Application\Dealership\RemoveDealershipPhoto;
+use App\Application\Dealership\RestoreDealership;
+use App\Application\Dealership\TrashDealership;
+use App\Application\Dealership\UpdateDealership;
+use App\Application\Dealership\ViewDealership;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
-use App\Domain\Files\Ports\FileRepository;
-use App\Domain\Files\StoredFile;
-use App\Domain\Ports\Queue;
-use App\Domain\Ports\StorageProvider;
-use App\Domain\Shared\TrashableStatus;
-use App\Domain\Support\Uuid;
-use App\Domain\Users\Ports\UserRepository;
-use App\Domain\Users\User;
-use App\Domain\Users\UserRole;
-use App\Infrastructure\Dealerships\Jobs\ProcessDealershipPhotoJob;
+use App\Domain\User\UserRole;
 use App\Infrastructure\Http\Request;
+use App\Infrastructure\Http\RequestActor;
 use App\Infrastructure\Http\Response;
 use App\Infrastructure\Http\UploadedFile;
-use App\Infrastructure\Jobs\JobStatusStore;
 use App\Infrastructure\Pagination\PaginationPolicy;
 use App\Infrastructure\Validation\Validator;
 
@@ -41,67 +36,43 @@ use App\Infrastructure\Validation\Validator;
  */
 final readonly class DealershipController
 {
-    /** Recusa antes de sequer copiar o arquivo pra fila -- algo que vai ser rejeitado de qualquer jeito. */
-    private const int MAX_PHOTO_BYTES = 20 * 1024 * 1024;
-
     public function __construct(
-        private DealershipRepository $dealerships,
-        private FileRepository $files,
-        private StorageProvider $storage,
-        private Queue $queue,
-        private JobStatusStore $jobStatus,
-        private AuditLogger $audit,
+        private ListDealerships $listDealerships,
+        private ViewDealership $viewDealership,
+        private CreateDealership $createDealership,
+        private UpdateDealership $updateDealership,
+        private TrashDealership $trashDealership,
+        private RestoreDealership $restoreDealership,
+        private PurgeDealership $purgeDealership,
+        private EnqueueDealershipPhoto $enqueueDealershipPhoto,
+        private RemoveDealershipPhoto $removeDealershipPhoto,
         private PaginationPolicy $pagination,
-        private UserRepository $users,
-        private string $tempPath,
     ) {
     }
 
     public function index(Request $request): Response
     {
-        $claims = $request->attribute('auth');
         [$page, $perPage] = $this->pagination->resolve($request->query('page'), $request->query('per_page'));
-        $offset = ($page - 1) * $perPage;
+        $result = ($this->listDealerships)(RequestActor::fromRequest($request), $perPage, ($page - 1) * $perPage);
 
-        if ($claims->role === UserRole::Admin) {
-            $profiles = array_map(
-                $this->toProfile(...),
-                $this->dealerships->findPage($perPage, $offset),
-            );
-
-            return Response::paginated($profiles, $page, $perPage, $this->dealerships->count());
-        }
-
-        $profiles = array_map(
-            $this->toProfile(...),
-            $this->dealerships->findByOwner($claims->subject, $perPage, $offset),
+        return Response::paginated(
+            array_map(static fn (DealershipProfile $profile): array => $profile->toArray(), $result['items']),
+            $page,
+            $perPage,
+            $result['total'],
         );
-
-        return Response::paginated($profiles, $page, $perPage, $this->dealerships->countByOwner($claims->subject));
     }
 
     public function show(Request $request): Response
     {
-        $dealership = $this->requireDealership($request);
-        $claims = $request->attribute('auth');
-
-        if ($claims !== null && ($claims->role === UserRole::Admin || $claims->subject === $dealership->ownerUserId)) {
-            return Response::success($this->toProfile($dealership));
-        }
-
-        $seller = $this->users->findById($dealership->ownerUserId);
-        $profile = PublicDealershipProfile::fromDealership(
-            $dealership,
-            $this->resolvePhotoUrl($dealership),
-            $seller instanceof User ? $seller->name : null,
-        );
+        $profile = ($this->viewDealership)($request->param('id'), RequestActor::fromRequest($request));
 
         return Response::success($profile->toArray());
     }
 
     public function store(Request $request): Response
     {
-        $claims = $request->attribute('auth');
+        $actor = RequestActor::fromRequest($request);
         $rules = [
             'name' => 'required|max:160',
             'zip_code' => 'required|max:10',
@@ -115,31 +86,13 @@ final readonly class DealershipController
             'email' => 'max:190|email',
         ];
 
-        if ($claims->role === UserRole::Admin) {
+        if ($actor->role === UserRole::Admin) {
             $rules['owner_user_id'] = 'required|uuid';
         }
 
-        $data = Validator::validate($request->json(), $rules);
-        $ownerUserId = $claims->role === UserRole::Admin ? $data['owner_user_id'] : $claims->subject;
+        $profile = ($this->createDealership)(Validator::validate($request->json(), $rules), $actor);
 
-        $dealership = Dealership::register(
-            ownerUserId: $ownerUserId,
-            name: $data['name'],
-            zipCode: $data['zip_code'],
-            address: $data['address'],
-            number: $data['number'],
-            complement: $data['complement'] ?? null,
-            neighborhood: $data['neighborhood'],
-            city: $data['city'],
-            state: $data['state'],
-            phone: $data['phone'] ?? null,
-            email: $data['email'] ?? null,
-        );
-
-        $this->dealerships->insert($dealership);
-        $this->audit->record(AuditEvent::DealershipCreated, $claims->subject, 'Dealership', $dealership->id, [], $request->ip(), $request->header('user-agent'));
-
-        return Response::success($this->toProfile($dealership), 201);
+        return Response::success($profile->toArray(), 201);
     }
 
     /**
@@ -148,8 +101,7 @@ final readonly class DealershipController
      */
     public function update(Request $request): Response
     {
-        $dealership = $this->requireDealership($request);
-        $claims = $request->attribute('auth');
+        $actor = RequestActor::fromRequest($request);
         $rules = [
             'name' => 'max:160',
             'zip_code' => 'max:10',
@@ -163,74 +115,26 @@ final readonly class DealershipController
             'email' => 'max:190|email',
         ];
 
-        if ($claims->role === UserRole::Admin) {
+        if ($actor->role === UserRole::Admin) {
             $rules['owner_user_id'] = 'uuid';
         }
 
-        $data = Validator::validate($request->json(), $rules);
-        $previousOwnerUserId = $dealership->ownerUserId;
+        $profile = ($this->updateDealership)($request->param('id'), Validator::validate($request->json(), $rules), $actor);
 
-        $updated = $dealership->withProfile(
-            name: $data['name'] ?? $dealership->name,
-            zipCode: $data['zip_code'] ?? $dealership->zipCode,
-            address: $data['address'] ?? $dealership->address,
-            number: $data['number'] ?? $dealership->number,
-            complement: $data['complement'] ?? $dealership->complement,
-            neighborhood: $data['neighborhood'] ?? $dealership->neighborhood,
-            city: $data['city'] ?? $dealership->city,
-            state: $data['state'] ?? $dealership->state,
-            phone: $data['phone'] ?? $dealership->phone,
-            email: $data['email'] ?? $dealership->email,
-            latitude: $dealership->latitude,
-            longitude: $dealership->longitude,
-            googlePlaceId: $dealership->googlePlaceId,
-        );
-
-        if (array_key_exists('owner_user_id', $data) && $data['owner_user_id'] !== $previousOwnerUserId) {
-            $updated = $updated->withOwner($data['owner_user_id']);
-        }
-
-        $this->dealerships->update($updated);
-        $this->audit->record(AuditEvent::DealershipUpdated, $claims->subject, 'Dealership', $updated->id, ['fields' => array_keys($data)], $request->ip(), $request->header('user-agent'));
-
-        if ($updated->ownerUserId !== $previousOwnerUserId) {
-            $this->audit->record(
-                AuditEvent::DealershipOwnerReassigned,
-                $claims->subject,
-                'Dealership',
-                $updated->id,
-                ['from' => $previousOwnerUserId, 'to' => $updated->ownerUserId],
-                $request->ip(),
-                $request->header('user-agent'),
-            );
-        }
-
-        return Response::success($this->toProfile($updated));
+        return Response::success($profile->toArray());
     }
 
     /** Move pra lixeira -- recuperável por 30 dias (`restore()`/`purge()` abaixo). */
     public function destroy(Request $request): Response
     {
-        $dealership = $this->requireDealership($request);
-        $claims = $request->attribute('auth');
-
-        $this->dealerships->trash($dealership->id, byOwnerDeactivation: false);
-        $this->audit->record(AuditEvent::DealershipTrashed, $claims->subject, 'Dealership', $dealership->id, [], $request->ip(), $request->header('user-agent'));
+        ($this->trashDealership)($request->param('id'), RequestActor::fromRequest($request));
 
         return Response::success(['message' => 'Dealership moved to trash.']);
     }
 
     public function restore(Request $request): Response
     {
-        $dealership = $this->requireDealership($request);
-        $claims = $request->attribute('auth');
-
-        if (!$dealership->isEligibleForRestore()) {
-            throw new DomainException('This dealership is not in the trash (or was already permanently deleted).', DomainErrorType::Conflict);
-        }
-
-        $this->dealerships->restore($dealership->id);
-        $this->audit->record(AuditEvent::DealershipRestored, $claims->subject, 'Dealership', $dealership->id, [], $request->ip(), $request->header('user-agent'));
+        ($this->restoreDealership)($request->param('id'), RequestActor::fromRequest($request));
 
         return Response::success(['message' => 'Dealership restored.']);
     }
@@ -238,58 +142,30 @@ final readonly class DealershipController
     /** Apaga em definitivo agora, sem esperar os 30 dias. */
     public function purge(Request $request): Response
     {
-        $dealership = $this->requireDealership($request);
-        $claims = $request->attribute('auth');
-
-        if ($dealership->status !== TrashableStatus::Trashed) {
-            throw new DomainException('This dealership is not in the trash.', DomainErrorType::Conflict);
-        }
-
-        $oldPhotoFileId = $dealership->photoFileId;
-        $this->dealerships->update($dealership->anonymized());
-        $this->deleteStoredFile($oldPhotoFileId);
-        $this->audit->record(AuditEvent::DealershipPurged, $claims->subject, 'Dealership', $dealership->id, [], $request->ip(), $request->header('user-agent'));
+        ($this->purgeDealership)($request->param('id'), RequestActor::fromRequest($request));
 
         return Response::success(['message' => 'Dealership permanently deleted.']);
     }
 
     /**
-     * Só uma foto por concessionária -- um upload novo substitui a anterior.
-     * Otimização (WebP) e gravação rodam fora do request, no worker
-     * (`ProcessDealershipPhotoJob`) -- aqui só valida o essencial (arquivo
-     * presente, tamanho) e copia pro `tempPath` compartilhado, porque o
-     * `tmp_name` do PHP some assim que a request termina. Quem chamou
+     * Só enfileira: otimização (WebP) e gravação rodam no worker. Quem chamou
      * acompanha o progresso via `job_id` (`GET /jobs/{id}` ou `/events`).
      */
     public function setPhoto(Request $request): Response
     {
-        $dealership = $this->requireDealership($request);
-        $claims = $request->attribute('auth');
         $uploaded = $request->file('image');
 
         if (!$uploaded instanceof UploadedFile || !$uploaded->isValid()) {
             throw new DomainException('Invalid data.', DomainErrorType::Validation, ['image' => 'No valid image file was sent.']);
         }
 
-        if ($uploaded->size > self::MAX_PHOTO_BYTES) {
-            throw new DomainException('Invalid data.', DomainErrorType::Validation, ['image' => 'The image must be at most 20MB.']);
-        }
-
-        $jobId = Uuid::v7();
-        $sourcePath = sprintf('%s/%s', rtrim($this->tempPath, '/'), $jobId);
-
-        if (!copy($uploaded->tmpName, $sourcePath)) {
-            throw new \RuntimeException('Could not stage the uploaded photo for processing.');
-        }
-
-        $this->jobStatus->create($jobId);
-        $this->queue->push(ProcessDealershipPhotoJob::class, [
-            'job_id' => $jobId,
-            'dealership_id' => $dealership->id,
-            'source_path' => $sourcePath,
-            'original_name' => $uploaded->originalName,
-            'uploaded_by' => $claims->subject,
-        ]);
+        $jobId = ($this->enqueueDealershipPhoto)(
+            $request->param('id'),
+            $uploaded->tmpName,
+            $uploaded->originalName,
+            $uploaded->size,
+            RequestActor::fromRequest($request),
+        );
 
         return Response::success([
             'job_id' => $jobId,
@@ -300,86 +176,8 @@ final readonly class DealershipController
 
     public function removePhoto(Request $request): Response
     {
-        $dealership = $this->requireDealership($request);
-        $claims = $request->attribute('auth');
-
-        if ($dealership->photoFileId === null) {
-            throw new DomainException('This dealership has no photo.', DomainErrorType::NotFound);
-        }
-
-        $oldPhotoFileId = $dealership->photoFileId;
-        $this->dealerships->update($dealership->withPhoto(null));
-        $this->deleteStoredFile($oldPhotoFileId);
-        $this->audit->record(AuditEvent::DealershipPhotoRemoved, $claims->subject, 'Dealership', $dealership->id, [], $request->ip(), $request->header('user-agent'));
+        ($this->removeDealershipPhoto)($request->param('id'), RequestActor::fromRequest($request));
 
         return Response::success(['message' => 'Photo removed.']);
-    }
-
-    /**
-     * `{id}` da rota aceita o UUID (uso interno/gerenciamento) ou o `slug`
-     * (URL pública amigável) -- os dois formatos nunca colidem entre si. RLS
-     * já barra dono errado (linha nem aparece), então "não é sua" e "não
-     * existe" viram o mesmo 404, de propósito.
-     */
-    private function requireDealership(Request $request): Dealership
-    {
-        $identifier = $request->param('id');
-
-        if ($identifier === null) {
-            throw new DomainException('Dealership not found.', DomainErrorType::NotFound);
-        }
-
-        $dealership = $this->looksLikeUuid($identifier)
-            ? $this->dealerships->findById($identifier)
-            : $this->dealerships->findBySlug($identifier);
-
-        if (!$dealership instanceof Dealership) {
-            throw new DomainException('Dealership not found.', DomainErrorType::NotFound);
-        }
-
-        return $dealership;
-    }
-
-    private function looksLikeUuid(string $value): bool
-    {
-        return preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $value) === 1;
-    }
-
-    /** @return array<string, mixed> */
-    private function toProfile(Dealership $dealership): array
-    {
-        return DealershipProfile::fromDealership($dealership, $this->resolvePhotoUrl($dealership))->toArray();
-    }
-
-    private function resolvePhotoUrl(Dealership $dealership): ?string
-    {
-        if ($dealership->photoFileId === null) {
-            return null;
-        }
-
-        $file = $this->files->findById($dealership->photoFileId);
-
-        return $file instanceof StoredFile ? $this->storage->url($file->path) : null;
-    }
-
-    /**
-     * Content-addressed (`FileUploadService` dedupa por checksum) -- em
-     * teoria duas concessionárias poderiam acabar apontando pro mesmo
-     * arquivo se subissem bytes idênticos, e apagar aqui quebraria a outra.
-     * Aceito o risco: fotos reais nunca colidem byte a byte na prática, e
-     * não vale a complexidade de contar referências pra isso.
-     */
-    private function deleteStoredFile(?string $fileId): void
-    {
-        if ($fileId === null) {
-            return;
-        }
-
-        $file = $this->files->findById($fileId);
-
-        if ($file instanceof StoredFile) {
-            $this->storage->delete($file->path);
-            $this->files->delete($file->id);
-        }
     }
 }

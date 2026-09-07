@@ -8,13 +8,14 @@ use App\Domain\Auth\Ports\TokenIssuer;
 use App\Domain\Auth\ValueObjects\AccessTokenClaims;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
-use App\Domain\Users\UserRole;
+use App\Domain\User\UserRole;
 use App\Infrastructure\Database\PostgresConnection;
 use App\Infrastructure\Http\JsonResponse;
 use App\Infrastructure\Http\Middleware\AuthContextMiddleware;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
 use App\Infrastructure\Http\Router;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -22,6 +23,7 @@ use PHPUnit\Framework\TestCase;
  * Teste de integração: abre transação real via autoschedule_app -- precisa
  * rodar dentro do compose (mesmo padrão dos outros testes de Postgres).
  */
+#[Group('integration')]
 final class AuthContextMiddlewareTest extends TestCase
 {
     private PostgresConnection $connection;

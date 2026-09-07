@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Infrastructure\Http\Middleware;
 
 use App\Domain\Auth\ValueObjects\AccessTokenClaims;
-use App\Domain\Users\UserRole;
+use App\Domain\User\UserRole;
 use App\Infrastructure\Http\JsonResponse;
 use App\Infrastructure\Http\Middleware\RateLimitMiddleware;
 use App\Infrastructure\Http\Request;
