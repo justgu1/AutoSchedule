@@ -11,6 +11,7 @@ use App\Application\Shared\ValidatedInput;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
 use App\Domain\Dealership\Ports\DealershipRepository;
+use App\Domain\Shared\Email;
 
 /** Reassociar dono vira evento de auditoria próprio, além do update comum. */
 final readonly class UpdateDealership
@@ -32,7 +33,7 @@ final readonly class UpdateDealership
             name: $changes->stringOr('name', $dealership->name),
             address: AddressFields::from($changes, $dealership->address),
             phone: $changes->stringOrNull('phone') ?? $dealership->phone,
-            email: $changes->stringOrNull('email') ?? $dealership->email,
+            email: Email::fromNullable($changes->stringOrNull('email')) ?? $dealership->email,
         );
 
         if ($changes->has('owner_user_id') && $changes->string('owner_user_id') !== $previousOwnerUserId) {

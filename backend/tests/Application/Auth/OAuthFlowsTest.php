@@ -31,6 +31,7 @@ use App\Domain\Dealership\Dealership;
 use App\Domain\Dealership\Ports\DealershipRepository;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
+use App\Domain\Shared\Email;
 use App\Domain\Shared\Trashable;
 use App\Domain\Shared\TrashableStatus;
 use App\Domain\Shared\TrashState;
@@ -62,7 +63,7 @@ final class OAuthFlowsTest extends TestCase
             redirectUris: [],
             allowedScopes: ['profile:read'],
         );
-        $this->customer = User::register('Ada', 'ada@example.com', null, 'correct-password', UserRole::Customer);
+        $this->customer = User::register('Ada', new Email('ada@example.com'), null, 'correct-password', UserRole::Customer);
 
         $this->users = new InMemoryUserRepository($this->customer);
         $this->refreshTokens = new InMemoryRefreshTokenRepository();
@@ -210,7 +211,7 @@ final class OAuthFlowsTest extends TestCase
     #[Test]
     public function login_with_google_com_identidade_ja_linkada_loga_na_conta_existente(): void
     {
-        $this->identities->insert(UserIdentity::link($this->customer->id, 'google', 'google-sub-1', 'ada@example.com'));
+        $this->identities->insert(UserIdentity::link($this->customer->id, 'google', 'google-sub-1', new Email('ada@example.com')));
         $this->googleVerifier->nextClaims = new GoogleIdentityClaims('google-sub-1', 'ada@example.com', true, 'Ada');
 
         $tokenPair = ($this->loginWithGoogle())('autoschedule-web', 'fake-id-token', $this->context());
@@ -223,7 +224,7 @@ final class OAuthFlowsTest extends TestCase
     #[Test]
     public function login_with_google_restaura_conta_trashed_da_identidade_ja_linkada(): void
     {
-        $this->identities->insert(UserIdentity::link($this->customer->id, 'google', 'google-sub-1', 'ada@example.com'));
+        $this->identities->insert(UserIdentity::link($this->customer->id, 'google', 'google-sub-1', new Email('ada@example.com')));
         $this->googleVerifier->nextClaims = new GoogleIdentityClaims('google-sub-1', 'ada@example.com', true, 'Ada');
         $this->users->trash($this->customer->id);
 
@@ -259,7 +260,7 @@ final class OAuthFlowsTest extends TestCase
 
         ($this->loginWithGoogle())('autoschedule-web', 'fake-id-token', $this->context());
 
-        $created = $this->users->findByEmail('nova@example.com');
+        $created = $this->users->findByEmail(new Email('nova@example.com'));
         $this->assertNotNull($created);
         $this->assertSame(UserRole::Customer, $created->role);
         $this->assertSame([AuditEvent::UserCreated], $this->audit->events);
@@ -276,7 +277,7 @@ final class OAuthFlowsTest extends TestCase
             $this->fail('Expected a DomainException to be thrown.');
         } catch (DomainException $exception) {
             $this->assertSame(DomainErrorType::Unauthorized, $exception->type());
-            $this->assertNull($this->users->findByEmail('naoverificado@example.com'));
+            $this->assertNull($this->users->findByEmail(new Email('naoverificado@example.com')));
         }
     }
 
@@ -481,10 +482,10 @@ final class InMemoryUserRepository implements UserRepository
         return $this->byId[$id] ?? null;
     }
 
-    public function findByEmail(string $email): ?User
+    public function findByEmail(Email $email): ?User
     {
         foreach ($this->byId as $user) {
-            if ($user->email === $email) {
+            if ($user->email->value === $email->value) {
                 return $user;
             }
         }
@@ -492,7 +493,7 @@ final class InMemoryUserRepository implements UserRepository
         return null;
     }
 
-    public function existsByEmail(string $email): bool
+    public function existsByEmail(Email $email): bool
     {
         return $this->findByEmail($email) instanceof \App\Domain\User\User;
     }

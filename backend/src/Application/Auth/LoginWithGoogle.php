@@ -14,6 +14,7 @@ use App\Domain\Auth\Ports\UserIdentityRepository;
 use App\Domain\Auth\UserIdentity;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
+use App\Domain\Shared\Email;
 use App\Domain\User\Ports\UserRepository;
 use App\Domain\User\User;
 use App\Domain\User\UserRole;
@@ -41,6 +42,7 @@ final readonly class LoginWithGoogle
             throw new DomainException('Google account email is not verified.', DomainErrorType::Unauthorized);
         }
 
+        $email = new Email($claims->email);
         $identity = $this->identities->findByProvider('google', $claims->subject);
 
         if ($identity instanceof UserIdentity) {
@@ -56,10 +58,10 @@ final readonly class LoginWithGoogle
             return $this->tokenPairs->issue($client, $user->id, $user->role, $client->allowedScopes, $restored);
         }
 
-        $existingByEmail = $this->users->findByEmail($claims->email);
+        $existingByEmail = $this->users->findByEmail($email);
 
         if ($existingByEmail instanceof User) {
-            $this->identities->insert(UserIdentity::link($existingByEmail->id, 'google', $claims->subject, $claims->email));
+            $this->identities->insert(UserIdentity::link($existingByEmail->id, 'google', $claims->subject, $email));
             $restored = $this->accountRestorer->restoreIfTrashed($existingByEmail, $context);
             $this->audit->record(AuditEvent::LoginSucceeded, $existingByEmail->id, 'User', $existingByEmail->id, ['via' => 'google', 'linked' => true], $context->ipAddress, $context->userAgent);
 
@@ -67,9 +69,9 @@ final readonly class LoginWithGoogle
         }
 
         // Senha inutilizável só pra ocupar o NOT NULL: a conta é social-only até um reset trocar por uma real.
-        $newUser = User::register($claims->name, $claims->email, null, bin2hex(random_bytes(32)), UserRole::Customer);
+        $newUser = User::register($claims->name, $email, null, bin2hex(random_bytes(32)), UserRole::Customer);
         $this->users->insert($newUser);
-        $this->identities->insert(UserIdentity::link($newUser->id, 'google', $claims->subject, $claims->email));
+        $this->identities->insert(UserIdentity::link($newUser->id, 'google', $claims->subject, $email));
         $this->audit->record(AuditEvent::UserCreated, $newUser->id, 'User', $newUser->id, ['role' => $newUser->role->value, 'via' => 'google'], $context->ipAddress, $context->userAgent);
 
         return $this->tokenPairs->issue($client, $newUser->id, $newUser->role, $client->allowedScopes);

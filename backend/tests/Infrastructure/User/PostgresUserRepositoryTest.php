@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Infrastructure\User;
 
+use App\Domain\Shared\Email;
 use App\Domain\Shared\Trashable;
 use App\Domain\Shared\TrashableStatus;
 use App\Domain\Shared\TrashState;
@@ -42,7 +43,7 @@ final class PostgresUserRepositoryTest extends TestCase
     #[Test]
     public function insere_e_encontra_por_id(): void
     {
-        $user = User::register('Ada Lovelace', 'ada@example.com', '+55 11 90000-0000', 'secret', UserRole::Seller);
+        $user = User::register('Ada Lovelace', new Email('ada@example.com'), '+55 11 90000-0000', 'secret', UserRole::Seller);
         $this->repository->insert($user);
 
         $found = $this->repository->findById($user->id);
@@ -56,10 +57,10 @@ final class PostgresUserRepositoryTest extends TestCase
     #[Test]
     public function insere_e_encontra_por_email(): void
     {
-        $user = User::register('Ada Lovelace', 'ada@example.com', '+55 11 90000-0000', 'secret', UserRole::Seller);
+        $user = User::register('Ada Lovelace', new Email('ada@example.com'), '+55 11 90000-0000', 'secret', UserRole::Seller);
         $this->repository->insert($user);
 
-        $found = $this->repository->findByEmail('ada@example.com');
+        $found = $this->repository->findByEmail(new Email('ada@example.com'));
 
         $this->assertNotNull($found);
         $this->assertSame($user->id, $found->id);
@@ -74,17 +75,17 @@ final class PostgresUserRepositoryTest extends TestCase
     #[Test]
     public function exists_by_email_reflete_o_estado_atual(): void
     {
-        $this->assertFalse($this->repository->existsByEmail('ada@example.com'));
+        $this->assertFalse($this->repository->existsByEmail(new Email('ada@example.com')));
 
-        $this->repository->insert(User::register('Ada', 'ada@example.com', null, 'secret', UserRole::Customer));
+        $this->repository->insert(User::register('Ada', new Email('ada@example.com'), null, 'secret', UserRole::Customer));
 
-        $this->assertTrue($this->repository->existsByEmail('ada@example.com'));
+        $this->assertTrue($this->repository->existsByEmail(new Email('ada@example.com')));
     }
 
     #[Test]
     public function update_persiste_as_alteracoes(): void
     {
-        $user = User::register('Ada', 'ada@example.com', null, 'secret', UserRole::Customer);
+        $user = User::register('Ada', new Email('ada@example.com'), null, 'secret', UserRole::Customer);
         $this->repository->insert($user);
 
         $updated = new User(
@@ -112,19 +113,19 @@ final class PostgresUserRepositoryTest extends TestCase
     #[Test]
     public function purge_some_das_buscas(): void
     {
-        $user = User::register('Ada Lovelace', 'ada@example.com', '+55 11 90000-0000', 'secret', UserRole::Customer);
+        $user = User::register('Ada Lovelace', new Email('ada@example.com'), '+55 11 90000-0000', 'secret', UserRole::Customer);
         $this->repository->insert($user);
 
         $this->repository->purge($user->anonymized());
 
         $this->assertNull($this->repository->findById($user->id));
-        $this->assertFalse($this->repository->existsByEmail('ada@example.com'));
+        $this->assertFalse($this->repository->existsByEmail(new Email('ada@example.com')));
     }
 
     #[Test]
     public function purge_escruba_a_pii_na_linha_persistida(): void
     {
-        $user = User::register('Ada Lovelace', 'ada@example.com', '+55 11 90000-0000', 'secret', UserRole::Customer);
+        $user = User::register('Ada Lovelace', new Email('ada@example.com'), '+55 11 90000-0000', 'secret', UserRole::Customer);
         $this->repository->insert($user);
 
         $this->repository->purge($user->anonymized());
@@ -144,7 +145,7 @@ final class PostgresUserRepositoryTest extends TestCase
     #[Test]
     public function trash_move_pra_status_trashed_e_seta_deleted_at_sem_apagar_pii(): void
     {
-        $user = User::register('Ada Lovelace', 'ada@example.com', null, 'secret', UserRole::Customer);
+        $user = User::register('Ada Lovelace', new Email('ada@example.com'), null, 'secret', UserRole::Customer);
         $this->repository->insert($user);
 
         $this->repository->trash($user->id);
@@ -162,21 +163,21 @@ final class PostgresUserRepositoryTest extends TestCase
     #[Test]
     public function trashed_ainda_e_encontrado_por_email_e_bloqueia_reuso_do_email(): void
     {
-        $user = User::register('Ada Lovelace', 'ada@example.com', null, 'secret', UserRole::Customer);
+        $user = User::register('Ada Lovelace', new Email('ada@example.com'), null, 'secret', UserRole::Customer);
         $this->repository->insert($user);
 
         $this->repository->trash($user->id);
 
-        $found = $this->repository->findByEmail('ada@example.com');
+        $found = $this->repository->findByEmail(new Email('ada@example.com'));
         $this->assertNotNull($found);
         $this->assertSame(TrashableStatus::Trashed, $found->trash->status);
-        $this->assertTrue($this->repository->existsByEmail('ada@example.com'));
+        $this->assertTrue($this->repository->existsByEmail(new Email('ada@example.com')));
     }
 
     #[Test]
     public function restore_volta_status_active_e_limpa_deleted_at(): void
     {
-        $user = User::register('Ada Lovelace', 'ada@example.com', null, 'secret', UserRole::Customer);
+        $user = User::register('Ada Lovelace', new Email('ada@example.com'), null, 'secret', UserRole::Customer);
         $this->repository->insert($user);
         $this->repository->trash($user->id);
 
@@ -192,9 +193,9 @@ final class PostgresUserRepositoryTest extends TestCase
     public function find_purge_eligible_so_traz_trashed_ha_mais_de_grace_days_e_ainda_nao_anonimizado(): void
     {
         $now = new \DateTimeImmutable();
-        $recentlyTrashed = User::register('Recent', 'recent@example.com', null, 'secret', UserRole::Customer);
-        $longTrashed = User::register('Long', 'long@example.com', null, 'secret', UserRole::Customer);
-        $active = User::register('Active', 'active@example.com', null, 'secret', UserRole::Customer);
+        $recentlyTrashed = User::register('Recent', new Email('recent@example.com'), null, 'secret', UserRole::Customer);
+        $longTrashed = User::register('Long', new Email('long@example.com'), null, 'secret', UserRole::Customer);
+        $active = User::register('Active', new Email('active@example.com'), null, 'secret', UserRole::Customer);
         $this->repository->insert($recentlyTrashed);
         $this->repository->insert($longTrashed);
         $this->repository->insert($active);
@@ -214,8 +215,8 @@ final class PostgresUserRepositoryTest extends TestCase
     #[Test]
     public function find_page_inclui_usuario_recem_criado_mas_nao_o_soft_deletado(): void
     {
-        $active = User::register('Ada Lovelace', 'ada@example.com', null, 'secret', UserRole::Customer);
-        $deleted = User::register('Charles Babbage', 'charles@example.com', null, 'secret', UserRole::Customer);
+        $active = User::register('Ada Lovelace', new Email('ada@example.com'), null, 'secret', UserRole::Customer);
+        $deleted = User::register('Charles Babbage', new Email('charles@example.com'), null, 'secret', UserRole::Customer);
         $this->repository->insert($active);
         $this->repository->insert($deleted);
         $this->repository->purge($deleted->anonymized());
@@ -229,8 +230,8 @@ final class PostgresUserRepositoryTest extends TestCase
     #[Test]
     public function find_page_respeita_limit_e_offset(): void
     {
-        $first = User::register('First', 'first@example.com', null, 'secret', UserRole::Customer);
-        $second = User::register('Second', 'second@example.com', null, 'secret', UserRole::Customer);
+        $first = User::register('First', new Email('first@example.com'), null, 'secret', UserRole::Customer);
+        $second = User::register('Second', new Email('second@example.com'), null, 'secret', UserRole::Customer);
         $this->repository->insert($first);
         $this->repository->insert($second);
 
@@ -244,7 +245,7 @@ final class PostgresUserRepositoryTest extends TestCase
     {
         $before = $this->repository->count();
 
-        $this->repository->insert(User::register('Ada', 'ada-count@example.com', null, 'secret', UserRole::Customer));
+        $this->repository->insert(User::register('Ada', new Email('ada-count@example.com'), null, 'secret', UserRole::Customer));
 
         $this->assertSame($before + 1, $this->repository->count());
     }
@@ -254,7 +255,7 @@ final class PostgresUserRepositoryTest extends TestCase
     {
         $before = $this->repository->countByRole(UserRole::Seller);
 
-        $this->repository->insert(User::register('Ada', 'ada-seller@example.com', null, 'secret', UserRole::Seller));
+        $this->repository->insert(User::register('Ada', new Email('ada-seller@example.com'), null, 'secret', UserRole::Seller));
 
         $this->assertSame($before + 1, $this->repository->countByRole(UserRole::Seller));
     }
@@ -262,7 +263,7 @@ final class PostgresUserRepositoryTest extends TestCase
     #[Test]
     public function count_by_role_nao_conta_admin_trashed(): void
     {
-        $admin = User::register('Ada', 'ada-admin@example.com', null, 'secret', UserRole::Admin);
+        $admin = User::register('Ada', new Email('ada-admin@example.com'), null, 'secret', UserRole::Admin);
         $this->repository->insert($admin);
         $before = $this->repository->countByRole(UserRole::Admin);
 

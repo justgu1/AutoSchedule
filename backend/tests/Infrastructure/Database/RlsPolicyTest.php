@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Infrastructure\Database;
 
+use App\Domain\Shared\Email;
 use App\Domain\User\User;
 use App\Domain\User\UserRole;
 use PHPUnit\Framework\Attributes\Group;
@@ -27,8 +28,8 @@ final class RlsPolicyTest extends TestCase
     {
         $this->admin = TestDatabase::connect()->pdo();
 
-        $this->customer = User::register('Customer RLS', 'rls-customer@example.com', null, 'secret', UserRole::Customer);
-        $this->otherCustomer = User::register('Other Customer RLS', 'rls-other@example.com', null, 'secret', UserRole::Customer);
+        $this->customer = User::register('Customer RLS', new Email('rls-customer@example.com'), null, 'secret', UserRole::Customer);
+        $this->otherCustomer = User::register('Other Customer RLS', new Email('rls-other@example.com'), null, 'secret', UserRole::Customer);
         $this->insertUser($this->customer);
         $this->insertUser($this->otherCustomer);
 
@@ -90,8 +91,8 @@ final class RlsPolicyTest extends TestCase
     #[Test]
     public function contexto_de_leitura_publica_enxerga_so_seller_com_concessionaria_ativa(): void
     {
-        $sellerWithDealership = User::register('Seller RLS', 'rls-seller-public@example.com', null, 'secret', UserRole::Seller);
-        $sellerWithoutDealership = User::register('Seller Sem Loja RLS', 'rls-seller-nodealership@example.com', null, 'secret', UserRole::Seller);
+        $sellerWithDealership = User::register('Seller RLS', new Email('rls-seller-public@example.com'), null, 'secret', UserRole::Seller);
+        $sellerWithoutDealership = User::register('Seller Sem Loja RLS', new Email('rls-seller-nodealership@example.com'), null, 'secret', UserRole::Seller);
         $this->insertUser($sellerWithDealership);
         $this->insertUser($sellerWithoutDealership);
         $this->admin->exec(<<<SQL
@@ -118,7 +119,7 @@ final class RlsPolicyTest extends TestCase
     #[Test]
     public function contexto_de_servico_consegue_inserir(): void
     {
-        $newUser = User::register('Registered RLS', 'rls-registered@example.com', null, 'secret', UserRole::Customer);
+        $newUser = User::register('Registered RLS', new Email('rls-registered@example.com'), null, 'secret', UserRole::Customer);
 
         $this->rls->beginTransaction();
         $this->rls->exec("SET LOCAL app.is_service_context = 'true'");
@@ -131,7 +132,7 @@ final class RlsPolicyTest extends TestCase
     #[Test]
     public function sem_contexto_setado_insert_falha(): void
     {
-        $newUser = User::register('Blocked RLS', 'rls-blocked@example.com', null, 'secret', UserRole::Customer);
+        $newUser = User::register('Blocked RLS', new Email('rls-blocked@example.com'), null, 'secret', UserRole::Customer);
 
         $this->rls->beginTransaction();
 

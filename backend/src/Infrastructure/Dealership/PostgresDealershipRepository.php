@@ -7,6 +7,7 @@ namespace App\Infrastructure\Dealership;
 use App\Domain\Dealership\Dealership;
 use App\Domain\Dealership\Ports\DealershipRepository;
 use App\Domain\Shared\Address;
+use App\Domain\Shared\Email;
 use App\Domain\Shared\Trashable;
 use App\Domain\Shared\TrashableStatus;
 use App\Domain\Shared\TrashState;
@@ -185,7 +186,7 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
                 state: Uf::from($row['state']),
             ),
             phone: $row['phone'],
-            email: $row['email'],
+            email: Email::fromNullable($row['email']),
             photoFileId: $row['photo_file_id'],
             trash: new TrashState(
                 status: TrashableStatus::from($row['status']),
@@ -219,7 +220,7 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
             'city' => $dealership->address->city,
             'state' => $dealership->address->state->value,
             'phone' => $dealership->phone,
-            'email' => $dealership->email,
+            'email' => $dealership->email?->value,
             'photo_file_id' => $dealership->photoFileId,
             'status' => $dealership->trash->status->value,
             'trashed_by_owner_deactivation' => $dealership->trashedByOwnerDeactivation ? 't' : 'f',

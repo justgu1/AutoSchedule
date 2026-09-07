@@ -19,7 +19,7 @@ final readonly class UserProfile
 
     public static function fromUser(User $user): self
     {
-        return new self($user->id, $user->name, $user->email, $user->phone, $user->role->value);
+        return new self($user->id, $user->name, $user->email->value, $user->phone, $user->role->value);
     }
 
     /** @return array<string, mixed> */

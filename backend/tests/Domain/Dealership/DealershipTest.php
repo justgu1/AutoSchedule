@@ -6,6 +6,7 @@ namespace Tests\Domain\Dealership;
 
 use App\Domain\Dealership\Dealership;
 use App\Domain\Shared\Address;
+use App\Domain\Shared\Email;
 use App\Domain\Shared\TrashableStatus;
 use App\Domain\Shared\TrashState;
 use App\Domain\Shared\Uf;
@@ -52,7 +53,7 @@ final class DealershipTest extends TestCase
             name: 'Novo Nome',
             address: new Address('99999-999', 'Rua Nova', '42', 'Fundos', 'Centro', 'Nova Cidade', Uf::RJ),
             phone: '11999999999',
-            email: 'novo@example.com',
+            email: new Email('novo@example.com'),
         );
 
         $this->assertSame('Novo Nome', $updated->name);

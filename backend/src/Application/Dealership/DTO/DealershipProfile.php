@@ -7,6 +7,7 @@ namespace App\Application\Dealership\DTO;
 use App\Application\Shared\AddressFields;
 use App\Domain\Dealership\Dealership;
 use App\Domain\Shared\Address;
+use App\Domain\Shared\Email;
 
 final readonly class DealershipProfile
 {
@@ -17,7 +18,7 @@ final readonly class DealershipProfile
         public string $slug,
         public Address $address,
         public ?string $phone,
-        public ?string $email,
+        public ?Email $email,
         public ?string $photoUrl,
         public string $status,
     ) {
@@ -49,7 +50,7 @@ final readonly class DealershipProfile
             'slug' => $this->slug,
             ...AddressFields::toArray($this->address),
             'phone' => $this->phone,
-            'email' => $this->email,
+            'email' => $this->email?->value,
             'photo_url' => $this->photoUrl,
             'status' => $this->status,
         ];

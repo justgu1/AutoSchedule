@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\User;
 
+use App\Domain\Shared\Email;
 use App\Domain\Shared\Trashable;
 use App\Domain\Shared\TrashState;
 use App\Domain\Shared\Uuid;
@@ -13,7 +14,7 @@ final readonly class User implements Trashable
     public function __construct(
         public string $id,
         public string $name,
-        public string $email,
+        public Email $email,
         public ?string $phone,
         public string $passwordHash,
         public UserRole $role,
@@ -27,7 +28,7 @@ final readonly class User implements Trashable
 
     public static function register(
         string $name,
-        string $email,
+        Email $email,
         ?string $phone,
         string $plainPassword,
         UserRole $role,
@@ -87,7 +88,7 @@ final readonly class User implements Trashable
         return clone($this, [
             'name' => 'Deleted user',
             // Id inteiro, não prefixo: os primeiros hex de um UUIDv7 são timestamp e colidem entre exclusões próximas.
-            'email' => sprintf('deleted-%s@anonymized.local', $this->id),
+            'email' => new Email(sprintf('deleted-%s@anonymized.local', $this->id)),
             'phone' => null,
             'trash' => $this->trash->anonymized(),
         ]);

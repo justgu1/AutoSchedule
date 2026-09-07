@@ -6,6 +6,7 @@ namespace App\Infrastructure\Auth\Postgres;
 
 use App\Domain\Auth\Ports\UserIdentityRepository;
 use App\Domain\Auth\UserIdentity;
+use App\Domain\Shared\Email;
 use App\Infrastructure\Database\DatabaseConnection;
 
 final readonly class PostgresUserIdentityRepository implements UserIdentityRepository
@@ -37,7 +38,7 @@ final readonly class PostgresUserIdentityRepository implements UserIdentityRepos
             'user_id' => $identity->userId,
             'provider' => $identity->provider,
             'provider_user_id' => $identity->providerUserId,
-            'email' => $identity->email,
+            'email' => $identity->email->value,
         ]);
     }
 
@@ -49,7 +50,7 @@ final readonly class PostgresUserIdentityRepository implements UserIdentityRepos
             userId: $row['user_id'],
             provider: $row['provider'],
             providerUserId: $row['provider_user_id'],
-            email: $row['email'],
+            email: new Email($row['email']),
             createdAt: new \DateTimeImmutable($row['created_at']),
         );
     }

@@ -7,6 +7,7 @@ namespace App\Application\Dealership\DTO;
 use App\Application\Shared\AddressFields;
 use App\Domain\Dealership\Dealership;
 use App\Domain\Shared\Address;
+use App\Domain\Shared\Email;
 
 /**
  * Deliberadamente mais enxuto que `DealershipProfile`: sem `id`/`owner_user_id`/`status`, e `slug` no lugar do id.
@@ -19,7 +20,7 @@ final readonly class PublicDealershipProfile
         public string $name,
         public Address $address,
         public ?string $phone,
-        public ?string $email,
+        public ?Email $email,
         public ?string $photoUrl,
         public ?string $sellerName,
     ) {
@@ -47,7 +48,7 @@ final readonly class PublicDealershipProfile
             'name' => $this->name,
             ...AddressFields::toArray($this->address),
             'phone' => $this->phone,
-            'email' => $this->email,
+            'email' => $this->email?->value,
             'photo_url' => $this->photoUrl,
             'seller_name' => $this->sellerName,
             // Reservado: o front já lê a chave, então a Epic Veículo não muda o contrato.

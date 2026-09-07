@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\User\Ports;
 
+use App\Domain\Shared\Email;
 use App\Domain\Shared\Ports\TrashableRepository;
 use App\Domain\User\User;
 use App\Domain\User\UserRole;
@@ -12,9 +13,9 @@ interface UserRepository extends TrashableRepository
 {
     public function findById(string $id): ?User;
 
-    public function findByEmail(string $email): ?User;
+    public function findByEmail(Email $email): ?User;
 
-    public function existsByEmail(string $email): bool;
+    public function existsByEmail(Email $email): bool;
 
     public function insert(User $user): void;
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Infrastructure\User\Scheduler;
 
 use App\Domain\Audit\AuditEvent;
+use App\Domain\Shared\Email;
 use App\Domain\User\User;
 use App\Domain\User\UserRole;
 use App\Infrastructure\Scheduler\PurgeTrashedEntitiesTask;
@@ -51,8 +52,8 @@ final class PurgeTrashedUsersTaskTest extends TestCase
     #[Test]
     public function anonimiza_so_quem_esta_trashed_ha_mais_de_30_dias(): void
     {
-        $longTrashed = User::register('Long', 'long@example.com', null, 'secret', UserRole::Customer);
-        $recentlyTrashed = User::register('Recent', 'recent@example.com', null, 'secret', UserRole::Customer);
+        $longTrashed = User::register('Long', new Email('long@example.com'), null, 'secret', UserRole::Customer);
+        $recentlyTrashed = User::register('Recent', new Email('recent@example.com'), null, 'secret', UserRole::Customer);
         $this->repository->insert($longTrashed);
         $this->repository->insert($recentlyTrashed);
         $this->repository->trash($longTrashed->id);
@@ -71,7 +72,7 @@ final class PurgeTrashedUsersTaskTest extends TestCase
     #[Test]
     public function audita_cada_conta_purgada(): void
     {
-        $longTrashed = User::register('Long', 'long@example.com', null, 'secret', UserRole::Customer);
+        $longTrashed = User::register('Long', new Email('long@example.com'), null, 'secret', UserRole::Customer);
         $this->repository->insert($longTrashed);
         $this->repository->trash($longTrashed->id);
         $this->pdo->prepare("UPDATE users SET deleted_at = now() - interval '31 days' WHERE id = ?")->execute([$longTrashed->id]);

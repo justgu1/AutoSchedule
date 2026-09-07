@@ -235,12 +235,6 @@ parameters:
 			path: src/Infrastructure/Auth/Postgres/PostgresUserIdentityRepository.php
 
 		-
-			message: '#^Parameter \$email of class App\\Domain\\Auth\\UserIdentity constructor expects string, mixed given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Infrastructure/Auth/Postgres/PostgresUserIdentityRepository.php
-
-		-
 			message: '#^Parameter \$id of class App\\Domain\\Auth\\UserIdentity constructor expects string, mixed given\.$#'
 			identifier: argument.type
 			count: 1
@@ -362,12 +356,6 @@ parameters:
 
 		-
 			message: '#^Parameter \#1 \$value of static method App\\Domain\\Shared\\Uf\:\:from\(\) expects int\|string, mixed given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Infrastructure/Dealership/PostgresDealershipRepository.php
-
-		-
-			message: '#^Parameter \$email of class App\\Domain\\Dealership\\Dealership constructor expects string\|null, mixed given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Infrastructure/Dealership/PostgresDealershipRepository.php
@@ -602,12 +590,6 @@ parameters:
 
 		-
 			message: '#^Parameter \#1 \$value of static method App\\Domain\\User\\UserRole\:\:from\(\) expects int\|string, mixed given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Infrastructure/User/PostgresUserRepository.php
-
-		-
-			message: '#^Parameter \$email of class App\\Domain\\User\\User constructor expects string, mixed given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Infrastructure/User/PostgresUserRepository.php
@@ -989,6 +971,24 @@ parameters:
 			identifier: property.nonObject
 			count: 1
 			path: tests/Infrastructure/User/PostgresUserRepositoryTest.php
+
+		-
+			message: '#^Parameter \#1 \$value of class App\\Domain\\Shared\\Email constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Auth/Postgres/PostgresUserIdentityRepository.php
+
+		-
+			message: '#^Parameter \#1 \$value of static method App\\Domain\\Shared\\Email\:\:fromNullable\(\) expects string\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealership/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \#1 \$value of class App\\Domain\\Shared\\Email constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/User/PostgresUserRepository.php
 
 		-
 			message: '#^Cannot access property \$phone on App\\Domain\\User\\User\|null\.$#'

@@ -11,6 +11,7 @@ use App\Domain\Audit\Ports\AuditLogger;
 use App\Domain\Auth\GrantType;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
+use App\Domain\Shared\Email;
 use App\Domain\User\Ports\UserRepository;
 use App\Domain\User\User;
 
@@ -28,7 +29,7 @@ final readonly class LoginWithPassword
     public function __invoke(string $clientId, string $email, string $password, ActorContext $context): TokenPair
     {
         $client = $this->clients->authenticate($clientId, GrantType::Password);
-        $user = $this->users->findByEmail($email);
+        $user = $this->users->findByEmail(new Email($email));
 
         if (!$user instanceof User || !$user->verifyPassword($password)) {
             // Sem actor: identidade não foi provada. O alvo só é conhecido quando o e-mail existe.

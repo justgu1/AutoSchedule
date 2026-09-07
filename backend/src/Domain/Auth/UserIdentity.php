@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Auth;
 
+use App\Domain\Shared\Email;
 use App\Domain\Shared\Uuid;
 
 /** Vincula uma conta a um provedor externo (hoje só Google) -- um usuário pode ter mais de uma identidade linkada. */
@@ -14,12 +15,12 @@ final readonly class UserIdentity
         public string $userId,
         public string $provider,
         public string $providerUserId,
-        public string $email,
+        public Email $email,
         public \DateTimeImmutable $createdAt,
     ) {
     }
 
-    public static function link(string $userId, string $provider, string $providerUserId, string $email): self
+    public static function link(string $userId, string $provider, string $providerUserId, Email $email): self
     {
         return new self(
             id: Uuid::v7(),

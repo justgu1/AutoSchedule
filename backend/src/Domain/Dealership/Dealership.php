@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Dealership;
 
 use App\Domain\Shared\Address;
+use App\Domain\Shared\Email;
 use App\Domain\Shared\Trashable;
 use App\Domain\Shared\TrashState;
 use App\Domain\Shared\Uuid;
@@ -18,7 +19,7 @@ final readonly class Dealership implements Trashable
         public string $slug,
         public Address $address,
         public ?string $phone,
-        public ?string $email,
+        public ?Email $email,
         public ?string $photoFileId,
         public TrashState $trash,
         public bool $trashedByOwnerDeactivation,
@@ -32,7 +33,7 @@ final readonly class Dealership implements Trashable
         string $name,
         Address $address,
         ?string $phone,
-        ?string $email = null,
+        ?Email $email = null,
     ): self {
         $now = new \DateTimeImmutable();
         $id = Uuid::v7();
@@ -53,7 +54,7 @@ final readonly class Dealership implements Trashable
         );
     }
 
-    public function withProfile(string $name, Address $address, ?string $phone, ?string $email): self
+    public function withProfile(string $name, Address $address, ?string $phone, ?Email $email): self
     {
         return clone($this, [
             'name' => $name,

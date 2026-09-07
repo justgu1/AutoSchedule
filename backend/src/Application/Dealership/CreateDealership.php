@@ -14,6 +14,7 @@ use App\Domain\Dealership\Dealership;
 use App\Domain\Dealership\Ports\DealershipRepository;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
+use App\Domain\Shared\Email;
 
 /** Seller sempre vira dono do que cria; só admin escolhe o dono (`owner_user_id`). */
 final readonly class CreateDealership
@@ -38,7 +39,7 @@ final readonly class CreateDealership
             name: $data->string('name'),
             address: AddressFields::from($data),
             phone: $data->stringOrNull('phone'),
-            email: $data->stringOrNull('email'),
+            email: Email::fromNullable($data->stringOrNull('email')),
         );
 
         $this->dealerships->insert($dealership);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\User;
 
+use App\Domain\Shared\Email;
 use App\Domain\Shared\Trashable;
 use App\Domain\Shared\TrashableStatus;
 use App\Domain\Shared\TrashState;
@@ -23,15 +24,15 @@ final readonly class PostgresUserRepository implements UserRepository
         return $this->findOneBy('id', $id);
     }
 
-    public function findByEmail(string $email): ?User
+    public function findByEmail(Email $email): ?User
     {
-        return $this->findOneBy('email', $email);
+        return $this->findOneBy('email', $email->value);
     }
 
-    public function existsByEmail(string $email): bool
+    public function existsByEmail(Email $email): bool
     {
         $statement = $this->connection->pdo()->prepare("SELECT 1 FROM users WHERE email = :email AND status <> 'deleted'");
-        $statement->execute(['email' => $email]);
+        $statement->execute(['email' => $email->value]);
 
         return $statement->fetchColumn() !== false;
     }
@@ -100,7 +101,7 @@ final readonly class PostgresUserRepository implements UserRepository
         $statement->execute([
             'id' => $entity->id,
             'name' => $entity->name,
-            'email' => $entity->email,
+            'email' => $entity->email->value,
             'status' => $entity->trash->status->value,
             'anonymized_at' => $entity->trash->anonymizedAt?->format(DATE_ATOM),
         ]);
@@ -146,7 +147,7 @@ final readonly class PostgresUserRepository implements UserRepository
         return new User(
             id: $row['id'],
             name: $row['name'],
-            email: $row['email'],
+            email: new Email($row['email']),
             phone: $row['phone'],
             passwordHash: $row['password'],
             role: UserRole::from($row['role']),
@@ -173,7 +174,7 @@ final readonly class PostgresUserRepository implements UserRepository
         return [
             'id' => $user->id,
             'name' => $user->name,
-            'email' => $user->email,
+            'email' => $user->email->value,
             'phone' => $user->phone,
             'password' => $user->passwordHash,
             'role' => $user->role->value,
