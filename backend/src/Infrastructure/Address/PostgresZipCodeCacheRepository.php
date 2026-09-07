@@ -6,7 +6,7 @@ namespace App\Infrastructure\Address;
 
 use App\Domain\Address\Ports\ZipCodeCacheRepository;
 use App\Domain\Address\ZipCodeAddress;
-use App\Domain\Ports\DatabaseConnection;
+use App\Infrastructure\Database\DatabaseConnection;
 
 final readonly class PostgresZipCodeCacheRepository implements ZipCodeCacheRepository
 {

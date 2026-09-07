@@ -1,0 +1,57 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Application\Shared;
+
+/**
+ * Payload já validado, com acesso tipado -- é aqui que `mixed` morre, em vez
+ * de vazar da validação até a entidade. Pedir campo que a regra não declarou
+ * (ou que veio com outro tipo) é erro de programação, não do cliente: daí
+ * `LogicException` e não `DomainException`.
+ */
+final readonly class ValidatedInput
+{
+    /** @param array<string, mixed> $values */
+    public function __construct(private array $values)
+    {
+    }
+
+    public function has(string $field): bool
+    {
+        return array_key_exists($field, $this->values);
+    }
+
+    public function string(string $field): string
+    {
+        $value = $this->values[$field] ?? null;
+
+        if (!is_string($value)) {
+            throw new \LogicException(sprintf('Field "%s" was not validated as a string.', $field));
+        }
+
+        return $value;
+    }
+
+    public function stringOrNull(string $field): ?string
+    {
+        return ($this->values[$field] ?? null) === null ? null : $this->string($field);
+    }
+
+    public function stringOr(string $field, string $fallback): string
+    {
+        return $this->stringOrNull($field) ?? $fallback;
+    }
+
+    /** @return list<string> */
+    public function fields(): array
+    {
+        return array_keys($this->values);
+    }
+
+    /** @return array<string, mixed> */
+    public function all(): array
+    {
+        return $this->values;
+    }
+}
