@@ -11,11 +11,7 @@ use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
 use App\Domain\Dealership\Ports\DealershipRepository;
 
-/**
- * `owner_user_id` só chega aqui quando quem chama é admin (a rota é a mesma
- * que reassocia dono, sem endpoint paralelo pra isso) -- reassociação vira um
- * evento de auditoria próprio, além do update comum.
- */
+/** Reassociar dono vira evento de auditoria próprio, além do update comum. */
 final readonly class UpdateDealership
 {
     public function __construct(

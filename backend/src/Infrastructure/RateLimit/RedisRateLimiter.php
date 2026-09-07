@@ -7,11 +7,8 @@ namespace App\Infrastructure\RateLimit;
 use App\Infrastructure\Redis\RedisConnection;
 
 /**
- * Sliding window counter: 2 contadores fixos (janela atual + anterior) com
- * interpolação, em vez de fixed window (estoura na borda de duas janelas) ou
- * sliding log (uma entrada por request, cresce sem limite). O incremento e a
- * leitura da janela anterior são um script Lua só -- atômico no Redis, sem
- * round-trip extra nem race entre requests concorrentes na mesma key.
+ * Sliding window counter, não fixed window (estoura na borda) nem sliding log (cresce sem limite).
+ * Incremento e leitura num script Lua só, pra ser atômico sem round-trip extra.
  */
 final readonly class RedisRateLimiter implements RateLimiter
 {
@@ -42,9 +39,6 @@ final readonly class RedisRateLimiter implements RateLimiter
             $policy->windowSeconds,
         );
 
-        // Peso da janela anterior cai conforme a janela atual avança -- é essa
-        // interpolação que aproxima uma janela deslizante de verdade sem
-        // guardar uma entrada por request.
         $estimated = ((int) $previous * (1 - $elapsedFraction)) + (int) $current;
 
         return new RateLimitResult(

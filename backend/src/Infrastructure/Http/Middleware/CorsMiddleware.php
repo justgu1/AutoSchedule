@@ -8,13 +8,7 @@ use App\Infrastructure\Http\Middleware;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
 
-/**
- * Preflight (`OPTIONS`) responde aqui mesmo, antes de qualquer outro
- * middleware -- não pode ser barrado por rate limit nem chegar no router.
- * `Access-Control-Allow-Credentials: true` porque o token agora vai em
- * cookie; por isso a origem nunca pode ser `*` (o próprio spec de CORS proíbe
- * as duas coisas juntas), só a allowlist exata.
- */
+/** Credenciais em cookie obrigam allowlist exata: o spec de CORS proíbe `*` junto de `Allow-Credentials`. */
 final readonly class CorsMiddleware implements Middleware
 {
     /** @param list<string> $allowedOrigins */
@@ -28,7 +22,7 @@ final readonly class CorsMiddleware implements Middleware
         $allowed = $origin !== null && in_array($origin, $this->allowedOrigins, true);
 
         if ($request->method() === 'OPTIONS') {
-            // 204 não pode ter corpo -- Response (não JsonResponse) fica vazio.
+            // 204 não pode ter corpo, daí Response e não JsonResponse.
             $response = new Response(status: 204);
 
             return $allowed ? $this->withCorsHeaders($response, $origin) : $response;

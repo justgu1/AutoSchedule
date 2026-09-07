@@ -12,11 +12,7 @@ use App\Domain\Dealership\Ports\DealershipRepository;
 use App\Domain\User\Ports\UserRepository;
 use App\Domain\User\UserRole;
 
-/**
- * Move pra lixeira (reversível por 30 dias -- login de novo restaura, ou
- * `RestoreAccount`/`PurgeAccount`) e revoga todo refresh token, ninguém
- * continua logado depois disso.
- */
+/** Revoga todo refresh token junto: ninguém segue logado numa conta na lixeira. */
 final readonly class TrashAccount
 {
     public function __construct(
@@ -39,8 +35,7 @@ final readonly class TrashAccount
 
         $this->users->trash($user->id);
         $this->refreshTokens->revokeAllForUser($user->id);
-        // Cascata: concessionária ativa desse seller vai junto pra lixeira (marcada como "por causa da desativação",
-        // pra restaurar seletivo depois -- a que ele já tinha trashed manualmente antes fica quieta).
+        // Marcada como cascata pra o restore devolver só o que caiu por causa da conta, não o que o dono já tinha arquivado.
         $this->dealerships->trashAllOwnedBy($user->id);
         $this->audit->record(AuditEvent::AccountTrashed, $context->actorId, 'User', $user->id, [], $context->ipAddress, $context->userAgent);
     }

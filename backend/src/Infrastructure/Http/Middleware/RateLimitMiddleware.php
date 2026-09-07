@@ -14,10 +14,8 @@ use App\Infrastructure\RateLimit\RateLimitPolicy;
 use Psr\Log\LoggerInterface;
 
 /**
- * Roda antes de qualquer outro middleware (inclusive AuthContextMiddleware) --
- * tráfego abusivo é barrado com um único round-trip ao Redis, antes de abrir
- * transação ou tocar no Postgres. Cabeçalhos seguem o rascunho IETF de
- * RateLimit Header Fields (mesmo formato que a Cloudflare adota hoje).
+ * Vem antes da autenticação no pipeline: tráfego abusivo custa um round-trip ao Redis, não uma transação.
+ * Os cabeçalhos seguem o rascunho IETF de RateLimit Header Fields.
  */
 final readonly class RateLimitMiddleware implements Middleware
 {

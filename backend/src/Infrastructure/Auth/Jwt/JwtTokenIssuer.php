@@ -45,10 +45,7 @@ final readonly class JwtTokenIssuer implements TokenIssuer
     public function decodeAccessToken(string $token): AccessTokenClaims
     {
         try {
-            // Passar um Key fixa o algoritmo em RS256 -- o firebase/php-jwt recusa
-            // verificar um token cujo header diga outro alg, o que barra o ataque
-            // clássico de "trocar RS256 por HS256 usando a chave pública como
-            // segredo HMAC".
+            // Key fixa o alg em RS256, o que barra o ataque de trocar por HS256 usando a chave pública como segredo.
             $decoded = JWT::decode($token, new Key($this->publicKeyPem, 'RS256'));
         } catch (\Throwable) {
             throw new DomainException('Invalid or expired access token.', DomainErrorType::Unauthorized);

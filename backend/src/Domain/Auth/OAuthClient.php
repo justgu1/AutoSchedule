@@ -52,10 +52,7 @@ final readonly class OAuthClient
             clientId: $clientId,
             name: $name,
             type: $type,
-            // Client público não tem como guardar segredo com segurança (roda no
-            // dispositivo do usuário final), então nunca tem um -- qualquer
-            // $plainSecret informado pra ele é ignorado de propósito, não é
-            // hasheado nem salvo.
+            // Client público roda no dispositivo do usuário final, então não guarda segredo: $plainSecret é ignorado de propósito.
             secretHash: $type === ClientType::Confidential ? password_hash($plainSecret, PASSWORD_ARGON2ID) : null,
             allowedGrantTypes: $allowedGrantTypes,
             redirectUris: $redirectUris,

@@ -15,12 +15,7 @@ use App\Domain\Dealership\Dealership;
 use App\Domain\Dealership\Ports\DealershipRepository;
 use App\Domain\File\Ports\StorageProvider;
 
-/**
- * Otimiza (WebP) e grava a foto de uma concessionária fora do request de
- * upload -- `EnqueueDealershipPhoto` só enfileira e devolve `202` na hora;
- * quem chamou acompanha o progresso via `JobProgress` (`GET /jobs/{id}` ou
- * `/events`, SSE).
- */
+/** Ver `EnqueueDealershipPhoto` pro motivo de isto rodar fora do request. */
 final readonly class ProcessDealershipPhotoJob implements Job
 {
     public function __construct(

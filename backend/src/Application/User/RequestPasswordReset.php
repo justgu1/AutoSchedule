@@ -12,7 +12,7 @@ use App\Domain\Auth\Ports\PasswordResetTokenRepository;
 use App\Domain\User\Ports\UserRepository;
 use App\Domain\User\User;
 
-/** E-mail existindo ou não, quem chamou recebe a mesma resposta -- não vaza se a conta existe, mesma regra do login. */
+/** Mesma resposta exista ou não a conta: não vaza cadastro, igual `LoginWithPassword`. */
 final readonly class RequestPasswordReset
 {
     public function __construct(

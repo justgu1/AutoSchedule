@@ -24,16 +24,6 @@ use App\Infrastructure\Http\UploadedFile;
 use App\Infrastructure\Pagination\PaginationPolicy;
 use App\Infrastructure\Validation\Validator;
 
-/**
- * Admin vê/gerencia qualquer concessionária; seller só as próprias -- RLS já
- * escopa isso na leitura (linha de outro dono nem aparece pro `findById`),
- * então "não encontrada" e "não é sua" são a mesma resposta (404), de propósito.
- *
- * `show()` é a exceção: responde qualquer um, autenticado ou não -- dono/admin
- * recebem o perfil completo, todo o resto (outro seller, customer, sem conta
- * nenhuma) recebe o perfil público de uma concessionária `active` (RLS
- * garante isso na leitura em si; ver migration da policy pública).
- */
 final readonly class DealershipController
 {
     public function __construct(
@@ -95,10 +85,7 @@ final readonly class DealershipController
         return Response::success($profile->toArray(), 201);
     }
 
-    /**
-     * `owner_user_id` só é aceito no corpo quando quem chama é admin -- é a
-     * mesma rota que reassocia dono, sem endpoint paralelo pra isso.
-     */
+    /** `owner_user_id` só entra no contrato quando quem chama é admin. */
     public function update(Request $request): Response
     {
         $actor = RequestActor::fromRequest($request);
@@ -124,7 +111,6 @@ final readonly class DealershipController
         return Response::success($profile->toArray());
     }
 
-    /** Move pra lixeira -- recuperável por 30 dias (`restore()`/`purge()` abaixo). */
     public function destroy(Request $request): Response
     {
         ($this->trashDealership)($request->param('id'), RequestActor::fromRequest($request));
@@ -139,7 +125,6 @@ final readonly class DealershipController
         return Response::success(['message' => 'Dealership restored.']);
     }
 
-    /** Apaga em definitivo agora, sem esperar os 30 dias. */
     public function purge(Request $request): Response
     {
         ($this->purgeDealership)($request->param('id'), RequestActor::fromRequest($request));
@@ -147,10 +132,6 @@ final readonly class DealershipController
         return Response::success(['message' => 'Dealership permanently deleted.']);
     }
 
-    /**
-     * Só enfileira: otimização (WebP) e gravação rodam no worker. Quem chamou
-     * acompanha o progresso via `job_id` (`GET /jobs/{id}` ou `/events`).
-     */
     public function setPhoto(Request $request): Response
     {
         $uploaded = $request->file('image');

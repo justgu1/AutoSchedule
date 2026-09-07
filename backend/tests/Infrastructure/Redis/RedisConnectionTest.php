@@ -9,12 +9,6 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
-/**
- * Teste de integração: conecta no Redis real do docker-compose. Precisa
- * rodar dentro da rede `autoschedule` (via `make test` /
- * `docker compose exec backend vendor/bin/phpunit`) — não alcança o
- * hostname `redis` a partir de um container avulso fora do compose.
- */
 #[Group('integration')]
 final class RedisConnectionTest extends TestCase
 {

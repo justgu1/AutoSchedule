@@ -6,13 +6,7 @@ namespace App\Domain\Shared;
 
 final class Uuid
 {
-    /**
-     * Gera um UUID versão 7 (RFC 9562): timestamp Unix em milissegundos (48 bits,
-     * big-endian) seguido de bits aleatórios. Ordenável no tempo, então os ids
-     * ordenam (e indexam) na ordem de inserção — diferente do v4, que é
-     * totalmente aleatório. Usado por entidades que precisam ter um id antes
-     * de persistir.
-     */
+    /** v7 e não v4 porque o timestamp vem primeiro: id ordena e indexa na ordem de inserção. */
     public static function v7(): string
     {
         $timestampMs = (int) (microtime(true) * 1000);

@@ -11,11 +11,7 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
-/**
- * Teste de integração: conecta no Redis real do docker-compose. Cada teste usa
- * uma key própria (uniqid) -- sem transação/rollback pra isolar (Redis não tem
- * isso), então nunca reaproveita key entre testes.
- */
+/** Key própria por teste: Redis não tem transação pra dar rollback no isolamento. */
 #[Group('integration')]
 final class RedisRateLimiterTest extends TestCase
 {

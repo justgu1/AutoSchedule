@@ -12,13 +12,8 @@ use App\Infrastructure\Http\Response;
 use App\Infrastructure\Http\StreamedResponse;
 
 /**
- * Genérico de propósito -- não sabe o que o job faz, só expõe o progresso que
- * ele mesmo reportou em `JobStatusStore`. Mesmo endpoint serve qualquer job
- * assíncrono futuro (ex: import em lote de fotos de veículo), não só foto de
- * concessionária.
- *
- * Autorização aqui é só "logado" -- o id do job (UUID) não é adivinhável e
- * não carrega dado sensível além do que o próprio dono já pediu pra processar.
+ * Não sabe o que o job faz, só repassa o que ele reportou -- serve qualquer job assíncrono.
+ * Autorização é só "logado": o id é UUID não adivinhável e o progresso não carrega dado sensível.
  */
 final readonly class JobController
 {
@@ -34,15 +29,10 @@ final readonly class JobController
         return Response::success($this->requireStatus($request));
     }
 
-    /**
-     * SSE -- `EventSource` do browser reconecta sozinho se a conexão cair ou
-     * `MAX_STREAM_SECONDS` esgotar antes do job terminar; um novo `GET`
-     * pega o progresso de onde parou (o estado vive no Redis, não na conexão).
-     */
+    /** Cair no meio não perde nada: o estado vive fora da conexão, e o `EventSource` reconecta sozinho. */
     public function events(Request $request): Response
     {
-        // Falha rápido aqui (404 JSON normal) se o job nem existe -- só a
-        // partir daqui é que vale a pena virar text/event-stream.
+        // Job inexistente vira 404 JSON normal, antes de a resposta se comprometer com event-stream.
         $this->requireStatus($request);
         $jobId = (string) $request->param('id');
 

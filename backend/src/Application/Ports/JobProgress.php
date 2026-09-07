@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Ports;
 
-/**
- * Progresso que um job conta de si mesmo enquanto roda, pra quem enfileirou
- * poder acompanhar -- não é o estado da fila em si (isso é `Queue`).
- */
+/** O que o job conta de si mesmo enquanto roda; o estado da fila em si é `Queue`. */
 interface JobProgress
 {
     public function create(string $jobId): void;

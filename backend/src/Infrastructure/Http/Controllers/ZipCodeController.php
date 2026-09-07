@@ -11,11 +11,7 @@ use App\Domain\Exceptions\DomainException;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
 
-/**
- * Proxy do próprio backend pro ViaCEP -- o front nunca chama o terceiro
- * direto. Primeira consulta de um CEP resolve de fora, o resto vem do
- * cache (`zip_code_cache`), sem depender do ViaCEP de novo.
- */
+/** Proxy pra o front nunca chamar o terceiro direto; o cache é responsabilidade de `LookupZipCode`. */
 final readonly class ZipCodeController
 {
     public function __construct(private LookupZipCode $lookup)

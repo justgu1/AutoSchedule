@@ -12,7 +12,7 @@ use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
 use App\Domain\User\Ports\UserRepository;
 
-/** Admin-only -- recupera uma conta na lixeira sem esperar o dono logar de novo. */
+/** Recupera sem esperar o dono logar de novo, que é o outro caminho de restore. */
 final readonly class RestoreAccount
 {
     public function __construct(

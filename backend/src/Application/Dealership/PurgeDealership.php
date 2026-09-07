@@ -12,7 +12,7 @@ use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
 use App\Domain\Shared\TrashableStatus;
 
-/** Apaga em definitivo agora, sem esperar os 30 dias. */
+/** Antecipa o que a purga agendada faria, a pedido de quem é dono. */
 final readonly class PurgeDealership
 {
     public function __construct(

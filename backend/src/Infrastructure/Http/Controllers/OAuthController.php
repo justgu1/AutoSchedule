@@ -31,11 +31,8 @@ final readonly class OAuthController
     }
 
     /**
-     * Sem `grant_type` de propósito -- quem integra não devia aprender
-     * vocabulário de OAuth só pra logar. Ordem importa quando o body traz
-     * campo de mais de um formato por engano: `refresh_token` manda mais que
-     * `email`/`password`, que manda mais que `id_token` (Google), que manda
-     * mais que `client_secret` (M2M).
+     * Sem `grant_type`: quem integra não devia aprender vocabulário de OAuth só pra logar.
+     * A ordem dos ramos resolve o body que traz campo de mais de um formato por engano.
      */
     public function token(Request $request): Response
     {
@@ -125,7 +122,7 @@ final readonly class OAuthController
             RequestActor::fromRequest($request),
         );
 
-        // M2M: sem browser no meio, sem sessão pra manter em cookie -- só o JSON de sempre.
+        // Sem browser no meio, não há sessão pra manter em cookie.
         return Response::success([
             'access_token' => $tokenPair->accessToken,
             'token_type' => 'Bearer',
@@ -134,7 +131,7 @@ final readonly class OAuthController
         ]);
     }
 
-    /** Lê o refresh token do cookie (SPA não manda no corpo) -- sem cookie, não tem o quê revogar, mas ainda limpa os cookies do client. */
+    /** Sem cookie não há o quê revogar, mas os cookies do client são limpos de todo jeito. */
     public function logout(Request $request): Response
     {
         $rawRefreshToken = $request->cookie('refresh_token');
@@ -148,11 +145,7 @@ final readonly class OAuthController
             ->withCookie('refresh_token', '', maxAge: -1, secure: $this->cookieSecure);
     }
 
-    /**
-     * O corpo JSON continua com os tokens (curl/Postman/scripts não mudam
-     * nada) -- os cookies HttpOnly são só pra quem tem browser no meio (a
-     * SPA nunca lê o token do corpo, confia só no cookie).
-     */
+    /** Token vai no corpo e no cookie: script usa o corpo, SPA confia só no cookie HttpOnly. */
     private function tokenResponse(TokenPair $tokenPair): Response
     {
         $response = Response::success([

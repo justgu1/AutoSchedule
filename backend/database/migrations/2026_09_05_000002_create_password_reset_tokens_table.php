@@ -7,9 +7,7 @@ use App\Infrastructure\Database\Migration;
 return new class () implements Migration {
     public function up(\PDO $pdo): void
     {
-        // Sem RLS -- mesmo padrão de oauth_refresh_tokens/oauth_clients: só o
-        // hash do token é sensível, e ele já não é reversível/consultável por
-        // ninguém sem o valor em texto puro (que só existe no e-mail enviado).
+        // Sem RLS: só o hash é guardado, e ele é inútil sem o texto puro, que só existe no e-mail.
         $pdo->exec(<<<'SQL'
             CREATE TABLE password_reset_tokens (
                 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

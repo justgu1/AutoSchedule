@@ -12,7 +12,7 @@ use App\Domain\Exceptions\DomainException;
 use App\Domain\Shared\TrashableStatus;
 use App\Domain\User\Ports\UserRepository;
 
-/** Apaga em definitivo agora, sem esperar os 30 dias -- self (`/me/purge`) ou admin (`/users/{id}/purge`). */
+/** Antecipa o que a purga agendada faria, a pedido do dono ou de um admin. */
 final readonly class PurgeAccount
 {
     public function __construct(

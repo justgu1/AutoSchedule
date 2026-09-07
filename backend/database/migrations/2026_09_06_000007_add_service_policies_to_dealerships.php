@@ -5,13 +5,8 @@ declare(strict_types=1);
 use App\Infrastructure\Database\Migration;
 
 /**
- * Scheduler e worker rodam fora de qualquer request HTTP -- não tem
- * `current_user_id`/`current_user_role` pra setar, então as policies
- * admin-or-owner de `dealerships` (migration 000005) escondem toda linha
- * dessas conexões. Mesmo padrão que `users` já tinha desde o início
- * (`users_service_select`/`users_service_update`), só nunca foi replicado
- * aqui quando o domínio de concessionária ganhou rotina em background
- * (purge agendado, processamento assíncrono de foto).
+ * Sem request HTTP não há identidade pra setar, então as policies admin-or-owner escondem tudo do background.
+ * `users` já tinha o equivalente; faltou replicar aqui quando concessionária ganhou rotina assíncrona.
  */
 return new class () implements Migration {
     public function up(\PDO $pdo): void

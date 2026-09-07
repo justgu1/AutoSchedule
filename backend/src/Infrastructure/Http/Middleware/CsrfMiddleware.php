@@ -10,14 +10,7 @@ use App\Infrastructure\Http\Middleware;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
 
-/**
- * Double-submit cookie: `XSRF-TOKEN` (legível por JS, não HttpOnly) precisa
- * bater com o header `X-CSRF-Token` em toda mutação -- só quando a
- * autenticação veio do cookie `access_token` (sem header Authorization
- * explícito). Um cliente que manda `Authorization: Bearer` na mão (Postman,
- * script, outro serviço) não depende de credencial ambiente nenhuma, então
- * CSRF não se aplica a ele.
- */
+/** Só vale pra autenticação por cookie: quem manda o Bearer na mão não depende de credencial ambiente. */
 final readonly class CsrfMiddleware implements Middleware
 {
     private const array SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];

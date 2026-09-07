@@ -38,14 +38,7 @@ final class ConfigLoaderTest extends TestCase
         $this->assertSame('fallback', $app->config('does-not-exist', 'fallback'));
     }
 
-    /**
-     * Regressão: secret selado (SealedSecret/kubeseal) com `\n` sobrando (ex:
-     * gerado com `echo` em vez de `printf`) já derrubou login do Google e
-     * autenticação do Postgres/Redis em produção -- comparação/parse contra
-     * um valor externo limpo nunca batia. `Config` corta espaço em
-     * branco de todo valor de config na raiz, então nenhuma env var
-     * individual precisa se preocupar com isso de novo.
-     */
+    /** Regressão: secret selado com `\n` sobrando já derrubou login do Google e autenticação do Postgres em produção. */
     #[Test]
     public function config_corta_espaco_em_branco_de_valores_string_incluindo_aninhados(): void
     {

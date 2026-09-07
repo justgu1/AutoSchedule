@@ -12,12 +12,8 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Teste de integração: valida as policies de RLS de `users` de verdade,
- * conectando como autoschedule_app (a role admin/pgsql é superuser e sempre
- * ignora RLS, não serve pra esse teste). Como são DUAS conexões/sessões
- * diferentes, os dados de fixture precisam ser commitados de verdade pela
- * conexão admin (senão a sessão autoschedule_app nunca os enxerga) --
- * limpeza no tearDown é um DELETE, não rollback de transação.
+ * Conecta como autoschedule_app porque a role admin é superuser e ignora RLS.
+ * Duas sessões: a fixture precisa ser commitada, então a limpeza é DELETE e não rollback.
  */
 #[Group('integration')]
 final class RlsPolicyTest extends TestCase
@@ -104,13 +100,7 @@ final class RlsPolicyTest extends TestCase
         $this->assertSame([], $ids);
     }
 
-    /**
-     * `GET /dealerships/{id}` (rota `publicRead`) mostra quem é o vendedor
-     * responsável mesmo pra quem não é dono/admin -- só o seller dono de
-     * concessionária ATIVA fica visível com a flag setada, o customer nunca
-     * aparece (não tem por quê) e um seller sem concessionária ativa também
-     * não.
-     */
+    /** Só o seller dono de concessionária ativa fica visível na leitura pública; customer nunca. */
     #[Test]
     public function contexto_de_leitura_publica_enxerga_so_seller_com_concessionaria_ativa(): void
     {

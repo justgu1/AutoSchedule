@@ -15,11 +15,7 @@ use App\Domain\Auth\ValueObjects\AccessTokenClaims;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
 
-/**
- * M2M: sem usuário, sem sessão pra renovar -- só access token, sem refresh
- * token. Client tem que ser confidencial (guarda segredo) e provar posse
- * dele; mesma mensagem genérica de sempre pra não vazar se o client_id existe.
- */
+/** M2M não tem sessão pra renovar, então sai access token sem refresh token. */
 final readonly class IssueServiceToken
 {
     public function __construct(
@@ -46,7 +42,7 @@ final readonly class IssueServiceToken
             ttlSeconds: $this->accessTokenTtl,
         ));
 
-        // actorId/userId nulos -- não é um usuário, é o client se autenticando; o client_id vai no context.
+        // Sem actor nem alvo: quem se autenticou é o client, e ele vai no context.
         $this->audit->record(AuditEvent::ServiceTokenIssued, null, 'User', null, ['client_id' => $client->clientId], $context->ipAddress, $context->userAgent);
 
         return new TokenPair($accessToken, $this->accessTokenTtl, $client->allowedScopes);

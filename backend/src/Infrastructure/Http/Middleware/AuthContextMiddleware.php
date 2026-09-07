@@ -12,21 +12,8 @@ use App\Infrastructure\Http\Response;
 use App\Infrastructure\Http\Router;
 
 /**
- * Decodifica o access token (header `Authorization: Bearer` ou cookie
- * `access_token` -- o que vier primeiro) e anexa as claims ao Request.
- * Autenticado, seta `current_user_id`/`role` pro RLS.
- *
- * Sem token nenhum, a rota pode estar marcada como serviceContext (ex: login
- * busca usuário por email antes de existir qualquer autenticação) -- nesse
- * caso seta um contexto de serviço mais restrito (só enxerga o necessário
- * pra autenticação em si).
- *
- * `publicRead` é composto, não alternativo: uma rota marcada assim (ex:
- * `GET /dealerships/{id}`) recebe a flag `is_public_read` JUNTO com
- * `current_user_id`/`role` quando há Bearer válido -- precisa das duas coisas
- * pra um seller autenticado (não dono, não admin) ainda cair no fallback
- * público em vez de tomar 404. Só quando pelo menos um dos três se aplica é
- * que abre transação; rota pública comum sem nenhuma marca segue direto.
+ * As três marcas de contexto do RLS são compostas, não alternativas: um seller autenticado numa leitura
+ * pública precisa da flag pública E da própria identidade, senão o RLS esconde a linha e ele toma 404.
  */
 final readonly class AuthContextMiddleware implements Middleware
 {

@@ -19,10 +19,6 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
-/**
- * Teste de integração: abre transação real via autoschedule_app -- precisa
- * rodar dentro do compose (mesmo padrão dos outros testes de Postgres).
- */
 #[Group('integration')]
 final class AuthContextMiddlewareTest extends TestCase
 {
@@ -195,13 +191,7 @@ final class AuthContextMiddlewareTest extends TestCase
         $this->assertSame('true', $seenContext);
     }
 
-    /**
-     * `publicRead` é composto com o contexto autenticado normal, não
-     * alternativo -- com Bearer válido numa rota `publicRead`, as duas coisas
-     * ficam setadas ao mesmo tempo (é isso que deixa um seller autenticado
-     * cair no fallback público de `GET /dealerships/{id}` pra concessionária
-     * de outro seller, em vez de só enxergar via `current_user_id`).
-     */
+    /** As duas marcas ficam setadas ao mesmo tempo, que é o que deixa o seller autenticado ver o perfil público alheio. */
     #[Test]
     public function com_bearer_valido_em_rota_public_read_seta_os_dois_contextos_juntos(): void
     {

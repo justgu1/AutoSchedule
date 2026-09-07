@@ -8,11 +8,8 @@ use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
 
 /**
- * Rotina de purga genérica -- todo domínio com lixeira reversível (User,
- * Dealership, ...) monta uma instância desta classe em vez de escrever a
- * própria ScheduledTask. `findEligible`/`purge`/`identify` ficam a cargo de
- * cada domínio porque o próprio jeito de persistir a anonimização varia
- * (`User::anonymizeAndSoftDelete` vs `Dealership::anonymized()` + `update`).
+ * Uma instância por domínio com lixeira reversível, em vez de uma ScheduledTask por domínio.
+ * As closures existem porque cada domínio persiste a anonimização de um jeito diferente.
  *
  * @template T of object
  */

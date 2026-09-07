@@ -32,12 +32,7 @@ return new class () implements Migration {
                 )
             SQL);
 
-        // Login/refresh (POST /api/oauth/token) buscam usuário por email/id
-        // ANTES de existir qualquer autenticação -- não tem "current_user_id"
-        // pra comparar ainda. Sem essa policy, o próprio login ficaria
-        // bloqueado pelo RLS (ninguém nunca teria contexto pra logar).
-        // AuthContextMiddleware seta esse contexto só pra rota marcada como
-        // serviceContext, nunca em qualquer request sem autenticação.
+        // Sem esta policy o próprio login ficaria bloqueado: ele busca o usuário antes de existir identidade.
         $pdo->exec(<<<'SQL'
             CREATE POLICY users_service_select ON users
                 FOR SELECT

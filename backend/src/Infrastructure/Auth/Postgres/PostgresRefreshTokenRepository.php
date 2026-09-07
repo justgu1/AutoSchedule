@@ -45,13 +45,8 @@ final readonly class PostgresRefreshTokenRepository implements RefreshTokenRepos
 
     public function rotate(RefreshToken $current, RefreshToken $next): void
     {
-        // Três passos, nessa ordem, porque replaced_by_id tem FK pra essa mesma
-        // tabela -- não pode apontar pro $next antes dele existir. Revogar
-        // $current primeiro (condicionado a revoked_at IS NULL) também é a
-        // trava de concorrência: duas renovações concorrentes no mesmo token
-        // não conseguem "ganhar" esse UPDATE ao mesmo tempo, quem perder pega
-        // rowCount() = 0 e nunca chega no insert abaixo -- $next nunca é
-        // duplicado pra um token só.
+        // A ordem é obrigatória: replaced_by_id tem FK pra própria tabela, e revogar condicionado a
+        // revoked_at IS NULL é a trava de concorrência -- quem perder a corrida pega rowCount() = 0.
         $revoke = $this->pdo->prepare(
             'UPDATE oauth_refresh_tokens SET revoked_at = now() WHERE id = :current_id AND revoked_at IS NULL',
         );

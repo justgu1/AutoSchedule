@@ -14,15 +14,8 @@ use App\Domain\File\StoredFile;
 use App\Domain\Shared\Uuid;
 
 /**
- * Orquestra um upload de ponta a ponta: backup local -> validação de
- * conteúdo real -> envio pro storage -> metadado só é gravado depois do
- * storage confirmar sucesso.
- *
- * O backup local é feito ANTES do envio pro storage e só é descartado DEPOIS
- * do `put()` e do `files->insert()` terem sucesso -- se qualquer um dos dois
- * lançar, o arquivo local continua lá pra retry, nada se perde (mesma
- * exigência já documentada no comentário de `backend_tmp` em
- * docker-compose.yaml).
+ * A ordem é a garantia: o backup local só é descartado depois que storage e metadado confirmam.
+ * Qualquer falha no meio deixa o arquivo local intacto pra retry.
  */
 final readonly class UploadFile
 {
@@ -34,11 +27,7 @@ final readonly class UploadFile
     ) {
     }
 
-    /**
-     * Toda foto do site passa por aqui em vez de `upload()` direto -- converte
-     * pra WebP e redimensiona pro padrão do site antes de gravar, então o
-     * MIME permitido é sempre só `image/webp` (o que sai do otimizador).
-     */
+    /** O whitelist é só `image/webp` porque o otimizador é a autoridade sobre o formato final. */
     public function uploadImage(string $uploadedTmpPath, string $originalName, ?string $uploadedBy): StoredFile
     {
         $optimized = $this->imageOptimizer->optimizeToWebp($uploadedTmpPath);
@@ -60,7 +49,7 @@ final readonly class UploadFile
         $mimeType = $this->tempFiles->detectMimeType($localPath);
 
         if (!in_array($mimeType, $allowedMimeTypes, true)) {
-            // Conteúdo rejeitado nunca vai passar num retry -- sem motivo pra guardar backup.
+            // Conteúdo rejeitado não passa num retry, então não vale guardar backup.
             $this->tempFiles->discard($localPath);
 
             throw new DomainException(sprintf('File type "%s" is not allowed.', $mimeType), DomainErrorType::Validation);
@@ -69,10 +58,7 @@ final readonly class UploadFile
         $contents = $this->tempFiles->read($localPath);
         $checksum = hash('sha256', $contents);
 
-        // Path content-addressed (checksum) -- upload do mesmo conteúdo duas
-        // vezes (ex: retry após falha parcial, ou a mesma foto reaproveitada
-        // noutra concessionária) é idempotente: mesma key no storage, mesma
-        // linha em `files`.
+        // Path é o checksum, então subir o mesmo conteúdo duas vezes é idempotente.
         $existing = $this->files->findByPath($checksum);
 
         if ($existing instanceof StoredFile) {
@@ -81,9 +67,6 @@ final readonly class UploadFile
             return $existing;
         }
 
-        // Ponto crítico: só chega no discard() de baixo se put() E insert()
-        // tiverem sucesso. Qualquer exceção de um dos dois propaga e deixa
-        // `$localPath` intacto -- é o backup que garante que nada se perde.
         $this->storage->put($checksum, $contents, $mimeType);
 
         $file = StoredFile::register(

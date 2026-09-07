@@ -10,12 +10,7 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
-/**
- * Teste de integração: conecta no Postgres real do docker-compose e roda os
- * seeders reais de backend/database/seeders/. Depende da tabela `users`
- * (migration da PR anterior) já existir. Isolado por transação (rollback no
- * tearDown), igual o MigrationRunnerTest.
- */
+/** Isolado por transação com rollback no tearDown, igual o MigrationRunnerTest. */
 #[Group('integration')]
 final class SeederRunnerTest extends TestCase
 {
@@ -37,9 +32,7 @@ final class SeederRunnerTest extends TestCase
 
         $this->pdo->beginTransaction();
 
-        // Estado real do banco de dev pode já ter o admin e os oauth clients
-        // seedados (via `make seed`). Zera dentro da própria transação, some
-        // no rollback.
+        // O banco pode já estar seedado; zerar dentro da transação some no rollback.
         $statement = $this->pdo->prepare('DELETE FROM users WHERE email = ?');
         $statement->execute([self::ADMIN_EMAIL]);
 

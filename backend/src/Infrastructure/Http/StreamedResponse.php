@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace App\Infrastructure\Http;
 
 /**
- * Resposta de corpo longo/incremental (SSE) -- `send()` não faz um `echo`
- * só, ele entrega o controle pra quem criou a resposta escrever aos poucos
- * e dar `flush()` a cada pedaço. Sem cookies: SSE não usa.
+ * Entrega o controle pra quem criou a resposta escrever aos poucos. Sem cookies: SSE não usa.
  */
 final class StreamedResponse extends Response
 {
@@ -25,8 +23,7 @@ final class StreamedResponse extends Response
             header($name . ': ' . $value);
         }
 
-        // Sem isso o PHP-FPM guarda tudo num buffer e só entrega no final da
-        // request -- o cliente veria a stream inteira de uma vez, não "ao vivo".
+        // Sem isso o PHP-FPM entrega a stream inteira no final, e o cliente não vê nada "ao vivo".
         while (ob_get_level() > 0) {
             ob_end_flush();
         }

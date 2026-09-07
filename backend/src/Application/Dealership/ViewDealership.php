@@ -11,10 +11,8 @@ use App\Domain\User\Ports\UserRepository;
 use App\Domain\User\User;
 
 /**
- * Mesma rota pro gerenciamento e pra página pública: dono/admin recebem o
- * perfil completo, todo o resto (outro seller, customer, sem conta nenhuma)
- * recebe o perfil público de uma concessionária `active` (RLS garante isso na
- * leitura em si; ver migration da policy pública).
+ * Uma leitura, dois perfis: dono e admin recebem o completo, todo o resto recebe o público.
+ * O RLS reforça isso na própria query, então nem depende deste ramo estar certo.
  */
 final readonly class ViewDealership
 {

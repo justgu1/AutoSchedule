@@ -14,12 +14,7 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
-/**
- * Teste de integração: resolver os bindings de banco/JWT toca recurso real
- * (conexão Postgres, arquivo de chave) -- precisa rodar dentro do compose.
- * Existe pra pegar erro de wiring cedo (ex: config/auth.php nunca carregado,
- * já aconteceu uma vez).
- */
+/** Pega erro de wiring cedo: um config nunca carregado já passou batido por todo o resto da suíte. */
 #[Group('integration')]
 final class ContainerFactoryTest extends TestCase
 {
@@ -28,8 +23,7 @@ final class ContainerFactoryTest extends TestCase
     {
         $container = ContainerFactory::build(new Config());
 
-        // Resolver o controller arrasta todo caso de uso por trás dele -- é o
-        // que cobre o autowiring, que não aparece no ContainerFactory.
+        // Resolver o controller arrasta todo caso de uso atrás, que é o que cobre o autowiring.
         $this->assertInstanceOf(OAuthController::class, $container->get(OAuthController::class));
         $this->assertInstanceOf(UserController::class, $container->get(UserController::class));
         $this->assertInstanceOf(DealershipController::class, $container->get(DealershipController::class));

@@ -8,10 +8,7 @@ use App\Domain\Address\Ports\ZipCodeProvider;
 use App\Domain\Address\ZipCodeAddress;
 
 /**
- * ViaCEP (gratuito, sem chave) -- sem SDK, só `file_get_contents` como o
- * `GoogleJwksIdTokenVerifier` já faz pra outra integração externa. CEP
- * inválido/fora dos Correios vem com `erro: true` no corpo, HTTP 200 mesmo
- * assim -- não é exceção de rede, é resultado "não encontrado" de verdade.
+ * CEP inexistente vem com `erro: true` e HTTP 200, então "não encontrado" não é falha de rede.
  */
 final readonly class ViaCepZipCodeProvider implements ZipCodeProvider
 {

@@ -7,9 +7,7 @@ namespace App\Infrastructure\File;
 use App\Application\Ports\TempFileStore;
 
 /**
- * Diretório local compartilhado entre PHP-FPM e o worker (volume `backend_tmp`
- * no compose, `emptyDir` no k8s) -- é o que faz um arquivo recebido numa
- * request continuar existindo quando o job roda noutro processo.
+ * Diretório compartilhado entre PHP-FPM e worker, que é o que faz o arquivo sobreviver ao fim da request.
  */
 final readonly class LocalTempFileStore implements TempFileStore
 {

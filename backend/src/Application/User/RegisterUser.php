@@ -13,10 +13,7 @@ use App\Domain\User\Ports\UserRepository;
 use App\Domain\User\User;
 use App\Domain\User\UserRole;
 
-/**
- * Serve o cadastro público e o cadastro pelo admin -- a diferença entre os
- * dois é qual role a rota aceita, não o que acontece aqui.
- */
+/** Serve cadastro público e admin: a diferença é a role que a rota aceita, não o que acontece aqui. */
 final readonly class RegisterUser
 {
     public function __construct(
@@ -34,7 +31,7 @@ final readonly class RegisterUser
         $user = User::register($name, $email, $phone, $password, $role);
         $this->users->insert($user);
 
-        // Cadastro público não tem ator autenticado -- a conta criada é o próprio ator.
+        // Cadastro público não tem ator autenticado, então a conta criada é o próprio ator.
         $actorId = $context->actorId ?? $user->id;
         $this->audit->record(AuditEvent::UserCreated, $actorId, 'User', $user->id, ['role' => $user->role->value], $context->ipAddress, $context->userAgent);
 
