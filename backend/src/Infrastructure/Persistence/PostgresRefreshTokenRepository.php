@@ -6,23 +6,22 @@ namespace App\Infrastructure\Persistence;
 
 use App\Domain\Auth\Ports\RefreshTokenRepository;
 use App\Domain\Auth\RefreshToken;
-use App\Domain\Exceptions\DomainErrorType;
-use App\Domain\Exceptions\DomainException;
+use App\Domain\Auth\RefreshTokenAlreadyRotated;
 
 final readonly class PostgresRefreshTokenRepository implements RefreshTokenRepository
 {
+    private const string COLUMNS = 'id, token_hash, family_id, client_id, user_id, scopes, expires_at, revoked_at, replaced_by_id';
+
     public function __construct(private DatabaseConnection $connection)
     {
     }
 
     public function insert(RefreshToken $token): void
     {
-        $statement = $this->connection->pdo()->prepare(<<<'SQL'
+        $this->connection->execute(<<<'SQL'
             INSERT INTO oauth_refresh_tokens (id, token_hash, family_id, client_id, user_id, scopes, expires_at)
             VALUES (:id, :token_hash, :family_id, :client_id, :user_id, :scopes, :expires_at)
-            SQL);
-
-        $statement->execute([
+            SQL, [
             'id' => $token->id,
             'token_hash' => $token->tokenHash,
             'family_id' => $token->familyId,
@@ -35,10 +34,10 @@ final readonly class PostgresRefreshTokenRepository implements RefreshTokenRepos
 
     public function findByRawToken(string $rawToken): ?RefreshToken
     {
-        $statement = $this->connection->pdo()->prepare(
-            'SELECT id, token_hash, family_id, client_id, user_id, scopes, expires_at, revoked_at, replaced_by_id FROM oauth_refresh_tokens WHERE token_hash = :token_hash',
+        $statement = $this->connection->execute(
+            'SELECT ' . self::COLUMNS . ' FROM oauth_refresh_tokens WHERE token_hash = :token_hash',
+            ['token_hash' => hash('sha256', $rawToken)],
         );
-        $statement->execute(['token_hash' => hash('sha256', $rawToken)]);
         $row = $statement->fetch();
 
         return $row === false ? null : $this->fromRow(Row::from($row));
@@ -48,39 +47,35 @@ final readonly class PostgresRefreshTokenRepository implements RefreshTokenRepos
     {
         // A ordem é obrigatória: replaced_by_id tem FK pra própria tabela, e revogar condicionado a
         // revoked_at IS NULL é a trava de concorrência -- quem perder a corrida pega rowCount() = 0.
-        $revoke = $this->connection->pdo()->prepare(
+        $revoke = $this->connection->execute(
             'UPDATE oauth_refresh_tokens SET revoked_at = now() WHERE id = :current_id AND revoked_at IS NULL',
+            ['current_id' => $current->id],
         );
-        $revoke->execute(['current_id' => $current->id]);
 
         if ($revoke->rowCount() === 0) {
-            throw new DomainException('Invalid or expired refresh token.', DomainErrorType::Unauthorized);
+            throw new RefreshTokenAlreadyRotated();
         }
 
         $this->insert($next);
 
-        $link = $this->connection->pdo()->prepare(
+        $this->connection->execute(
             'UPDATE oauth_refresh_tokens SET replaced_by_id = :next_id WHERE id = :current_id',
+            ['next_id' => $next->id, 'current_id' => $current->id],
         );
-        $link->execute(['next_id' => $next->id, 'current_id' => $current->id]);
     }
 
     public function revokeFamily(string $familyId): void
     {
-        $statement = $this->connection->pdo()->prepare(<<<'SQL'
+        $this->connection->execute(<<<'SQL'
             UPDATE oauth_refresh_tokens SET revoked_at = now() WHERE family_id = :family_id AND revoked_at IS NULL
-            SQL);
-
-        $statement->execute(['family_id' => $familyId]);
+            SQL, ['family_id' => $familyId]);
     }
 
     public function revokeAllForUser(string $userId): void
     {
-        $statement = $this->connection->pdo()->prepare(<<<'SQL'
+        $this->connection->execute(<<<'SQL'
             UPDATE oauth_refresh_tokens SET revoked_at = now() WHERE user_id = :user_id AND revoked_at IS NULL
-            SQL);
-
-        $statement->execute(['user_id' => $userId]);
+            SQL, ['user_id' => $userId]);
     }
 
     private function fromRow(Row $row): RefreshToken

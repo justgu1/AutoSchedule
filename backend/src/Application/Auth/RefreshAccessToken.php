@@ -12,6 +12,7 @@ use App\Domain\Auth\GrantType;
 use App\Domain\Auth\Ports\RefreshTokenRepository;
 use App\Domain\Auth\Ports\TokenIssuer;
 use App\Domain\Auth\RefreshToken;
+use App\Domain\Auth\RefreshTokenAlreadyRotated;
 use App\Domain\Auth\ValueObjects\AccessTokenClaims;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
@@ -60,7 +61,13 @@ final readonly class RefreshAccessToken
         }
 
         [$rawNext, $next] = $current->rotate($this->refreshTokenTtl);
-        $this->refreshTokens->rotate($current, $next);
+
+        try {
+            $this->refreshTokens->rotate($current, $next);
+        } catch (RefreshTokenAlreadyRotated) {
+            // Perder a corrida é indistinguível de reuso para quem chamou, e a resposta é a mesma.
+            throw new DomainException('Invalid or expired refresh token.', DomainErrorType::Unauthorized);
+        }
 
         $accessToken = $this->tokens->issueAccessToken(AccessTokenClaims::issue(
             subject: $current->userId ?? $client->clientId,

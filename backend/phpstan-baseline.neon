@@ -157,18 +157,6 @@ parameters:
 			path: src/Infrastructure/Persistence/Schema/MigrationRunner.php
 
 		-
-			message: '#^Cannot call method fetchColumn\(\) on PDOStatement\|false\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: src/Infrastructure/Persistence/PostgresDealershipRepository.php
-
-		-
-			message: '#^Cannot call method fetchColumn\(\) on PDOStatement\|false\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: src/Infrastructure/Persistence/PostgresUserRepository.php
-
-		-
 			message: '#^Parameter \#1 \$json of function json_decode expects string, mixed given\.$#'
 			identifier: argument.type
 			count: 1
@@ -337,18 +325,6 @@ parameters:
 			path: tests/Infrastructure/Persistence/DealershipRlsPolicyTest.php
 
 		-
-			message: '#^Cannot call method fetchAll\(\) on PDOStatement\|false\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: tests/Infrastructure/Persistence/Schema/MigrationRunnerTest.php
-
-		-
-			message: '#^Cannot call method fetchColumn\(\) on PDOStatement\|false\.$#'
-			identifier: method.nonObject
-			count: 3
-			path: tests/Infrastructure/Persistence/Schema/MigrationRunnerTest.php
-
-		-
 			message: '#^Cannot access offset ''actor_id'' on mixed\.$#'
 			identifier: offsetAccess.nonOffsetAccessible
 			count: 1
@@ -509,6 +485,18 @@ parameters:
 			identifier: method.nonObject
 			count: 5
 			path: tests/Infrastructure/Persistence/RlsPolicyTest.php
+
+		-
+			message: '#^Cannot call method fetchAll\(\) on PDOStatement\|false\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: tests/Infrastructure/Persistence/Schema/MigrationRunnerTest.php
+
+		-
+			message: '#^Cannot call method fetchColumn\(\) on PDOStatement\|false\.$#'
+			identifier: method.nonObject
+			count: 3
+			path: tests/Infrastructure/Persistence/Schema/MigrationRunnerTest.php
 
 		-
 			message: '#^Cannot access offset ''password'' on mixed\.$#'

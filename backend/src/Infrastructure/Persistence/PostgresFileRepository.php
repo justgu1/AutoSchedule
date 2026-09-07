@@ -17,28 +17,24 @@ final readonly class PostgresFileRepository implements FileRepository
 
     public function findById(string $id): ?StoredFile
     {
-        $statement = $this->connection->pdo()->prepare('SELECT ' . self::COLUMNS . ' FROM files WHERE id = :id');
-        $statement->execute(['id' => $id]);
-
-        return $this->hydrateOne($statement);
+        return $this->hydrateOne(
+            $this->connection->execute('SELECT ' . self::COLUMNS . ' FROM files WHERE id = :id', ['id' => $id]),
+        );
     }
 
     public function findByPath(string $path): ?StoredFile
     {
-        $statement = $this->connection->pdo()->prepare('SELECT ' . self::COLUMNS . ' FROM files WHERE path = :path');
-        $statement->execute(['path' => $path]);
-
-        return $this->hydrateOne($statement);
+        return $this->hydrateOne(
+            $this->connection->execute('SELECT ' . self::COLUMNS . ' FROM files WHERE path = :path', ['path' => $path]),
+        );
     }
 
     public function insert(StoredFile $file): void
     {
-        $statement = $this->connection->pdo()->prepare(<<<'SQL'
+        $this->connection->execute(<<<'SQL'
             INSERT INTO files (id, path, original_name, mime_type, size_bytes, checksum, uploaded_by, created_at)
             VALUES (:id, :path, :original_name, :mime_type, :size_bytes, :checksum, :uploaded_by, :created_at)
-            SQL);
-
-        $statement->execute([
+            SQL, [
             'id' => $file->id,
             'path' => $file->path,
             'original_name' => $file->originalName,
@@ -52,8 +48,7 @@ final readonly class PostgresFileRepository implements FileRepository
 
     public function delete(string $id): void
     {
-        $statement = $this->connection->pdo()->prepare('DELETE FROM files WHERE id = :id');
-        $statement->execute(['id' => $id]);
+        $this->connection->execute('DELETE FROM files WHERE id = :id', ['id' => $id]);
     }
 
     private function hydrateOne(\PDOStatement $statement): ?StoredFile

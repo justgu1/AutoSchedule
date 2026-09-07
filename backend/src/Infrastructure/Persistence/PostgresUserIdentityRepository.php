@@ -16,10 +16,10 @@ final readonly class PostgresUserIdentityRepository implements UserIdentityRepos
 
     public function findByProvider(string $provider, string $providerUserId): ?UserIdentity
     {
-        $statement = $this->connection->pdo()->prepare(
+        $statement = $this->connection->execute(
             'SELECT id, user_id, provider, provider_user_id, email, created_at FROM user_identities WHERE provider = :provider AND provider_user_id = :provider_user_id',
+            ['provider' => $provider, 'provider_user_id' => $providerUserId],
         );
-        $statement->execute(['provider' => $provider, 'provider_user_id' => $providerUserId]);
         $row = $statement->fetch();
 
         return $row === false ? null : $this->fromRow(Row::from($row));
@@ -27,12 +27,10 @@ final readonly class PostgresUserIdentityRepository implements UserIdentityRepos
 
     public function insert(UserIdentity $identity): void
     {
-        $statement = $this->connection->pdo()->prepare(<<<'SQL'
+        $this->connection->execute(<<<'SQL'
             INSERT INTO user_identities (id, user_id, provider, provider_user_id, email)
             VALUES (:id, :user_id, :provider, :provider_user_id, :email)
-            SQL);
-
-        $statement->execute([
+            SQL, [
             'id' => $identity->id,
             'user_id' => $identity->userId,
             'provider' => $identity->provider,

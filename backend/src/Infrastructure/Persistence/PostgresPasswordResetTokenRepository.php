@@ -15,12 +15,10 @@ final readonly class PostgresPasswordResetTokenRepository implements PasswordRes
 
     public function insert(PasswordResetToken $token): void
     {
-        $statement = $this->connection->pdo()->prepare(<<<'SQL'
+        $this->connection->execute(<<<'SQL'
             INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at)
             VALUES (:id, :user_id, :token_hash, :expires_at)
-            SQL);
-
-        $statement->execute([
+            SQL, [
             'id' => $token->id,
             'user_id' => $token->userId,
             'token_hash' => $token->tokenHash,
@@ -30,10 +28,10 @@ final readonly class PostgresPasswordResetTokenRepository implements PasswordRes
 
     public function findByRawToken(string $rawToken): ?PasswordResetToken
     {
-        $statement = $this->connection->pdo()->prepare(
+        $statement = $this->connection->execute(
             'SELECT id, user_id, token_hash, expires_at, used_at FROM password_reset_tokens WHERE token_hash = :token_hash',
+            ['token_hash' => hash('sha256', $rawToken)],
         );
-        $statement->execute(['token_hash' => hash('sha256', $rawToken)]);
         $row = $statement->fetch();
 
         return $row === false ? null : $this->fromRow(Row::from($row));
@@ -41,17 +39,14 @@ final readonly class PostgresPasswordResetTokenRepository implements PasswordRes
 
     public function markUsed(string $id): void
     {
-        $statement = $this->connection->pdo()->prepare('UPDATE password_reset_tokens SET used_at = now() WHERE id = :id');
-        $statement->execute(['id' => $id]);
+        $this->connection->execute('UPDATE password_reset_tokens SET used_at = now() WHERE id = :id', ['id' => $id]);
     }
 
     public function invalidateAllForUser(string $userId): void
     {
-        $statement = $this->connection->pdo()->prepare(<<<'SQL'
+        $this->connection->execute(<<<'SQL'
             UPDATE password_reset_tokens SET used_at = now() WHERE user_id = :user_id AND used_at IS NULL
-            SQL);
-
-        $statement->execute(['user_id' => $userId]);
+            SQL, ['user_id' => $userId]);
     }
 
     private function fromRow(Row $row): PasswordResetToken

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Infrastructure\Persistence;
 
+use App\Domain\Exceptions\DomainErrorType;
+use App\Domain\Exceptions\DomainException;
 use App\Domain\Shared\Email;
 use App\Domain\Shared\Trashable;
 use App\Domain\Shared\TrashableStatus;
@@ -52,6 +54,20 @@ final class PostgresUserRepositoryTest extends TestCase
         $this->assertSame($user->id, $found->id);
         $this->assertSame('Ada Lovelace', $found->name);
         $this->assertSame(UserRole::Seller, $found->role);
+    }
+
+    /** Duas requisições cadastrando o mesmo e-mail passam juntas pelo `existsByEmail`: quem perde tem que receber 409, não 500. */
+    #[Test]
+    public function email_duplicado_vira_conflito_de_dominio_e_nao_erro_interno(): void
+    {
+        $this->repository->insert(User::register('Ada', new Email('ada@example.com'), null, 'secret', UserRole::Customer));
+
+        try {
+            $this->repository->insert(User::register('Outra Ada', new Email('ada@example.com'), null, 'secret', UserRole::Customer));
+            $this->fail('Expected a DomainException to be thrown.');
+        } catch (DomainException $exception) {
+            $this->assertSame(DomainErrorType::Conflict, $exception->type());
+        }
     }
 
     #[Test]

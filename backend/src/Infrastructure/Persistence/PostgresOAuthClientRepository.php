@@ -17,10 +17,10 @@ final readonly class PostgresOAuthClientRepository implements OAuthClientReposit
 
     public function findByClientId(string $clientId): ?OAuthClient
     {
-        $statement = $this->connection->pdo()->prepare(
+        $statement = $this->connection->execute(
             'SELECT id, client_id, name, type, secret_hash, allowed_grant_types, redirect_uris, allowed_scopes, created_at, updated_at FROM oauth_clients WHERE client_id = :client_id',
+            ['client_id' => $clientId],
         );
-        $statement->execute(['client_id' => $clientId]);
         $row = $statement->fetch();
 
         return $row === false ? null : $this->fromRow(Row::from($row));

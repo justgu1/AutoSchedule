@@ -23,23 +23,21 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
 
     public function findById(string $id): ?Dealership
     {
-        $statement = $this->connection->pdo()->prepare('SELECT ' . self::COLUMNS . ' FROM dealerships WHERE id = :id');
-        $statement->execute(['id' => $id]);
-
-        return $this->hydrateOne($statement);
+        return $this->hydrateOne(
+            $this->connection->execute('SELECT ' . self::COLUMNS . ' FROM dealerships WHERE id = :id', ['id' => $id]),
+        );
     }
 
     public function findBySlug(string $slug): ?Dealership
     {
-        $statement = $this->connection->pdo()->prepare('SELECT ' . self::COLUMNS . ' FROM dealerships WHERE slug = :slug');
-        $statement->execute(['slug' => $slug]);
-
-        return $this->hydrateOne($statement);
+        return $this->hydrateOne(
+            $this->connection->execute('SELECT ' . self::COLUMNS . ' FROM dealerships WHERE slug = :slug', ['slug' => $slug]),
+        );
     }
 
     public function insert(Dealership $dealership): void
     {
-        $statement = $this->connection->pdo()->prepare(<<<'SQL'
+        $this->connection->execute(<<<'SQL'
             INSERT INTO dealerships (
                 id, owner_user_id, name, slug, zip_code, address, number, complement, neighborhood, city, state,
                 phone, email, photo_file_id, status,
@@ -49,15 +47,16 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
                 :phone, :email, :photo_file_id, :status,
                 :trashed_by_owner_deactivation, :trashed_at, :anonymized_at, :created_at, :updated_at
             )
-            SQL);
-
-        $statement->execute($this->toParams($dealership));
+            SQL, $this->toParams($dealership));
     }
 
     /** `slug` normalmente não muda -- só a anonimização (`Dealership::anonymized()`) troca de verdade, o resto reenvia o mesmo valor. */
     public function update(Dealership $dealership): void
     {
-        $statement = $this->connection->pdo()->prepare(<<<'SQL'
+        $params = $this->toParams($dealership);
+        unset($params['created_at']);
+
+        $this->connection->execute(<<<'SQL'
             UPDATE dealerships SET
                 owner_user_id = :owner_user_id, name = :name, slug = :slug, zip_code = :zip_code, address = :address,
                 number = :number, complement = :complement, neighborhood = :neighborhood, city = :city, state = :state,
@@ -65,81 +64,63 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
                 status = :status, trashed_by_owner_deactivation = :trashed_by_owner_deactivation,
                 trashed_at = :trashed_at, anonymized_at = :anonymized_at, updated_at = :updated_at
             WHERE id = :id
-            SQL);
-
-        $params = $this->toParams($dealership);
-        unset($params['created_at']);
-        $statement->execute($params);
+            SQL, $params);
     }
 
     public function findByOwner(string $ownerUserId, int $limit, int $offset): array
     {
-        $statement = $this->connection->pdo()->prepare(
+        return $this->hydrateAll($this->connection->execute(
             'SELECT ' . self::COLUMNS . " FROM dealerships WHERE owner_user_id = :owner_user_id AND status <> 'deleted' ORDER BY created_at LIMIT :limit OFFSET :offset",
-        );
-        $statement->bindValue('owner_user_id', $ownerUserId);
-        $statement->bindValue('limit', $limit, \PDO::PARAM_INT);
-        $statement->bindValue('offset', $offset, \PDO::PARAM_INT);
-        $statement->execute();
-
-        return $this->hydrateAll($statement);
+            ['owner_user_id' => $ownerUserId, 'limit' => $limit, 'offset' => $offset],
+        ));
     }
 
     public function countByOwner(string $ownerUserId): int
     {
-        $statement = $this->connection->pdo()->prepare(
+        $statement = $this->connection->execute(
             "SELECT COUNT(*) FROM dealerships WHERE owner_user_id = :owner_user_id AND status <> 'deleted'",
+            ['owner_user_id' => $ownerUserId],
         );
-        $statement->execute(['owner_user_id' => $ownerUserId]);
 
         return (int) $statement->fetchColumn();
     }
 
     public function findPage(int $limit, int $offset): array
     {
-        $statement = $this->connection->pdo()->prepare(
+        return $this->hydrateAll($this->connection->execute(
             'SELECT ' . self::COLUMNS . " FROM dealerships WHERE status <> 'deleted' ORDER BY created_at LIMIT :limit OFFSET :offset",
-        );
-        $statement->bindValue('limit', $limit, \PDO::PARAM_INT);
-        $statement->bindValue('offset', $offset, \PDO::PARAM_INT);
-        $statement->execute();
-
-        return $this->hydrateAll($statement);
+            ['limit' => $limit, 'offset' => $offset],
+        ));
     }
 
     public function count(): int
     {
-        return (int) $this->connection->pdo()->query("SELECT COUNT(*) FROM dealerships WHERE status <> 'deleted'")->fetchColumn();
+        return (int) $this->connection->execute("SELECT COUNT(*) FROM dealerships WHERE status <> 'deleted'")->fetchColumn();
     }
 
     public function trash(string $id): void
     {
-        $statement = $this->connection->pdo()->prepare(<<<'SQL'
+        $this->connection->execute(<<<'SQL'
             UPDATE dealerships SET
                 status = 'trashed', trashed_at = now(), trashed_by_owner_deactivation = false, updated_at = now()
             WHERE id = :id
-            SQL);
-        $statement->execute(['id' => $id]);
+            SQL, ['id' => $id]);
     }
 
     public function restore(string $id): void
     {
-        $statement = $this->connection->pdo()->prepare(<<<'SQL'
+        $this->connection->execute(<<<'SQL'
             UPDATE dealerships SET
                 status = 'active', trashed_at = NULL, trashed_by_owner_deactivation = false, updated_at = now()
             WHERE id = :id
-            SQL);
-        $statement->execute(['id' => $id]);
+            SQL, ['id' => $id]);
     }
 
     public function findTrashed(): array
     {
-        $statement = $this->connection->pdo()->prepare(
-            'SELECT ' . self::COLUMNS . " FROM dealerships WHERE status = 'trashed' AND anonymized_at IS NULL",
+        return $this->hydrateAll(
+            $this->connection->execute('SELECT ' . self::COLUMNS . " FROM dealerships WHERE status = 'trashed' AND anonymized_at IS NULL"),
         );
-        $statement->execute();
-
-        return $this->hydrateAll($statement);
     }
 
     public function purge(Trashable $entity): void
@@ -151,22 +132,20 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
 
     public function trashAllOwnedBy(string $ownerUserId): void
     {
-        $statement = $this->connection->pdo()->prepare(<<<'SQL'
+        $this->connection->execute(<<<'SQL'
             UPDATE dealerships SET
                 status = 'trashed', trashed_at = now(), trashed_by_owner_deactivation = true, updated_at = now()
             WHERE owner_user_id = :owner_user_id AND status = 'active'
-            SQL);
-        $statement->execute(['owner_user_id' => $ownerUserId]);
+            SQL, ['owner_user_id' => $ownerUserId]);
     }
 
     public function restoreAutoTrashedOwnedBy(string $ownerUserId): void
     {
-        $statement = $this->connection->pdo()->prepare(<<<'SQL'
+        $this->connection->execute(<<<'SQL'
             UPDATE dealerships SET
                 status = 'active', trashed_at = NULL, trashed_by_owner_deactivation = false, updated_at = now()
             WHERE owner_user_id = :owner_user_id AND status = 'trashed' AND trashed_by_owner_deactivation = true
-            SQL);
-        $statement->execute(['owner_user_id' => $ownerUserId]);
+            SQL, ['owner_user_id' => $ownerUserId]);
     }
 
     private function hydrateOne(\PDOStatement $statement): ?Dealership
@@ -212,7 +191,7 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
         );
     }
 
-    /** @return array<string, mixed> */
+    /** @return array<string, string|bool|null> */
     private function toParams(Dealership $dealership): array
     {
         return [
@@ -231,7 +210,7 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
             'email' => $dealership->email?->value,
             'photo_file_id' => $dealership->photoFileId,
             'status' => $dealership->trash->status->value,
-            'trashed_by_owner_deactivation' => $dealership->trashedByOwnerDeactivation ? 't' : 'f',
+            'trashed_by_owner_deactivation' => $dealership->trashedByOwnerDeactivation,
             'trashed_at' => $dealership->trash->trashedAt?->format(DATE_ATOM),
             'anonymized_at' => $dealership->trash->anonymizedAt?->format(DATE_ATOM),
             'created_at' => $dealership->createdAt->format(DATE_ATOM),

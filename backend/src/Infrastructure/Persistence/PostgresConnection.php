@@ -18,6 +18,12 @@ final class PostgresConnection implements DatabaseConnection
     ) {
     }
 
+    /** @param array<string, string|int|bool|null> $params */
+    public function execute(string $sql, array $params = []): \PDOStatement
+    {
+        return Statement::execute($this->pdo(), $sql, $params);
+    }
+
     public function pdo(): \PDO
     {
         return $this->pdo ??= new \PDO(

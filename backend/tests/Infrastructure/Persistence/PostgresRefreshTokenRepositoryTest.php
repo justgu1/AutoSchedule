@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Infrastructure\Persistence;
 
 use App\Domain\Auth\RefreshToken;
-use App\Domain\Exceptions\DomainException;
+use App\Domain\Auth\RefreshTokenAlreadyRotated;
 use App\Infrastructure\Persistence\PostgresRefreshTokenRepository;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
@@ -80,7 +80,7 @@ final class PostgresRefreshTokenRepositoryTest extends TestCase
 
         [, $anotherNext] = $token->rotate(1_209_600);
 
-        $this->expectException(DomainException::class);
+        $this->expectException(RefreshTokenAlreadyRotated::class);
         $this->repository->rotate($token, $anotherNext);
     }
 

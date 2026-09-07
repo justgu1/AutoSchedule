@@ -20,12 +20,10 @@ final readonly class PostgresAuditLogger implements AuditLogger
     public function record(AuditEvent $event, ?string $actorId, string $auditableType, ?string $auditableId, array $context, ?string $ipAddress, ?string $userAgent): void
     {
         try {
-            $statement = $this->connection->pdo()->prepare(<<<'SQL'
+            $this->connection->execute(<<<'SQL'
                 INSERT INTO audit_logs (actor_id, user_id, event, auditable_type, auditable_id, new_values, ip_address, user_agent)
                 VALUES (:actor_id, :user_id, :event, :auditable_type, :auditable_id, :new_values, :ip_address, :user_agent)
-                SQL);
-
-            $statement->execute([
+                SQL, [
                 'actor_id' => $actorId,
                 // `user_id` tem FK pra `users` -- só preenche quando a entidade afetada de fato é um usuário.
                 'user_id' => $auditableType === 'User' ? $auditableId : null,
