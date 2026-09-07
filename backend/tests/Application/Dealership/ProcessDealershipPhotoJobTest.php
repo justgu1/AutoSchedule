@@ -15,7 +15,9 @@ use App\Domain\File\Ports\FileRepository;
 use App\Domain\File\Ports\ImageOptimizer;
 use App\Domain\File\Ports\StorageProvider;
 use App\Domain\File\StoredFile;
+use App\Domain\Shared\Address;
 use App\Domain\Shared\Trashable;
+use App\Domain\Shared\Uf;
 use App\Infrastructure\File\LocalTempFileStore;
 use App\Infrastructure\Jobs\JobStatusStore;
 use App\Infrastructure\Redis\RedisConnection;
@@ -167,13 +169,7 @@ final class ProcessDealershipPhotoJobTest extends TestCase
         return Dealership::register(
             ownerUserId: 'owner-1',
             name: 'Auto Center',
-            zipCode: '01000-000',
-            address: 'Rua Antiga',
-            number: '10',
-            complement: null,
-            neighborhood: 'Bairro',
-            city: 'Cidade',
-            state: 'SP',
+            address: new Address('01000-000', 'Rua Antiga', '10', null, 'Bairro', 'Cidade', Uf::SP),
             phone: '11988888888',
         );
     }

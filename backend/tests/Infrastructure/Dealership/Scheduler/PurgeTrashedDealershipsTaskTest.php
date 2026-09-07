@@ -6,7 +6,9 @@ namespace Tests\Infrastructure\Dealership\Scheduler;
 
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Dealership\Dealership;
+use App\Domain\Shared\Address;
 use App\Domain\Shared\TrashableStatus;
+use App\Domain\Shared\Uf;
 use App\Infrastructure\Dealership\PostgresDealershipRepository;
 use App\Infrastructure\Scheduler\PurgeTrashedEntitiesTask;
 use PHPUnit\Framework\Attributes\Group;
@@ -100,13 +102,7 @@ final class PurgeTrashedDealershipsTaskTest extends TestCase
         return Dealership::register(
             ownerUserId: $ownerUserId,
             name: $name,
-            zipCode: '01000-000',
-            address: 'Rua Antiga',
-            number: '10',
-            complement: null,
-            neighborhood: 'Bairro',
-            city: 'Cidade',
-            state: 'SP',
+            address: new Address('01000-000', 'Rua Antiga', '10', null, 'Bairro', 'Cidade', Uf::SP),
             phone: '11988888888',
         );
     }

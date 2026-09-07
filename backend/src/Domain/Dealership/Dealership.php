@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Dealership;
 
+use App\Domain\Shared\Address;
 use App\Domain\Shared\Trashable;
 use App\Domain\Shared\TrashState;
 use App\Domain\Shared\Uuid;
@@ -15,16 +16,7 @@ final readonly class Dealership implements Trashable
         public string $ownerUserId,
         public string $name,
         public string $slug,
-        public string $zipCode,
-        public string $address,
-        public string $number,
-        public ?string $complement,
-        public string $neighborhood,
-        public string $city,
-        public string $state,
-        public ?float $latitude,
-        public ?float $longitude,
-        public ?string $googlePlaceId,
+        public Address $address,
         public ?string $phone,
         public ?string $email,
         public ?string $photoFileId,
@@ -38,18 +30,9 @@ final readonly class Dealership implements Trashable
     public static function register(
         string $ownerUserId,
         string $name,
-        string $zipCode,
-        string $address,
-        string $number,
-        ?string $complement,
-        string $neighborhood,
-        string $city,
-        string $state,
+        Address $address,
         ?string $phone,
         ?string $email = null,
-        ?float $latitude = null,
-        ?float $longitude = null,
-        ?string $googlePlaceId = null,
     ): self {
         $now = new \DateTimeImmutable();
         $id = Uuid::v7();
@@ -59,16 +42,7 @@ final readonly class Dealership implements Trashable
             ownerUserId: $ownerUserId,
             name: $name,
             slug: self::buildSlug($name, $id),
-            zipCode: $zipCode,
             address: $address,
-            number: $number,
-            complement: $complement,
-            neighborhood: $neighborhood,
-            city: $city,
-            state: $state,
-            latitude: $latitude,
-            longitude: $longitude,
-            googlePlaceId: $googlePlaceId,
             phone: $phone,
             email: $email,
             photoFileId: null,
@@ -79,35 +53,13 @@ final readonly class Dealership implements Trashable
         );
     }
 
-    public function withProfile(
-        string $name,
-        string $zipCode,
-        string $address,
-        string $number,
-        ?string $complement,
-        string $neighborhood,
-        string $city,
-        string $state,
-        ?string $phone,
-        ?string $email,
-        ?float $latitude,
-        ?float $longitude,
-        ?string $googlePlaceId,
-    ): self {
+    public function withProfile(string $name, Address $address, ?string $phone, ?string $email): self
+    {
         return clone($this, [
             'name' => $name,
-            'zipCode' => $zipCode,
             'address' => $address,
-            'number' => $number,
-            'complement' => $complement,
-            'neighborhood' => $neighborhood,
-            'city' => $city,
-            'state' => $state,
             'phone' => $phone,
             'email' => $email,
-            'latitude' => $latitude,
-            'longitude' => $longitude,
-            'googlePlaceId' => $googlePlaceId,
             'updatedAt' => new \DateTimeImmutable(),
         ]);
     }
@@ -133,10 +85,7 @@ final readonly class Dealership implements Trashable
         return clone($this, [
             'name' => 'Concessionária removida',
             'slug' => self::buildSlug('concessionaria removida', $this->id),
-            'address' => '',
-            'number' => '',
-            'complement' => null,
-            'googlePlaceId' => null,
+            'address' => $this->address->withoutStreetLevelDetail(),
             'phone' => null,
             'email' => null,
             'photoFileId' => null,

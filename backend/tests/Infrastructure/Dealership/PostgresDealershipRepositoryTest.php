@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Tests\Infrastructure\Dealership;
 
 use App\Domain\Dealership\Dealership;
+use App\Domain\Shared\Address;
 use App\Domain\Shared\Trashable;
 use App\Domain\Shared\TrashableStatus;
+use App\Domain\Shared\Uf;
 use App\Infrastructure\Dealership\PostgresDealershipRepository;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
@@ -77,18 +79,9 @@ final class PostgresDealershipRepositoryTest extends TestCase
 
         $updated = $dealership->withProfile(
             name: 'Novo Nome',
-            zipCode: $dealership->zipCode,
             address: $dealership->address,
-            number: $dealership->number,
-            complement: $dealership->complement,
-            neighborhood: $dealership->neighborhood,
-            city: $dealership->city,
-            state: $dealership->state,
             phone: $dealership->phone,
             email: $dealership->email,
-            latitude: $dealership->latitude,
-            longitude: $dealership->longitude,
-            googlePlaceId: $dealership->googlePlaceId,
         );
         $this->repository->update($updated);
 
@@ -270,13 +263,7 @@ final class PostgresDealershipRepositoryTest extends TestCase
         return Dealership::register(
             ownerUserId: $ownerUserId,
             name: $name,
-            zipCode: '01000-000',
-            address: 'Rua Antiga',
-            number: '10',
-            complement: null,
-            neighborhood: 'Bairro',
-            city: 'Cidade',
-            state: 'SP',
+            address: new Address('01000-000', 'Rua Antiga', '10', null, 'Bairro', 'Cidade', Uf::SP),
             phone: '11988888888',
         );
     }

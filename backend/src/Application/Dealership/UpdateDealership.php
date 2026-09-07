@@ -6,6 +6,7 @@ namespace App\Application\Dealership;
 
 use App\Application\Dealership\DTO\DealershipProfile;
 use App\Application\Shared\ActorContext;
+use App\Application\Shared\AddressFields;
 use App\Application\Shared\ValidatedInput;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
@@ -29,18 +30,9 @@ final readonly class UpdateDealership
 
         $updated = $dealership->withProfile(
             name: $changes->stringOr('name', $dealership->name),
-            zipCode: $changes->stringOr('zip_code', $dealership->zipCode),
-            address: $changes->stringOr('address', $dealership->address),
-            number: $changes->stringOr('number', $dealership->number),
-            complement: $changes->stringOrNull('complement') ?? $dealership->complement,
-            neighborhood: $changes->stringOr('neighborhood', $dealership->neighborhood),
-            city: $changes->stringOr('city', $dealership->city),
-            state: $changes->stringOr('state', $dealership->state),
+            address: AddressFields::from($changes, $dealership->address),
             phone: $changes->stringOrNull('phone') ?? $dealership->phone,
             email: $changes->stringOrNull('email') ?? $dealership->email,
-            latitude: $dealership->latitude,
-            longitude: $dealership->longitude,
-            googlePlaceId: $dealership->googlePlaceId,
         );
 
         if ($changes->has('owner_user_id') && $changes->string('owner_user_id') !== $previousOwnerUserId) {

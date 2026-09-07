@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Tests\Domain\Dealership;
 
 use App\Domain\Dealership\Dealership;
+use App\Domain\Shared\Address;
 use App\Domain\Shared\TrashableStatus;
 use App\Domain\Shared\TrashState;
+use App\Domain\Shared\Uf;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -26,20 +28,14 @@ final class DealershipTest extends TestCase
         $this->assertNull($dealership->trash->anonymizedAt);
     }
 
-    /** Slug é URL amigável (`/concessionarias/{slug}`), nunca o id -- formato: nome normalizado + 6 caracteres do próprio id, sempre único por natureza. */
+    /** Slug é URL amigável, nunca o id -- formato: nome normalizado + 6 caracteres do próprio id, sempre único por natureza. */
     #[Test]
     public function register_gera_um_slug_a_partir_do_nome_sem_expor_o_id_inteiro(): void
     {
         $dealership = Dealership::register(
             ownerUserId: 'owner-1',
             name: 'Auto Center Prime!',
-            zipCode: '01000-000',
-            address: 'Rua Antiga',
-            number: '10',
-            complement: null,
-            neighborhood: 'Bairro',
-            city: 'Cidade',
-            state: 'SP',
+            address: $this->addressFixture(),
             phone: null,
         );
 
@@ -54,21 +50,14 @@ final class DealershipTest extends TestCase
 
         $updated = $dealership->withProfile(
             name: 'Novo Nome',
-            zipCode: '99999-999',
-            address: 'Rua Nova',
-            number: '42',
-            complement: 'Fundos',
-            neighborhood: 'Centro',
-            city: 'Nova Cidade',
-            state: 'SP',
+            address: new Address('99999-999', 'Rua Nova', '42', 'Fundos', 'Centro', 'Nova Cidade', Uf::RJ),
             phone: '11999999999',
             email: 'novo@example.com',
-            latitude: null,
-            longitude: null,
-            googlePlaceId: null,
         );
 
         $this->assertSame('Novo Nome', $updated->name);
+        $this->assertSame('Rua Nova', $updated->address->street);
+        $this->assertSame(Uf::RJ, $updated->address->state);
         $this->assertSame($dealership->id, $updated->id);
         $this->assertSame($dealership->ownerUserId, $updated->ownerUserId);
         $this->assertSame($dealership->trash->status, $updated->trash->status);
@@ -130,7 +119,7 @@ final class DealershipTest extends TestCase
     }
 
     #[Test]
-    public function anonymized_escruba_identificador_direto_mas_preserva_geolocalizacao(): void
+    public function anonymized_escruba_identificador_direto_mas_preserva_localidade_agregada(): void
     {
         $dealership = $this->registerFixture()->withPhoto('file-1');
 
@@ -140,18 +129,22 @@ final class DealershipTest extends TestCase
         $this->assertSame($dealership->ownerUserId, $anonymized->ownerUserId);
         $this->assertNotSame('Auto Center', $anonymized->name);
         $this->assertNotSame($dealership->slug, $anonymized->slug);
-        $this->assertSame('', $anonymized->address);
-        $this->assertSame('', $anonymized->number);
-        $this->assertNull($anonymized->complement);
+        $this->assertSame('', $anonymized->address->street);
+        $this->assertSame('', $anonymized->address->number);
+        $this->assertNull($anonymized->address->complement);
         $this->assertNull($anonymized->phone);
         $this->assertNull($anonymized->email);
-        $this->assertNull($anonymized->googlePlaceId);
-        $this->assertSame($dealership->zipCode, $anonymized->zipCode);
-        $this->assertSame($dealership->city, $anonymized->city);
-        $this->assertSame($dealership->state, $anonymized->state);
+        $this->assertSame($dealership->address->zipCode, $anonymized->address->zipCode);
+        $this->assertSame($dealership->address->city, $anonymized->address->city);
+        $this->assertSame($dealership->address->state, $anonymized->address->state);
         $this->assertSame(TrashableStatus::Deleted, $anonymized->trash->status);
         $this->assertNotNull($anonymized->trash->anonymizedAt);
         $this->assertNull($anonymized->photoFileId);
+    }
+
+    private function addressFixture(): Address
+    {
+        return new Address('01000-000', 'Rua Antiga', '10', null, 'Bairro', 'Cidade', Uf::SP);
     }
 
     private function registerFixture(): Dealership
@@ -159,13 +152,7 @@ final class DealershipTest extends TestCase
         return Dealership::register(
             ownerUserId: 'owner-1',
             name: 'Auto Center',
-            zipCode: '01000-000',
-            address: 'Rua Antiga',
-            number: '10',
-            complement: null,
-            neighborhood: 'Bairro',
-            city: 'Cidade',
-            state: 'SP',
+            address: $this->addressFixture(),
             phone: '11988888888',
         );
     }
@@ -179,16 +166,7 @@ final class DealershipTest extends TestCase
             ownerUserId: $dealership->ownerUserId,
             name: $dealership->name,
             slug: $dealership->slug,
-            zipCode: $dealership->zipCode,
             address: $dealership->address,
-            number: $dealership->number,
-            complement: $dealership->complement,
-            neighborhood: $dealership->neighborhood,
-            city: $dealership->city,
-            state: $dealership->state,
-            latitude: $dealership->latitude,
-            longitude: $dealership->longitude,
-            googlePlaceId: $dealership->googlePlaceId,
             phone: $dealership->phone,
             email: $dealership->email,
             photoFileId: $dealership->photoFileId,

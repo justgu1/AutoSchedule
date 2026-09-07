@@ -295,12 +295,6 @@ parameters:
 			path: src/Infrastructure/Dealership/PostgresDealershipRepository.php
 
 		-
-			message: '#^Cannot cast mixed to float\.$#'
-			identifier: cast.double
-			count: 2
-			path: src/Infrastructure/Dealership/PostgresDealershipRepository.php
-
-		-
 			message: '#^Parameter \#1 \$callback of function array_map expects \(callable\(mixed\)\: mixed\)\|null, Closure\(array\<string, mixed\>\)\: App\\Domain\\Dealership\\Dealership given\.$#'
 			identifier: argument.type
 			count: 3
@@ -331,31 +325,49 @@ parameters:
 			path: src/Infrastructure/Dealership/PostgresDealershipRepository.php
 
 		-
-			message: '#^Parameter \$address of class App\\Domain\\Dealership\\Dealership constructor expects string, mixed given\.$#'
+			message: '#^Parameter \$zipCode of class App\\Domain\\Shared\\Address constructor expects string, mixed given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Infrastructure/Dealership/PostgresDealershipRepository.php
 
 		-
-			message: '#^Parameter \$city of class App\\Domain\\Dealership\\Dealership constructor expects string, mixed given\.$#'
+			message: '#^Parameter \$street of class App\\Domain\\Shared\\Address constructor expects string, mixed given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Infrastructure/Dealership/PostgresDealershipRepository.php
 
 		-
-			message: '#^Parameter \$complement of class App\\Domain\\Dealership\\Dealership constructor expects string\|null, mixed given\.$#'
+			message: '#^Parameter \$number of class App\\Domain\\Shared\\Address constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealership/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \$complement of class App\\Domain\\Shared\\Address constructor expects string\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealership/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \$neighborhood of class App\\Domain\\Shared\\Address constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealership/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \$city of class App\\Domain\\Shared\\Address constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealership/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \#1 \$value of static method App\\Domain\\Shared\\Uf\:\:from\(\) expects int\|string, mixed given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Infrastructure/Dealership/PostgresDealershipRepository.php
 
 		-
 			message: '#^Parameter \$email of class App\\Domain\\Dealership\\Dealership constructor expects string\|null, mixed given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Infrastructure/Dealership/PostgresDealershipRepository.php
-
-		-
-			message: '#^Parameter \$googlePlaceId of class App\\Domain\\Dealership\\Dealership constructor expects string\|null, mixed given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Infrastructure/Dealership/PostgresDealershipRepository.php
@@ -368,18 +380,6 @@ parameters:
 
 		-
 			message: '#^Parameter \$name of class App\\Domain\\Dealership\\Dealership constructor expects string, mixed given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Infrastructure/Dealership/PostgresDealershipRepository.php
-
-		-
-			message: '#^Parameter \$neighborhood of class App\\Domain\\Dealership\\Dealership constructor expects string, mixed given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Infrastructure/Dealership/PostgresDealershipRepository.php
-
-		-
-			message: '#^Parameter \$number of class App\\Domain\\Dealership\\Dealership constructor expects string, mixed given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Infrastructure/Dealership/PostgresDealershipRepository.php
@@ -404,18 +404,6 @@ parameters:
 
 		-
 			message: '#^Parameter \$slug of class App\\Domain\\Dealership\\Dealership constructor expects string, mixed given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Infrastructure/Dealership/PostgresDealershipRepository.php
-
-		-
-			message: '#^Parameter \$state of class App\\Domain\\Dealership\\Dealership constructor expects string, mixed given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Infrastructure/Dealership/PostgresDealershipRepository.php
-
-		-
-			message: '#^Parameter \$zipCode of class App\\Domain\\Dealership\\Dealership constructor expects string, mixed given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Infrastructure/Dealership/PostgresDealershipRepository.php

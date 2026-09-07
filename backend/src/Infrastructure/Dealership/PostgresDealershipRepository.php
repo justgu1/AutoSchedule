@@ -6,9 +6,11 @@ namespace App\Infrastructure\Dealership;
 
 use App\Domain\Dealership\Dealership;
 use App\Domain\Dealership\Ports\DealershipRepository;
+use App\Domain\Shared\Address;
 use App\Domain\Shared\Trashable;
 use App\Domain\Shared\TrashableStatus;
 use App\Domain\Shared\TrashState;
+use App\Domain\Shared\Uf;
 use App\Infrastructure\Database\DatabaseConnection;
 
 final readonly class PostgresDealershipRepository implements DealershipRepository
@@ -40,11 +42,11 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
         $statement = $this->connection->pdo()->prepare(<<<'SQL'
             INSERT INTO dealerships (
                 id, owner_user_id, name, slug, zip_code, address, number, complement, neighborhood, city, state,
-                latitude, longitude, google_place_id, phone, email, photo_file_id, status,
+                phone, email, photo_file_id, status,
                 trashed_by_owner_deactivation, trashed_at, anonymized_at, created_at, updated_at
             ) VALUES (
                 :id, :owner_user_id, :name, :slug, :zip_code, :address, :number, :complement, :neighborhood, :city, :state,
-                :latitude, :longitude, :google_place_id, :phone, :email, :photo_file_id, :status,
+                :phone, :email, :photo_file_id, :status,
                 :trashed_by_owner_deactivation, :trashed_at, :anonymized_at, :created_at, :updated_at
             )
             SQL);
@@ -59,8 +61,7 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
             UPDATE dealerships SET
                 owner_user_id = :owner_user_id, name = :name, slug = :slug, zip_code = :zip_code, address = :address,
                 number = :number, complement = :complement, neighborhood = :neighborhood, city = :city, state = :state,
-                latitude = :latitude, longitude = :longitude, google_place_id = :google_place_id, phone = :phone, email = :email,
-                photo_file_id = :photo_file_id,
+                phone = :phone, email = :email, photo_file_id = :photo_file_id,
                 status = :status, trashed_by_owner_deactivation = :trashed_by_owner_deactivation,
                 trashed_at = :trashed_at, anonymized_at = :anonymized_at, updated_at = :updated_at
             WHERE id = :id
@@ -174,16 +175,15 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
             ownerUserId: $row['owner_user_id'],
             name: $row['name'],
             slug: $row['slug'],
-            zipCode: $row['zip_code'],
-            address: $row['address'],
-            number: $row['number'],
-            complement: $row['complement'],
-            neighborhood: $row['neighborhood'],
-            city: $row['city'],
-            state: $row['state'],
-            latitude: $row['latitude'] !== null ? (float) $row['latitude'] : null,
-            longitude: $row['longitude'] !== null ? (float) $row['longitude'] : null,
-            googlePlaceId: $row['google_place_id'],
+            address: new Address(
+                zipCode: $row['zip_code'],
+                street: $row['address'],
+                number: $row['number'],
+                complement: $row['complement'],
+                neighborhood: $row['neighborhood'],
+                city: $row['city'],
+                state: Uf::from($row['state']),
+            ),
             phone: $row['phone'],
             email: $row['email'],
             photoFileId: $row['photo_file_id'],
@@ -211,16 +211,13 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
             'owner_user_id' => $dealership->ownerUserId,
             'name' => $dealership->name,
             'slug' => $dealership->slug,
-            'zip_code' => $dealership->zipCode,
-            'address' => $dealership->address,
-            'number' => $dealership->number,
-            'complement' => $dealership->complement,
-            'neighborhood' => $dealership->neighborhood,
-            'city' => $dealership->city,
-            'state' => $dealership->state,
-            'latitude' => $dealership->latitude,
-            'longitude' => $dealership->longitude,
-            'google_place_id' => $dealership->googlePlaceId,
+            'zip_code' => $dealership->address->zipCode,
+            'address' => $dealership->address->street,
+            'number' => $dealership->address->number,
+            'complement' => $dealership->address->complement,
+            'neighborhood' => $dealership->address->neighborhood,
+            'city' => $dealership->address->city,
+            'state' => $dealership->address->state->value,
             'phone' => $dealership->phone,
             'email' => $dealership->email,
             'photo_file_id' => $dealership->photoFileId,

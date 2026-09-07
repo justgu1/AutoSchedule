@@ -71,7 +71,7 @@ final readonly class DealershipController
             'complement' => 'max:120',
             'neighborhood' => 'required|max:120',
             'city' => 'required|max:120',
-            'state' => 'required|max:2',
+            'state' => 'required|uf',
             'phone' => 'max:20',
             'email' => 'max:190|email',
         ];
@@ -97,7 +97,7 @@ final readonly class DealershipController
             'complement' => 'max:120',
             'neighborhood' => 'max:120',
             'city' => 'max:120',
-            'state' => 'max:2',
+            'state' => 'uf',
             'phone' => 'max:20',
             'email' => 'max:190|email',
         ];

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Application\Dealership\DTO;
 
+use App\Application\Shared\AddressFields;
 use App\Domain\Dealership\Dealership;
+use App\Domain\Shared\Address;
 
 /**
  * Deliberadamente mais enxuto que `DealershipProfile`: sem `id`/`owner_user_id`/`status`, e `slug` no lugar do id.
@@ -15,13 +17,7 @@ final readonly class PublicDealershipProfile
     public function __construct(
         public string $slug,
         public string $name,
-        public string $zipCode,
-        public string $address,
-        public string $number,
-        public ?string $complement,
-        public string $neighborhood,
-        public string $city,
-        public string $state,
+        public Address $address,
         public ?string $phone,
         public ?string $email,
         public ?string $photoUrl,
@@ -35,13 +31,7 @@ final readonly class PublicDealershipProfile
         return new self(
             slug: $dealership->slug,
             name: $dealership->name,
-            zipCode: $dealership->zipCode,
             address: $dealership->address,
-            number: $dealership->number,
-            complement: $dealership->complement,
-            neighborhood: $dealership->neighborhood,
-            city: $dealership->city,
-            state: $dealership->state,
             phone: $dealership->phone,
             email: $dealership->email,
             photoUrl: $photoUrl,
@@ -55,13 +45,7 @@ final readonly class PublicDealershipProfile
         return [
             'slug' => $this->slug,
             'name' => $this->name,
-            'zip_code' => $this->zipCode,
-            'address' => $this->address,
-            'number' => $this->number,
-            'complement' => $this->complement,
-            'neighborhood' => $this->neighborhood,
-            'city' => $this->city,
-            'state' => $this->state,
+            ...AddressFields::toArray($this->address),
             'phone' => $this->phone,
             'email' => $this->email,
             'photo_url' => $this->photoUrl,

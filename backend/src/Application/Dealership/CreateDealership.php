@@ -6,6 +6,7 @@ namespace App\Application\Dealership;
 
 use App\Application\Dealership\DTO\DealershipProfile;
 use App\Application\Shared\ActorContext;
+use App\Application\Shared\AddressFields;
 use App\Application\Shared\ValidatedInput;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
@@ -35,13 +36,7 @@ final readonly class CreateDealership
         $dealership = Dealership::register(
             ownerUserId: $ownerUserId,
             name: $data->string('name'),
-            zipCode: $data->string('zip_code'),
-            address: $data->string('address'),
-            number: $data->string('number'),
-            complement: $data->stringOrNull('complement'),
-            neighborhood: $data->string('neighborhood'),
-            city: $data->string('city'),
-            state: $data->string('state'),
+            address: AddressFields::from($data),
             phone: $data->stringOrNull('phone'),
             email: $data->stringOrNull('email'),
         );

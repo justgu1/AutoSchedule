@@ -7,6 +7,7 @@ namespace App\Infrastructure\Validation;
 use App\Application\Shared\ValidatedInput;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
+use App\Domain\Shared\Uf;
 
 final class Validator
 {
@@ -67,6 +68,8 @@ final class Validator
             'required' => $value !== null && $value !== '',
             'email' => is_string($value) && filter_var($value, FILTER_VALIDATE_EMAIL) !== false,
             'uuid' => is_string($value) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $value) === 1,
+            // Barra aqui o que `Uf::from()` transformaria em ValueError -- 500 no lugar de 422.
+            'uf' => is_string($value) && Uf::tryFrom($value) instanceof Uf,
             'min' => self::size($value) >= (float) $parameter,
             'max' => self::size($value) <= (float) $parameter,
             'in' => in_array((string) $value, explode(',', (string) $parameter), true),
@@ -85,6 +88,7 @@ final class Validator
             'required' => "The {$field} field is required.",
             'email' => "The {$field} field must be a valid email address.",
             'uuid' => "The {$field} field must be a valid UUID.",
+            'uf' => "The {$field} field must be a valid Brazilian state code.",
             'min' => "The {$field} field must be at least {$parameter}.",
             'max' => "The {$field} field must be at most {$parameter}.",
             'in' => "The {$field} field must be one of: {$parameter}.",
