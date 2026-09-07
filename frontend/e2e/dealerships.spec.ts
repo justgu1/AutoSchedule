@@ -87,6 +87,9 @@ async function registerSeller(page: Page, name: string): Promise<void> {
 }
 
 test('seller cria, edita, envia foto, move pra lixeira e restaura a própria concessionária', async ({ page }) => {
+    // Foto passa pela fila real (worker + Redis + GD) -- folga sobre os 30s padrão pro CI, mais lento que local.
+    test.setTimeout(60_000);
+
     await registerSeller(page, 'Seller Dealershiptest');
 
     await page.getByRole('link', { name: 'Concessionárias' }).click();
@@ -127,7 +130,7 @@ test('seller cria, edita, envia foto, move pra lixeira e restaura a própria con
     await page
         .locator('input[type="file"]')
         .setInputFiles({ name: 'foto.png', mimeType: 'image/png', buffer: TINY_PNG });
-    await expect(page.getByText('Concluído.')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Concluído.')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole('button', { name: 'Remover' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Trocar foto' })).toBeVisible();
     await page.getByRole('button', { name: 'Fechar' }).click();
