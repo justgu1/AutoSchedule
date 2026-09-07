@@ -35,11 +35,13 @@ final readonly class PostgresRefreshTokenRepository implements RefreshTokenRepos
 
     public function findByRawToken(string $rawToken): ?RefreshToken
     {
-        $statement = $this->connection->pdo()->prepare('SELECT * FROM oauth_refresh_tokens WHERE token_hash = :token_hash');
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT id, token_hash, family_id, client_id, user_id, scopes, expires_at, revoked_at, replaced_by_id FROM oauth_refresh_tokens WHERE token_hash = :token_hash',
+        );
         $statement->execute(['token_hash' => hash('sha256', $rawToken)]);
         $row = $statement->fetch();
 
-        return $row === false ? null : $this->fromRow($row);
+        return $row === false ? null : $this->fromRow(Row::from($row));
     }
 
     public function rotate(RefreshToken $current, RefreshToken $next): void
@@ -81,19 +83,18 @@ final readonly class PostgresRefreshTokenRepository implements RefreshTokenRepos
         $statement->execute(['user_id' => $userId]);
     }
 
-    /** @param array<string, mixed> $row */
-    private function fromRow(array $row): RefreshToken
+    private function fromRow(Row $row): RefreshToken
     {
         return new RefreshToken(
-            id: $row['id'],
-            tokenHash: $row['token_hash'],
-            familyId: $row['family_id'],
-            oauthClientId: $row['client_id'],
-            userId: $row['user_id'],
-            scopes: PostgresArray::fromText($row['scopes']),
-            expiresAt: new \DateTimeImmutable($row['expires_at']),
-            revokedAt: $row['revoked_at'] !== null ? new \DateTimeImmutable($row['revoked_at']) : null,
-            replacedById: $row['replaced_by_id'],
+            id: $row->string('id'),
+            tokenHash: $row->string('token_hash'),
+            familyId: $row->string('family_id'),
+            oauthClientId: $row->string('client_id'),
+            userId: $row->nullableString('user_id'),
+            scopes: $row->stringList('scopes'),
+            expiresAt: $row->dateTime('expires_at'),
+            revokedAt: $row->nullableDateTime('revoked_at'),
+            replacedById: $row->nullableString('replaced_by_id'),
         );
     }
 }

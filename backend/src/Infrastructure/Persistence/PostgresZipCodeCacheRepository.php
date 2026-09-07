@@ -19,19 +19,18 @@ final readonly class PostgresZipCodeCacheRepository implements ZipCodeCacheRepos
             'SELECT street, neighborhood, city, state FROM zip_code_cache WHERE zip_code = ?',
         );
         $statement->execute([$zipCode]);
-        $row = $statement->fetch(\PDO::FETCH_ASSOC);
+        $row = $statement->fetch();
 
-        return $row === false ? null : $this->fromRow($row);
+        return $row === false ? null : $this->fromRow(Row::from($row));
     }
 
-    /** @param array<string, mixed> $row */
-    private function fromRow(array $row): ZipCodeAddress
+    private function fromRow(Row $row): ZipCodeAddress
     {
         return new ZipCodeAddress(
-            street: $row['street'],
-            neighborhood: $row['neighborhood'],
-            city: $row['city'],
-            state: $row['state'],
+            street: $row->string('street'),
+            neighborhood: $row->string('neighborhood'),
+            city: $row->string('city'),
+            state: $row->string('state'),
         );
     }
 

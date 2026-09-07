@@ -28,8 +28,7 @@ interface DealershipRepository extends TrashableRepository
 
     public function count(): int;
 
-    /** Move pra lixeira -- `byOwnerDeactivation` marca se foi cascata da desativação do dono (restore seletivo depois). */
-    public function trash(string $id, bool $byOwnerDeactivation): void;
+    public function trash(string $id): void;
 
     public function restore(string $id): void;
 

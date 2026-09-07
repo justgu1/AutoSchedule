@@ -17,12 +17,12 @@ final readonly class PostgresUserIdentityRepository implements UserIdentityRepos
     public function findByProvider(string $provider, string $providerUserId): ?UserIdentity
     {
         $statement = $this->connection->pdo()->prepare(
-            'SELECT * FROM user_identities WHERE provider = :provider AND provider_user_id = :provider_user_id',
+            'SELECT id, user_id, provider, provider_user_id, email, created_at FROM user_identities WHERE provider = :provider AND provider_user_id = :provider_user_id',
         );
         $statement->execute(['provider' => $provider, 'provider_user_id' => $providerUserId]);
         $row = $statement->fetch();
 
-        return $row === false ? null : $this->fromRow($row);
+        return $row === false ? null : $this->fromRow(Row::from($row));
     }
 
     public function insert(UserIdentity $identity): void
@@ -41,16 +41,15 @@ final readonly class PostgresUserIdentityRepository implements UserIdentityRepos
         ]);
     }
 
-    /** @param array<string, mixed> $row */
-    private function fromRow(array $row): UserIdentity
+    private function fromRow(Row $row): UserIdentity
     {
         return new UserIdentity(
-            id: $row['id'],
-            userId: $row['user_id'],
-            provider: $row['provider'],
-            providerUserId: $row['provider_user_id'],
-            email: new Email($row['email']),
-            createdAt: new \DateTimeImmutable($row['created_at']),
+            id: $row->string('id'),
+            userId: $row->string('user_id'),
+            provider: $row->string('provider'),
+            providerUserId: $row->string('provider_user_id'),
+            email: new Email($row->string('email')),
+            createdAt: $row->dateTime('created_at'),
         );
     }
 }

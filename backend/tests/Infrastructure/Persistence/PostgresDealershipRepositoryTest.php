@@ -147,12 +147,12 @@ final class PostgresDealershipRepositoryTest extends TestCase
         $dealership = $this->registerFixture($owner);
         $this->repository->insert($dealership);
 
-        $this->repository->trash($dealership->id, byOwnerDeactivation: true);
+        $this->repository->trash($dealership->id);
 
         $found = $this->repository->findById($dealership->id);
         $this->assertNotNull($found);
         $this->assertSame(TrashableStatus::Trashed, $found->trash->status);
-        $this->assertTrue($found->trashedByOwnerDeactivation);
+        $this->assertFalse($found->trashedByOwnerDeactivation);
         $this->assertNotNull($found->trash->trashedAt);
     }
 
@@ -162,7 +162,7 @@ final class PostgresDealershipRepositoryTest extends TestCase
         $owner = $this->insertSellerUser();
         $dealership = $this->registerFixture($owner);
         $this->repository->insert($dealership);
-        $this->repository->trash($dealership->id, byOwnerDeactivation: false);
+        $this->repository->trash($dealership->id);
 
         $this->repository->restore($dealership->id);
 
@@ -181,8 +181,8 @@ final class PostgresDealershipRepositoryTest extends TestCase
         $longTrashed = $this->registerFixture($owner, name: 'Antiga');
         $this->repository->insert($recentlyTrashed);
         $this->repository->insert($longTrashed);
-        $this->repository->trash($recentlyTrashed->id, false);
-        $this->repository->trash($longTrashed->id, false);
+        $this->repository->trash($recentlyTrashed->id);
+        $this->repository->trash($longTrashed->id);
         $this->pdo->prepare("UPDATE dealerships SET trashed_at = now() - interval '31 days' WHERE id = ?")->execute([$longTrashed->id]);
 
         $now = new \DateTimeImmutable();
@@ -202,7 +202,7 @@ final class PostgresDealershipRepositoryTest extends TestCase
         $alreadyTrashed = $this->registerFixture($owner, name: 'Já na lixeira');
         $this->repository->insert($active);
         $this->repository->insert($alreadyTrashed);
-        $this->repository->trash($alreadyTrashed->id, byOwnerDeactivation: false);
+        $this->repository->trash($alreadyTrashed->id);
 
         $this->repository->trashAllOwnedBy($owner);
 
@@ -220,8 +220,8 @@ final class PostgresDealershipRepositoryTest extends TestCase
         $manual = $this->registerFixture($owner, name: 'Manual');
         $this->repository->insert($byOwnerDeactivation);
         $this->repository->insert($manual);
-        $this->repository->trash($byOwnerDeactivation->id, byOwnerDeactivation: true);
-        $this->repository->trash($manual->id, byOwnerDeactivation: false);
+        $this->repository->trash($manual->id);
+        $this->repository->trashAllOwnedBy($owner);
 
         $this->repository->restoreAutoTrashedOwnedBy($owner);
 

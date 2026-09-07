@@ -729,7 +729,7 @@ final class InMemoryDealershipRepository implements DealershipRepository
         return 0;
     }
 
-    public function trash(string $id, bool $byOwnerDeactivation): void
+    public function trash(string $id): void
     {
     }
 

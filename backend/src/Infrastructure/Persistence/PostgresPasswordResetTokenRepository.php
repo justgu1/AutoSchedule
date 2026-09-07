@@ -30,11 +30,13 @@ final readonly class PostgresPasswordResetTokenRepository implements PasswordRes
 
     public function findByRawToken(string $rawToken): ?PasswordResetToken
     {
-        $statement = $this->connection->pdo()->prepare('SELECT * FROM password_reset_tokens WHERE token_hash = :token_hash');
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT id, user_id, token_hash, expires_at, used_at FROM password_reset_tokens WHERE token_hash = :token_hash',
+        );
         $statement->execute(['token_hash' => hash('sha256', $rawToken)]);
         $row = $statement->fetch();
 
-        return $row === false ? null : $this->fromRow($row);
+        return $row === false ? null : $this->fromRow(Row::from($row));
     }
 
     public function markUsed(string $id): void
@@ -52,15 +54,14 @@ final readonly class PostgresPasswordResetTokenRepository implements PasswordRes
         $statement->execute(['user_id' => $userId]);
     }
 
-    /** @param array<string, mixed> $row */
-    private function fromRow(array $row): PasswordResetToken
+    private function fromRow(Row $row): PasswordResetToken
     {
         return new PasswordResetToken(
-            id: $row['id'],
-            userId: $row['user_id'],
-            tokenHash: $row['token_hash'],
-            expiresAt: new \DateTimeImmutable($row['expires_at']),
-            usedAt: $row['used_at'] !== null ? new \DateTimeImmutable($row['used_at']) : null,
+            id: $row->string('id'),
+            userId: $row->string('user_id'),
+            tokenHash: $row->string('token_hash'),
+            expiresAt: $row->dateTime('expires_at'),
+            usedAt: $row->nullableDateTime('used_at'),
         );
     }
 }

@@ -9,26 +9,26 @@ use App\Domain\File\StoredFile;
 
 final readonly class PostgresFileRepository implements FileRepository
 {
+    private const string COLUMNS = 'id, path, original_name, mime_type, size_bytes, checksum, uploaded_by, created_at';
+
     public function __construct(private DatabaseConnection $connection)
     {
     }
 
     public function findById(string $id): ?StoredFile
     {
-        $statement = $this->connection->pdo()->prepare('SELECT * FROM files WHERE id = :id');
+        $statement = $this->connection->pdo()->prepare('SELECT ' . self::COLUMNS . ' FROM files WHERE id = :id');
         $statement->execute(['id' => $id]);
-        $row = $statement->fetch();
 
-        return $row === false ? null : $this->fromRow($row);
+        return $this->hydrateOne($statement);
     }
 
     public function findByPath(string $path): ?StoredFile
     {
-        $statement = $this->connection->pdo()->prepare('SELECT * FROM files WHERE path = :path');
+        $statement = $this->connection->pdo()->prepare('SELECT ' . self::COLUMNS . ' FROM files WHERE path = :path');
         $statement->execute(['path' => $path]);
-        $row = $statement->fetch();
 
-        return $row === false ? null : $this->fromRow($row);
+        return $this->hydrateOne($statement);
     }
 
     public function insert(StoredFile $file): void
@@ -56,18 +56,24 @@ final readonly class PostgresFileRepository implements FileRepository
         $statement->execute(['id' => $id]);
     }
 
-    /** @param array<string, mixed> $row */
-    private function fromRow(array $row): StoredFile
+    private function hydrateOne(\PDOStatement $statement): ?StoredFile
+    {
+        $row = $statement->fetch();
+
+        return $row === false ? null : $this->fromRow(Row::from($row));
+    }
+
+    private function fromRow(Row $row): StoredFile
     {
         return new StoredFile(
-            id: $row['id'],
-            path: $row['path'],
-            originalName: $row['original_name'],
-            mimeType: $row['mime_type'],
-            sizeBytes: (int) $row['size_bytes'],
-            checksum: $row['checksum'],
-            uploadedBy: $row['uploaded_by'],
-            createdAt: new \DateTimeImmutable($row['created_at']),
+            id: $row->string('id'),
+            path: $row->string('path'),
+            originalName: $row->string('original_name'),
+            mimeType: $row->string('mime_type'),
+            sizeBytes: $row->int('size_bytes'),
+            checksum: $row->string('checksum'),
+            uploadedBy: $row->nullableString('uploaded_by'),
+            createdAt: $row->dateTime('created_at'),
         );
     }
 }

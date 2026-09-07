@@ -17,30 +17,28 @@ final readonly class PostgresOAuthClientRepository implements OAuthClientReposit
 
     public function findByClientId(string $clientId): ?OAuthClient
     {
-        $statement = $this->connection->pdo()->prepare('SELECT * FROM oauth_clients WHERE client_id = :client_id');
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT id, client_id, name, type, secret_hash, allowed_grant_types, redirect_uris, allowed_scopes, created_at, updated_at FROM oauth_clients WHERE client_id = :client_id',
+        );
         $statement->execute(['client_id' => $clientId]);
         $row = $statement->fetch();
 
-        return $row === false ? null : $this->fromRow($row);
+        return $row === false ? null : $this->fromRow(Row::from($row));
     }
 
-    /** @param array<string, mixed> $row */
-    private function fromRow(array $row): OAuthClient
+    private function fromRow(Row $row): OAuthClient
     {
         return new OAuthClient(
-            id: $row['id'],
-            clientId: $row['client_id'],
-            name: $row['name'],
-            type: ClientType::from($row['type']),
-            secretHash: $row['secret_hash'],
-            allowedGrantTypes: array_map(
-                GrantType::from(...),
-                PostgresArray::fromText($row['allowed_grant_types']),
-            ),
-            redirectUris: PostgresArray::fromText($row['redirect_uris']),
-            allowedScopes: PostgresArray::fromText($row['allowed_scopes']),
-            createdAt: new \DateTimeImmutable($row['created_at']),
-            updatedAt: new \DateTimeImmutable($row['updated_at']),
+            id: $row->string('id'),
+            clientId: $row->string('client_id'),
+            name: $row->string('name'),
+            type: $row->enum(ClientType::class, 'type'),
+            secretHash: $row->nullableString('secret_hash'),
+            allowedGrantTypes: $row->enumList(GrantType::class, 'allowed_grant_types'),
+            redirectUris: $row->stringList('redirect_uris'),
+            allowedScopes: $row->stringList('allowed_scopes'),
+            createdAt: $row->dateTime('created_at'),
+            updatedAt: $row->dateTime('updated_at'),
         );
     }
 }

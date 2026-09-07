@@ -57,8 +57,8 @@ final class PurgeTrashedDealershipsTaskTest extends TestCase
         $recentlyTrashed = $this->registerFixture($owner, 'Recent');
         $this->repository->insert($longTrashed);
         $this->repository->insert($recentlyTrashed);
-        $this->repository->trash($longTrashed->id, false);
-        $this->repository->trash($recentlyTrashed->id, false);
+        $this->repository->trash($longTrashed->id);
+        $this->repository->trash($recentlyTrashed->id);
         $this->pdo->prepare("UPDATE dealerships SET trashed_at = now() - interval '31 days' WHERE id = ?")->execute([$longTrashed->id]);
 
         $this->task->run();
@@ -79,7 +79,7 @@ final class PurgeTrashedDealershipsTaskTest extends TestCase
         $owner = $this->insertSellerUser();
         $longTrashed = $this->registerFixture($owner, 'Long');
         $this->repository->insert($longTrashed);
-        $this->repository->trash($longTrashed->id, false);
+        $this->repository->trash($longTrashed->id);
         $this->pdo->prepare("UPDATE dealerships SET trashed_at = now() - interval '31 days' WHERE id = ?")->execute([$longTrashed->id]);
 
         $this->task->run();

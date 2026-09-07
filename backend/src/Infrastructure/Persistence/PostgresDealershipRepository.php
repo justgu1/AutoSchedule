@@ -15,26 +15,26 @@ use App\Domain\Shared\Uf;
 
 final readonly class PostgresDealershipRepository implements DealershipRepository
 {
+    private const string COLUMNS = 'id, owner_user_id, name, slug, zip_code, address, number, complement, neighborhood, city, state, phone, email, photo_file_id, status, trashed_by_owner_deactivation, trashed_at, anonymized_at, created_at, updated_at';
+
     public function __construct(private DatabaseConnection $connection)
     {
     }
 
     public function findById(string $id): ?Dealership
     {
-        $statement = $this->connection->pdo()->prepare('SELECT * FROM dealerships WHERE id = :id');
+        $statement = $this->connection->pdo()->prepare('SELECT ' . self::COLUMNS . ' FROM dealerships WHERE id = :id');
         $statement->execute(['id' => $id]);
-        $row = $statement->fetch();
 
-        return $row === false ? null : $this->fromRow($row);
+        return $this->hydrateOne($statement);
     }
 
     public function findBySlug(string $slug): ?Dealership
     {
-        $statement = $this->connection->pdo()->prepare('SELECT * FROM dealerships WHERE slug = :slug');
+        $statement = $this->connection->pdo()->prepare('SELECT ' . self::COLUMNS . ' FROM dealerships WHERE slug = :slug');
         $statement->execute(['slug' => $slug]);
-        $row = $statement->fetch();
 
-        return $row === false ? null : $this->fromRow($row);
+        return $this->hydrateOne($statement);
     }
 
     public function insert(Dealership $dealership): void
@@ -75,14 +75,14 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
     public function findByOwner(string $ownerUserId, int $limit, int $offset): array
     {
         $statement = $this->connection->pdo()->prepare(
-            "SELECT * FROM dealerships WHERE owner_user_id = :owner_user_id AND status <> 'deleted' ORDER BY created_at LIMIT :limit OFFSET :offset",
+            'SELECT ' . self::COLUMNS . " FROM dealerships WHERE owner_user_id = :owner_user_id AND status <> 'deleted' ORDER BY created_at LIMIT :limit OFFSET :offset",
         );
         $statement->bindValue('owner_user_id', $ownerUserId);
         $statement->bindValue('limit', $limit, \PDO::PARAM_INT);
         $statement->bindValue('offset', $offset, \PDO::PARAM_INT);
         $statement->execute();
 
-        return array_values(array_map($this->fromRow(...), $statement->fetchAll()));
+        return $this->hydrateAll($statement);
     }
 
     public function countByOwner(string $ownerUserId): int
@@ -98,13 +98,13 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
     public function findPage(int $limit, int $offset): array
     {
         $statement = $this->connection->pdo()->prepare(
-            "SELECT * FROM dealerships WHERE status <> 'deleted' ORDER BY created_at LIMIT :limit OFFSET :offset",
+            'SELECT ' . self::COLUMNS . " FROM dealerships WHERE status <> 'deleted' ORDER BY created_at LIMIT :limit OFFSET :offset",
         );
         $statement->bindValue('limit', $limit, \PDO::PARAM_INT);
         $statement->bindValue('offset', $offset, \PDO::PARAM_INT);
         $statement->execute();
 
-        return array_values(array_map($this->fromRow(...), $statement->fetchAll()));
+        return $this->hydrateAll($statement);
     }
 
     public function count(): int
@@ -112,14 +112,14 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
         return (int) $this->connection->pdo()->query("SELECT COUNT(*) FROM dealerships WHERE status <> 'deleted'")->fetchColumn();
     }
 
-    public function trash(string $id, bool $byOwnerDeactivation): void
+    public function trash(string $id): void
     {
         $statement = $this->connection->pdo()->prepare(<<<'SQL'
             UPDATE dealerships SET
-                status = 'trashed', trashed_at = now(), trashed_by_owner_deactivation = :by_owner_deactivation, updated_at = now()
+                status = 'trashed', trashed_at = now(), trashed_by_owner_deactivation = false, updated_at = now()
             WHERE id = :id
             SQL);
-        $statement->execute(['id' => $id, 'by_owner_deactivation' => $byOwnerDeactivation ? 't' : 'f']);
+        $statement->execute(['id' => $id]);
     }
 
     public function restore(string $id): void
@@ -134,10 +134,12 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
 
     public function findTrashed(): array
     {
-        $statement = $this->connection->pdo()->prepare("SELECT * FROM dealerships WHERE status = 'trashed' AND anonymized_at IS NULL");
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT ' . self::COLUMNS . " FROM dealerships WHERE status = 'trashed' AND anonymized_at IS NULL",
+        );
         $statement->execute();
 
-        return array_values(array_map($this->fromRow(...), $statement->fetchAll()));
+        return $this->hydrateAll($statement);
     }
 
     public function purge(Trashable $entity): void
@@ -167,40 +169,47 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
         $statement->execute(['owner_user_id' => $ownerUserId]);
     }
 
-    /** @param array<string, mixed> $row */
-    private function fromRow(array $row): Dealership
+    private function hydrateOne(\PDOStatement $statement): ?Dealership
     {
-        return new Dealership(
-            id: $row['id'],
-            ownerUserId: $row['owner_user_id'],
-            name: $row['name'],
-            slug: $row['slug'],
-            address: new Address(
-                zipCode: $row['zip_code'],
-                street: $row['address'],
-                number: $row['number'],
-                complement: $row['complement'],
-                neighborhood: $row['neighborhood'],
-                city: $row['city'],
-                state: Uf::from($row['state']),
-            ),
-            phone: $row['phone'],
-            email: Email::fromNullable($row['email']),
-            photoFileId: $row['photo_file_id'],
-            trash: new TrashState(
-                status: TrashableStatus::from($row['status']),
-                trashedAt: $this->toDateTime($row['trashed_at']),
-                anonymizedAt: $this->toDateTime($row['anonymized_at']),
-            ),
-            trashedByOwnerDeactivation: (bool) $row['trashed_by_owner_deactivation'],
-            createdAt: new \DateTimeImmutable($row['created_at']),
-            updatedAt: new \DateTimeImmutable($row['updated_at']),
-        );
+        $row = $statement->fetch();
+
+        return $row === false ? null : $this->fromRow(Row::from($row));
     }
 
-    private function toDateTime(?string $value): ?\DateTimeImmutable
+    /** @return list<Dealership> */
+    private function hydrateAll(\PDOStatement $statement): array
     {
-        return $value === null ? null : new \DateTimeImmutable($value);
+        return array_values(array_map(fn (mixed $row): Dealership => $this->fromRow(Row::from($row)), $statement->fetchAll()));
+    }
+
+    private function fromRow(Row $row): Dealership
+    {
+        return new Dealership(
+            id: $row->string('id'),
+            ownerUserId: $row->string('owner_user_id'),
+            name: $row->string('name'),
+            slug: $row->string('slug'),
+            address: new Address(
+                zipCode: $row->string('zip_code'),
+                street: $row->string('address'),
+                number: $row->string('number'),
+                complement: $row->nullableString('complement'),
+                neighborhood: $row->string('neighborhood'),
+                city: $row->string('city'),
+                state: $row->enum(Uf::class, 'state'),
+            ),
+            phone: $row->nullableString('phone'),
+            email: Email::fromNullable($row->nullableString('email')),
+            photoFileId: $row->nullableString('photo_file_id'),
+            trash: new TrashState(
+                status: $row->enum(TrashableStatus::class, 'status'),
+                trashedAt: $row->nullableDateTime('trashed_at'),
+                anonymizedAt: $row->nullableDateTime('anonymized_at'),
+            ),
+            trashedByOwnerDeactivation: $row->bool('trashed_by_owner_deactivation'),
+            createdAt: $row->dateTime('created_at'),
+            updatedAt: $row->dateTime('updated_at'),
+        );
     }
 
     /** @return array<string, mixed> */

@@ -14,18 +14,30 @@ use App\Domain\User\UserRole;
 
 final readonly class PostgresUserRepository implements UserRepository
 {
+    private const string COLUMNS = 'id, name, email, phone, password, role, password_set_at, email_verified_at, created_at, updated_at, status, deleted_at, anonymized_at';
+
     public function __construct(private DatabaseConnection $connection)
     {
     }
 
     public function findById(string $id): ?User
     {
-        return $this->findOneBy('id', $id);
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT ' . self::COLUMNS . " FROM users WHERE id = :id AND status <> 'deleted'",
+        );
+        $statement->execute(['id' => $id]);
+
+        return $this->hydrateOne($statement);
     }
 
     public function findByEmail(Email $email): ?User
     {
-        return $this->findOneBy('email', $email->value);
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT ' . self::COLUMNS . " FROM users WHERE email = :email AND status <> 'deleted'",
+        );
+        $statement->execute(['email' => $email->value]);
+
+        return $this->hydrateOne($statement);
     }
 
     public function existsByEmail(Email $email): bool
@@ -79,10 +91,12 @@ final readonly class PostgresUserRepository implements UserRepository
 
     public function findTrashed(): array
     {
-        $statement = $this->connection->pdo()->prepare("SELECT * FROM users WHERE status = 'trashed' AND anonymized_at IS NULL");
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT ' . self::COLUMNS . " FROM users WHERE status = 'trashed' AND anonymized_at IS NULL",
+        );
         $statement->execute();
 
-        return array_values(array_map($this->fromRow(...), $statement->fetchAll()));
+        return $this->hydrateAll($statement);
     }
 
     public function purge(Trashable $entity): void
@@ -109,13 +123,13 @@ final readonly class PostgresUserRepository implements UserRepository
     public function findPage(int $limit, int $offset): array
     {
         $statement = $this->connection->pdo()->prepare(
-            "SELECT * FROM users WHERE status <> 'deleted' ORDER BY created_at LIMIT :limit OFFSET :offset",
+            'SELECT ' . self::COLUMNS . " FROM users WHERE status <> 'deleted' ORDER BY created_at LIMIT :limit OFFSET :offset",
         );
         $statement->bindValue('limit', $limit, \PDO::PARAM_INT);
         $statement->bindValue('offset', $offset, \PDO::PARAM_INT);
         $statement->execute();
 
-        return array_map($this->fromRow(...), $statement->fetchAll());
+        return $this->hydrateAll($statement);
     }
 
     public function count(): int
@@ -131,40 +145,38 @@ final readonly class PostgresUserRepository implements UserRepository
         return (int) $statement->fetchColumn();
     }
 
-    private function findOneBy(string $column, string $value): ?User
+    private function hydrateOne(\PDOStatement $statement): ?User
     {
-        $statement = $this->connection->pdo()->prepare("SELECT * FROM users WHERE {$column} = :value AND status <> 'deleted'");
-        $statement->execute(['value' => $value]);
         $row = $statement->fetch();
 
-        return $row === false ? null : $this->fromRow($row);
+        return $row === false ? null : $this->fromRow(Row::from($row));
     }
 
-    /** @param array<string, mixed> $row */
-    private function fromRow(array $row): User
+    /** @return list<User> */
+    private function hydrateAll(\PDOStatement $statement): array
+    {
+        return array_values(array_map(fn (mixed $row): User => $this->fromRow(Row::from($row)), $statement->fetchAll()));
+    }
+
+    private function fromRow(Row $row): User
     {
         return new User(
-            id: $row['id'],
-            name: $row['name'],
-            email: new Email($row['email']),
-            phone: $row['phone'],
-            passwordHash: $row['password'],
-            role: UserRole::from($row['role']),
-            passwordSetAt: $this->toDateTime($row['password_set_at']),
-            emailVerifiedAt: $this->toDateTime($row['email_verified_at']),
-            createdAt: new \DateTimeImmutable($row['created_at']),
-            updatedAt: new \DateTimeImmutable($row['updated_at']),
+            id: $row->string('id'),
+            name: $row->string('name'),
+            email: new Email($row->string('email')),
+            phone: $row->nullableString('phone'),
+            passwordHash: $row->string('password'),
+            role: $row->enum(UserRole::class, 'role'),
+            passwordSetAt: $row->nullableDateTime('password_set_at'),
+            emailVerifiedAt: $row->nullableDateTime('email_verified_at'),
+            createdAt: $row->dateTime('created_at'),
+            updatedAt: $row->dateTime('updated_at'),
             trash: new TrashState(
-                status: TrashableStatus::from($row['status']),
-                trashedAt: $this->toDateTime($row['deleted_at']),
-                anonymizedAt: $this->toDateTime($row['anonymized_at']),
+                status: $row->enum(TrashableStatus::class, 'status'),
+                trashedAt: $row->nullableDateTime('deleted_at'),
+                anonymizedAt: $row->nullableDateTime('anonymized_at'),
             ),
         );
-    }
-
-    private function toDateTime(?string $value): ?\DateTimeImmutable
-    {
-        return $value === null ? null : new \DateTimeImmutable($value);
     }
 
     /** @return array<string, mixed> */
