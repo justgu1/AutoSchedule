@@ -32,7 +32,11 @@ async function mockZipCodeLookup(
 }
 
 /** Registra um seller e devolve id/e-mail (via a resposta de `GET /me` disparada ao chegar em `/me`) -- necessário pra montar `owner_user_id` no fluxo de admin abaixo e testar "usar o meu" no form de concessionária. */
-async function registerSellerAndGetId(page: Page, name: string, phone?: string): Promise<{ id: string; email: string }> {
+async function registerSellerAndGetId(
+    page: Page,
+    name: string,
+    phone?: string,
+): Promise<{ id: string; email: string }> {
     const email = uniqueEmail('dealershipowner');
 
     await page.goto('/register');
