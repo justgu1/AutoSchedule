@@ -7,6 +7,7 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { MePage } from './pages/MePage';
+import { PublicDealershipPage } from './pages/PublicDealershipPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 
@@ -15,6 +16,7 @@ export default function App() {
         <Routes>
             <Route element={<PublicLayout />}>
                 <Route path="/" element={<HomePage />} />
+                <Route path="/concessionarias/:slug" element={<PublicDealershipPage />} />
             </Route>
             <Route element={<AuthLayout />}>
                 <Route path="/login" element={<LoginPage />} />

@@ -14,15 +14,19 @@ use App\Infrastructure\Http\Router;
 /**
  * Decodifica o access token (header `Authorization: Bearer` ou cookie
  * `access_token` -- o que vier primeiro) e anexa as claims ao Request.
- * Autenticado, abre transação + SET LOCAL pro RLS (current_user_id/role)
- * antes de seguir -- automático em toda query, ninguém precisa lembrar de
- * aplicar.
+ * Autenticado, seta `current_user_id`/`role` pro RLS.
  *
  * Sem token nenhum, a rota pode estar marcada como serviceContext (ex: login
  * busca usuário por email antes de existir qualquer autenticação) -- nesse
- * caso abre transação com um contexto de serviço mais restrito (só enxerga o
- * necessário pra autenticação em si). Nenhum dos dois casos: segue direto,
- * sem transação (rota pública comum, ou o RoleMiddleware barra depois).
+ * caso seta um contexto de serviço mais restrito (só enxerga o necessário
+ * pra autenticação em si).
+ *
+ * `publicRead` é composto, não alternativo: uma rota marcada assim (ex:
+ * `GET /dealerships/{id}`) recebe a flag `is_public_read` JUNTO com
+ * `current_user_id`/`role` quando há Bearer válido -- precisa das duas coisas
+ * pra um seller autenticado (não dono, não admin) ainda cair no fallback
+ * público em vez de tomar 404. Só quando pelo menos um dos três se aplica é
+ * que abre transação; rota pública comum sem nenhuma marca segue direto.
  */
 final readonly class AuthContextMiddleware implements Middleware
 {
@@ -36,24 +40,34 @@ final readonly class AuthContextMiddleware implements Middleware
     public function handle(Request $request, \Closure $next): Response
     {
         $token = $this->extractToken($request);
+        $claims = null;
 
         if ($token !== null) {
             $claims = $this->tokens->decodeAccessToken($token);
             $request = $request->withAttribute('auth', $claims);
+        }
 
-            return $this->runInTransaction($request, $next, static function (\PDO $pdo) use ($claims): void {
+        $isServiceContext = !$claims instanceof \App\Domain\Auth\ValueObjects\AccessTokenClaims && $this->router->isServiceContext($request->method(), $request->path());
+        $isPublicRead = $this->router->isPublicRead($request->method(), $request->path());
+
+        if (!$claims instanceof \App\Domain\Auth\ValueObjects\AccessTokenClaims && !$isServiceContext && !$isPublicRead) {
+            return $next($request);
+        }
+
+        return $this->runInTransaction($request, $next, static function (\PDO $pdo) use ($claims, $isServiceContext, $isPublicRead): void {
+            if ($claims instanceof \App\Domain\Auth\ValueObjects\AccessTokenClaims) {
                 $pdo->exec('SET LOCAL app.current_user_id = ' . $pdo->quote($claims->subject));
                 $pdo->exec('SET LOCAL app.current_user_role = ' . $pdo->quote($claims->role?->value ?? ''));
-            });
-        }
+            }
 
-        if ($this->router->isServiceContext($request->method(), $request->path())) {
-            return $this->runInTransaction($request, $next, static function (\PDO $pdo): void {
+            if ($isServiceContext) {
                 $pdo->exec("SET LOCAL app.is_service_context = 'true'");
-            });
-        }
+            }
 
-        return $next($request);
+            if ($isPublicRead) {
+                $pdo->exec("SET LOCAL app.is_public_read = 'true'");
+            }
+        });
     }
 
     private function extractToken(Request $request): ?string

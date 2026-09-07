@@ -105,12 +105,17 @@ Backlog do projeto: epic > issue > task. Cada `[x]` já está em `main`; `[ ]` �
 - [x] UF como campo de busca (Autocomplete), não texto livre
 - [x] Número da concessionária só aceita dígito
 - [x] Atalho "usar o meu" pra copiar o telefone do próprio seller no formulário
+- [x] Link "Ver página pública" na listagem, pra concessionária ativa (ver Epic Endereço abaixo)
 - [x] E2E (seller: ciclo completo incl. foto assíncrona; admin: reassociação de dono; customer: sem acesso)
 
 ## Epic: Endereço
 
-- [ ] Autocomplete de CEP no formulário de concessionária (ViaCEP)
-- [ ] Exibição em mapa pro cliente (Google Maps Embed, read-only)
+- [x] Autocomplete de CEP no formulário de concessionária -- `GET /zip-codes/{cep}` no próprio backend, proxy do ViaCEP cacheado (`zip_code_cache`, sem TTL) depois da primeira consulta, front nunca chama o terceiro direto
+- [x] Concessionária ganha `email` próprio (contato do negócio, ao lado do `phone` que já existia)
+- [x] Página pública da concessionária (`/concessionarias/{slug}`, sem conta) -- banner, endereço, contato, nome do vendedor (só o nome, nenhum outro dado dele), veículos reservado pra Epic Veículo
+- [x] `GET /dealerships/{id}` unificado -- mesma rota do gerenciamento, resposta muda conforme quem chama (perfil completo pro dono/admin, perfil público pro resto); RLS com contexto de leitura pública próprio (`app.is_public_read`, composto com o contexto autenticado normal, só concessionária `active` visível)
+- [x] `slug` amigável (nome + parte do id) substitui o `id` na URL pública -- estável mesmo se o nome mudar, só troca na anonimização
+- [x] Exibição em mapa pro cliente (Google Maps Embed, read-only, modo `place` por endereço)
 
 ## Epic: Veículo
 

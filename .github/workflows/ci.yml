@@ -68,6 +68,7 @@ jobs:
         working-directory: frontend
         env:
           VITE_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+          VITE_GOOGLE_MAPS_API_KEY: ${{ vars.GOOGLE_MAPS_API_KEY }}
         run: npm run build
 
   # PHPUnit precisa só de Postgres/Redis/Mailpit como dado -- GitHub cuida
@@ -76,15 +77,18 @@ jobs:
   phpunit:
     runs-on: ubuntu-latest
     services:
+      # Nome bate com o `autoschedule_test` local (phpunit.xml força esse
+      # DB_DATABASE em qualquer ambiente) -- aqui já é efêmero/isolado por
+      # natureza (container novo a cada run), o nome é só consistência.
       postgres:
         image: postgres:17-alpine
         env:
-          POSTGRES_DB: autoschedule
+          POSTGRES_DB: autoschedule_test
           POSTGRES_USER: pgsql
           POSTGRES_PASSWORD: password
         ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U pgsql -d autoschedule"
+          --health-cmd "pg_isready -U pgsql -d autoschedule_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -119,6 +123,7 @@ jobs:
         working-directory: backend
         env:
           DB_HOST: 127.0.0.1
+          DB_DATABASE: autoschedule_test
         run: php bin/migrate.php && php bin/seed.php
 
       # MinIO não dá pra subir via `services:` (a imagem exige `server /data`
@@ -235,6 +240,7 @@ jobs:
           push: true
           build-args: |
             VITE_GOOGLE_CLIENT_ID=${{ vars.GOOGLE_CLIENT_ID }}
+            VITE_GOOGLE_MAPS_API_KEY=${{ vars.GOOGLE_MAPS_API_KEY }}
           tags: |
             ghcr.io/justgu1/autoschedule-nginx:latest
             ghcr.io/justgu1/autoschedule-nginx:sha-${{ github.sha }}

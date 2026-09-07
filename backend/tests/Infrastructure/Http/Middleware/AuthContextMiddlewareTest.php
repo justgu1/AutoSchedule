@@ -170,6 +170,60 @@ final class AuthContextMiddlewareTest extends TestCase
 
         $this->assertSame('true', $seenContext);
     }
+
+    #[Test]
+    public function sem_bearer_em_rota_public_read_seta_o_contexto_de_leitura_publica(): void
+    {
+        $router = new Router();
+        $router->get('/api/dealerships/{id}', static fn (): Response => new JsonResponse([]), publicRead: true);
+        $middleware = new AuthContextMiddleware(new FakeTokenIssuer(), $this->connection, $router);
+        $seenContext = null;
+
+        $middleware->handle(
+            new Request(method: 'GET', path: '/api/dealerships/abc'),
+            function (Request $request) use (&$seenContext): Response {
+                $seenContext = $this->connection->pdo()
+                    ->query("SELECT current_setting('app.is_public_read', true)")
+                    ->fetchColumn();
+
+                return new JsonResponse(['ok' => true]);
+            },
+        );
+
+        $this->assertSame('true', $seenContext);
+    }
+
+    /**
+     * `publicRead` é composto com o contexto autenticado normal, não
+     * alternativo -- com Bearer válido numa rota `publicRead`, as duas coisas
+     * ficam setadas ao mesmo tempo (é isso que deixa um seller autenticado
+     * cair no fallback público de `GET /dealerships/{id}` pra concessionária
+     * de outro seller, em vez de só enxergar via `current_user_id`).
+     */
+    #[Test]
+    public function com_bearer_valido_em_rota_public_read_seta_os_dois_contextos_juntos(): void
+    {
+        $claims = AccessTokenClaims::issue('11111111-1111-4111-8111-111111111111', 'autoschedule-web', UserRole::Seller, [], 900);
+        $router = new Router();
+        $router->get('/api/dealerships/{id}', static fn (): Response => new JsonResponse([]), publicRead: true);
+        $middleware = new AuthContextMiddleware(new FakeTokenIssuer(['valid-token' => $claims]), $this->connection, $router);
+        $seenUserId = null;
+        $seenPublicRead = null;
+
+        $middleware->handle(
+            new Request(method: 'GET', path: '/api/dealerships/abc', headers: ['authorization' => 'Bearer valid-token']),
+            function (Request $request) use (&$seenUserId, &$seenPublicRead): Response {
+                $pdo = $this->connection->pdo();
+                $seenUserId = $pdo->query("SELECT current_setting('app.current_user_id', true)")->fetchColumn();
+                $seenPublicRead = $pdo->query("SELECT current_setting('app.is_public_read', true)")->fetchColumn();
+
+                return new JsonResponse(['ok' => true]);
+            },
+        );
+
+        $this->assertSame('11111111-1111-4111-8111-111111111111', $seenUserId);
+        $this->assertSame('true', $seenPublicRead);
+    }
 }
 
 final readonly class FakeTokenIssuer implements TokenIssuer

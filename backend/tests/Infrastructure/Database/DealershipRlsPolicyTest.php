@@ -22,6 +22,7 @@ final class DealershipRlsPolicyTest extends TestCase
     private string $otherSellerId;
     private string $dealershipId;
     private string $otherDealershipId;
+    private string $trashedDealershipId;
 
     protected function setUp(): void
     {
@@ -38,6 +39,8 @@ final class DealershipRlsPolicyTest extends TestCase
         $this->otherSellerId = $this->insertSellerUser('rls-other-seller@example.com');
         $this->dealershipId = $this->insertDealership($this->sellerId, 'RLS Auto Center');
         $this->otherDealershipId = $this->insertDealership($this->otherSellerId, 'RLS Other Center');
+        $this->trashedDealershipId = $this->insertDealership($this->otherSellerId, 'RLS Trashed Center');
+        $this->admin->exec("UPDATE dealerships SET status = 'trashed' WHERE id = " . $this->admin->quote($this->trashedDealershipId));
 
         $this->rls = new PostgresConnection(
             driver: getenv('DB_DRIVER') ?: 'pgsql',
@@ -51,8 +54,8 @@ final class DealershipRlsPolicyTest extends TestCase
 
     protected function tearDown(): void
     {
-        $statement = $this->admin->prepare('DELETE FROM dealerships WHERE id IN (?, ?)');
-        $statement->execute([$this->dealershipId, $this->otherDealershipId]);
+        $statement = $this->admin->prepare('DELETE FROM dealerships WHERE id IN (?, ?, ?)');
+        $statement->execute([$this->dealershipId, $this->otherDealershipId, $this->trashedDealershipId]);
         $statement = $this->admin->prepare('DELETE FROM users WHERE id IN (?, ?)');
         $statement->execute([$this->sellerId, $this->otherSellerId]);
     }
@@ -66,6 +69,28 @@ final class DealershipRlsPolicyTest extends TestCase
         $this->rls->rollBack();
 
         $this->assertSame([$this->dealershipId], $ids);
+    }
+
+    /**
+     * `AuthContextMiddleware` compõe `is_public_read` com o contexto
+     * autenticado normal (não é alternativo) -- um seller batendo em
+     * `GET /dealerships/{id}` de outro seller precisa das duas coisas juntas
+     * pra cair no fallback público em vez de tomar 404. Sem essa composição,
+     * `seller_so_enxerga_a_propria_concessionaria` (acima) continuaria
+     * verdade só nas rotas de gerenciamento -- aqui é o caso da rota pública.
+     */
+    #[Test]
+    public function seller_com_contexto_de_leitura_publica_tambem_enxerga_concessionaria_de_outro_seller(): void
+    {
+        $this->rls->beginTransaction();
+        $this->setContext($this->sellerId, 'seller');
+        $this->rls->exec("SET LOCAL app.is_public_read = 'true'");
+        $ids = $this->queryDealershipIds();
+        $this->rls->rollBack();
+
+        $this->assertContains($this->dealershipId, $ids);
+        $this->assertContains($this->otherDealershipId, $ids);
+        $this->assertNotContains($this->trashedDealershipId, $ids);
     }
 
     #[Test]
@@ -88,6 +113,25 @@ final class DealershipRlsPolicyTest extends TestCase
         $this->rls->rollBack();
 
         $this->assertSame([], $ids);
+    }
+
+    /**
+     * `GET /dealerships/{id}` (rota `publicRead`) só enxerga concessionária
+     * `active` -- trashed continua invisível mesmo com a flag setada, e a
+     * flag sozinha (sem `current_user_id`/role de dono/admin) não abre nada
+     * além disso.
+     */
+    #[Test]
+    public function contexto_de_leitura_publica_enxerga_so_concessionaria_ativa(): void
+    {
+        $this->rls->beginTransaction();
+        $this->rls->exec("SET LOCAL app.is_public_read = 'true'");
+        $ids = $this->queryDealershipIds();
+        $this->rls->rollBack();
+
+        $this->assertContains($this->dealershipId, $ids);
+        $this->assertContains($this->otherDealershipId, $ids);
+        $this->assertNotContains($this->trashedDealershipId, $ids);
     }
 
     /**
@@ -133,8 +177,8 @@ final class DealershipRlsPolicyTest extends TestCase
         try {
             $this->expectException(\PDOException::class);
             $this->rls->prepare(<<<'SQL'
-                INSERT INTO dealerships (owner_user_id, name, zip_code, address, number, neighborhood, city, state)
-                VALUES (?, 'Blocked', '00000-000', 'Rua', '1', 'Bairro', 'Cidade', 'SP')
+                INSERT INTO dealerships (owner_user_id, name, slug, zip_code, address, number, neighborhood, city, state)
+                VALUES (?, 'Blocked', 'blocked-slug', '00000-000', 'Rua', '1', 'Bairro', 'Cidade', 'SP')
                 SQL)->execute([$this->sellerId]);
         } finally {
             $this->rls->rollBack();
@@ -176,11 +220,15 @@ final class DealershipRlsPolicyTest extends TestCase
     private function insertDealership(string $ownerUserId, string $name): string
     {
         $statement = $this->admin->prepare(<<<'SQL'
-            INSERT INTO dealerships (owner_user_id, name, zip_code, address, number, neighborhood, city, state)
-            VALUES (:owner_user_id, :name, '00000-000', 'Rua', '1', 'Bairro', 'Cidade', 'SP')
+            INSERT INTO dealerships (owner_user_id, name, slug, zip_code, address, number, neighborhood, city, state)
+            VALUES (:owner_user_id, :name, :slug, '00000-000', 'Rua', '1', 'Bairro', 'Cidade', 'SP')
             RETURNING id
             SQL);
-        $statement->execute(['owner_user_id' => $ownerUserId, 'name' => $name]);
+        $statement->execute([
+            'owner_user_id' => $ownerUserId,
+            'name' => $name,
+            'slug' => strtolower(str_replace(' ', '-', $name)) . '-' . bin2hex(random_bytes(3)),
+        ]);
 
         return (string) $statement->fetchColumn();
     }

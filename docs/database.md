@@ -59,6 +59,7 @@ Table dealerships {
   id uuid [pk]
   owner_user_id uuid [not null]
   name varchar(160) [not null]
+  slug text [not null, unique]
   zip_code varchar(10) [not null]
   address varchar(255) [not null]
   number varchar(20) [not null]
@@ -70,6 +71,7 @@ Table dealerships {
   longitude decimal(10,7)
   google_place_id varchar(255)
   phone varchar(20)
+  email varchar(190)
   photo_file_id uuid
   status dealership_status [not null, default: 'active']
   trashed_by_owner_deactivation boolean [not null, default: false]
@@ -77,6 +79,16 @@ Table dealerships {
   anonymized_at timestamptz
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
+}
+
+// Cache do ViaCEP -- sem TTL (CEP não muda de endereço), sem RLS (não é dado de usuário).
+Table zip_code_cache {
+  zip_code text [pk]
+  street text [not null]
+  neighborhood text [not null]
+  city text [not null]
+  state text [not null]
+  created_at timestamptz [not null]
 }
 
 Table files {

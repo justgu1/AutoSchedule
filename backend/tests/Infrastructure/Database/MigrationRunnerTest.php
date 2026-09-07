@@ -42,6 +42,7 @@ final class MigrationRunnerTest extends TestCase
         // isso toda tabela com FK ainda precisa do próprio DROP explícito.
         $this->pdo->exec('DROP TABLE IF EXISTS dealership_images CASCADE');
         $this->pdo->exec('DROP TABLE IF EXISTS dealerships CASCADE');
+        $this->pdo->exec('DROP TABLE IF EXISTS zip_code_cache CASCADE');
         $this->pdo->exec('DROP TYPE IF EXISTS dealership_status');
         $this->pdo->exec('DROP TABLE IF EXISTS files CASCADE');
         $this->pdo->exec('DROP TABLE IF EXISTS audit_logs CASCADE');

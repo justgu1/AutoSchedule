@@ -179,6 +179,17 @@ final class InMemoryDealershipRepository implements DealershipRepository
         return $this->dealerships[$id] ?? null;
     }
 
+    public function findBySlug(string $slug): ?Dealership
+    {
+        foreach ($this->dealerships as $dealership) {
+            if ($dealership->slug === $slug) {
+                return $dealership;
+            }
+        }
+
+        return null;
+    }
+
     public function insert(Dealership $dealership): void
     {
         $this->dealerships[$dealership->id] = $dealership;

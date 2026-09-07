@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Bootstrap;
 
 use App\Application;
+use App\Domain\Address\Ports\ZipCodeCacheRepository;
+use App\Domain\Address\Ports\ZipCodeProvider;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
 use App\Domain\Auth\OAuthService;
@@ -24,6 +26,9 @@ use App\Domain\Ports\Queue;
 use App\Domain\Ports\StorageProvider;
 use App\Domain\Users\Ports\UserRepository;
 use App\Domain\Users\User;
+use App\Infrastructure\Address\PostgresZipCodeCacheRepository;
+use App\Infrastructure\Address\ViaCepZipCodeProvider;
+use App\Infrastructure\Address\ZipCodeLookupService;
 use App\Infrastructure\Audit\PostgresAuditLogger;
 use App\Infrastructure\Auth\Google\GoogleJwksIdTokenVerifier;
 use App\Infrastructure\Auth\Jwt\JwtTokenIssuer;
@@ -41,6 +46,7 @@ use App\Infrastructure\Http\Controllers\DealershipController;
 use App\Infrastructure\Http\Controllers\JobController;
 use App\Infrastructure\Http\Controllers\OAuthController;
 use App\Infrastructure\Http\Controllers\UserController;
+use App\Infrastructure\Http\Controllers\ZipCodeController;
 use App\Infrastructure\Jobs\JobStatusStore;
 use App\Infrastructure\Logging\Logger;
 use App\Infrastructure\Mail\SymfonyMailProvider;
@@ -266,11 +272,25 @@ final class ContainerFactory
             jobStatus: $c->get(JobStatusStore::class),
             audit: $c->get(AuditLogger::class),
             pagination: $c->get(PaginationPolicy::class),
+            users: $c->get(UserRepository::class),
             tempPath: $app->config('storage')['temp_path'],
         ));
         $container->set(
             JobController::class,
             static fn (Container $c): JobController => new JobController($c->get(JobStatusStore::class)),
+        );
+        $container->set(ZipCodeCacheRepository::class, static fn (Container $c): ZipCodeCacheRepository => new PostgresZipCodeCacheRepository($c->get(DatabaseConnection::class)));
+        $container->set(ZipCodeProvider::class, static fn (): ZipCodeProvider => new ViaCepZipCodeProvider());
+        $container->set(
+            ZipCodeLookupService::class,
+            static fn (Container $c): ZipCodeLookupService => new ZipCodeLookupService(
+                cache: $c->get(ZipCodeCacheRepository::class),
+                provider: $c->get(ZipCodeProvider::class),
+            ),
+        );
+        $container->set(
+            ZipCodeController::class,
+            static fn (Container $c): ZipCodeController => new ZipCodeController($c->get(ZipCodeLookupService::class)),
         );
 
         return $container;

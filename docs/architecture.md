@@ -65,7 +65,7 @@ TokenIssuer     -> JwtTokenIssuer (RS256)
 Queue           -> RedisQueue
 ```
 
-`AddressProvider`/`GeocodingProvider` (ViaCEP + Google Maps) entram junto do domínio de Endereço -- port planejado, sem adapter ainda.
+Google Maps Embed não virou port -- é só exibição por string de endereço (sem geocoding, sem Places autocomplete), chamado direto do browser (`DealershipMap`). ViaCEP é diferente: o backend proxeia (`GET /zip-codes/{cep}` → `ZipCodeLookupService`, cache-aside sobre `zip_code_cache`) porque cachear a resposta é o próprio motivo de existir dessa camada -- ali sim vale um port (`ZipCodeProvider`, adapter `ViaCepZipCodeProvider`), já que trocar de provedor de CEP é um cenário real, diferente do mapa.
 
 ## PostgreSQL
 
@@ -103,6 +103,8 @@ Rate limiting roda primeiro -- tráfego abusivo é barrado sem gastar uma transa
 
 Scheduler e worker rodam fora de qualquer request HTTP -- sem `current_user_id`/role pra setar, as policies admin-or-owner esconderiam toda linha dessas conexões. Mesma policy de serviço que já existia pra login/registro (`app.is_service_context`) resolve: `SET` (não `SET LOCAL`, a conexão vive pelo processo inteiro) uma vez, logo depois de conectar.
 
+`GET /dealerships/{id}` é uma exceção de propósito: é a MESMA rota que o gerenciamento usa, mas responde qualquer um -- dono/admin recebem o perfil completo, todo o resto (outro seller, customer, sem conta nenhuma) recebe o perfil público. A rota carrega uma flag própria (`app.is_public_read`, marcada no registro da rota, não no request), e essa flag é **composta** com o contexto autenticado normal, nunca alternativa a ele: com Bearer válido, `AuthContextMiddleware` seta `current_user_id`/`role` E `is_public_read` ao mesmo tempo -- sem isso, um seller autenticado batendo na concessionária de outro seller cairia em `current_user_role='seller'` sozinho, sem policy nenhuma pra liberar a leitura, e tomaria 404 em vez do fallback público. A policy em si só olha `status = 'active'`, sem checar quem é o dono -- é a rota ser a única marcada `publicRead` que garante essa visibilidade extra não vazar pras rotas de gerenciamento (`PATCH`/`DELETE`/etc nunca setam a flag).
+
 ## Auditoria
 
 `audit_logs` é polimórfico (`auditable_type`+`auditable_id`), pensado desde o início pra suportar qualquer entidade auditável, não só conta de usuário. Semântica de coluna e convenção de query em [`docs/database.md`](database.md#auditoria).
@@ -120,6 +122,8 @@ Job que o cliente precisa acompanhar (hoje: processar foto) grava progresso num 
 ## Busca e geolocalização
 
 PostgreSQL Full Text Search + `pg_trgm` cobrem a busca inicial, sem depender de Elasticsearch. Concessionária guarda `latitude`/`longitude`/`google_place_id`; busca por proximidade sai do próprio Postgres, PostGIS entra depois se um dia fizer falta de verdade.
+
+CEP autopreenche o resto do endereço no formulário via `GET /zip-codes/{cep}` (proxy cacheado do ViaCEP, ver "Ports & Adapters"), e a página pública da concessionária (`/concessionarias/{slug}` -- `slug`, nunca o `id`) mostra a localização com Google Maps Embed em modo `place` -- só exibição por string de endereço, sem geocoding nem Places autocomplete. `VITE_GOOGLE_MAPS_API_KEY` ausente não quebra a página, só omite o mapa (mesmo padrão do `VITE_GOOGLE_CLIENT_ID` do login social).
 
 ## CI/CD e Deploy
 

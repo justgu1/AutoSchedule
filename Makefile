@@ -86,7 +86,13 @@ logs:
 ps:
 	@watch -n 2 'docker compose ps'
 
+# `autoschedule_test` é um banco irmão, nunca o de dev -- ver bin/setup_test_database.php.
+# migrate/seed rodam com DB_DATABASE sobrescrito na mão porque são scripts CLI puros,
+# fora do phpunit.xml; o phpunit em si já força isso sozinho.
 test:
+	@docker compose exec backend php bin/setup_test_database.php
+	@docker compose exec -e DB_DATABASE=autoschedule_test backend php bin/migrate.php
+	@docker compose exec -e DB_DATABASE=autoschedule_test backend php bin/seed.php
 	@docker compose exec backend vendor/bin/phpunit
 
 static-analysis:

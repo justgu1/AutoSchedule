@@ -102,6 +102,41 @@ final class RlsPolicyTest extends TestCase
         $this->assertSame([], $ids);
     }
 
+    /**
+     * `GET /dealerships/{id}` (rota `publicRead`) mostra quem é o vendedor
+     * responsável mesmo pra quem não é dono/admin -- só o seller dono de
+     * concessionária ATIVA fica visível com a flag setada, o customer nunca
+     * aparece (não tem por quê) e um seller sem concessionária ativa também
+     * não.
+     */
+    #[Test]
+    public function contexto_de_leitura_publica_enxerga_so_seller_com_concessionaria_ativa(): void
+    {
+        $sellerWithDealership = User::register('Seller RLS', 'rls-seller-public@example.com', null, 'secret', UserRole::Seller);
+        $sellerWithoutDealership = User::register('Seller Sem Loja RLS', 'rls-seller-nodealership@example.com', null, 'secret', UserRole::Seller);
+        $this->insertUser($sellerWithDealership);
+        $this->insertUser($sellerWithoutDealership);
+        $this->admin->exec(<<<SQL
+            INSERT INTO dealerships (owner_user_id, name, slug, zip_code, address, number, neighborhood, city, state)
+            VALUES ({$this->admin->quote($sellerWithDealership->id)}, 'RLS Public Center', 'rls-public-center', '00000-000', 'Rua', '1', 'Bairro', 'Cidade', 'SP')
+            SQL);
+
+        try {
+            $this->rls->beginTransaction();
+            $this->rls->exec("SET LOCAL app.is_public_read = 'true'");
+            $ids = array_column($this->rls->query('SELECT id FROM users')->fetchAll(), 'id');
+            $this->rls->rollBack();
+
+            $this->assertContains($sellerWithDealership->id, $ids);
+            $this->assertNotContains($sellerWithoutDealership->id, $ids);
+            $this->assertNotContains($this->customer->id, $ids);
+        } finally {
+            $this->admin->exec('DELETE FROM dealerships WHERE owner_user_id = ' . $this->admin->quote($sellerWithDealership->id));
+            $statement = $this->admin->prepare('DELETE FROM users WHERE id IN (?, ?)');
+            $statement->execute([$sellerWithDealership->id, $sellerWithoutDealership->id]);
+        }
+    }
+
     #[Test]
     public function contexto_de_servico_consegue_inserir(): void
     {

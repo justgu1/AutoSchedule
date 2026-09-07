@@ -11,6 +11,11 @@
         </testsuite>
     </testsuites>
 
+    <!-- Nunca o banco de dev: "force" sobrescreve o DB_DATABASE do container/CI mesmo quando já setado. Ver bin/setup_test_database.php. -->
+    <php>
+        <env name="DB_DATABASE" value="autoschedule_test" force="true"/>
+    </php>
+
     <source>
         <include>
             <directory>src</directory>

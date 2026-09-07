@@ -11,6 +11,7 @@ use App\Infrastructure\Http\Controllers\DealershipController;
 use App\Infrastructure\Http\Controllers\JobController;
 use App\Infrastructure\Http\Controllers\OAuthController;
 use App\Infrastructure\Http\Controllers\UserController;
+use App\Infrastructure\Http\Controllers\ZipCodeController;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
 use App\Infrastructure\Http\Router;
@@ -186,20 +187,20 @@ return static function (Router $router, Container $container, Application $app):
         [$dealershipController, 'store'],
         roles: $adminOrSeller,
         description: 'Creates a dealership. Seller becomes the owner automatically; admin must send owner_user_id.',
-        accepts: ['name', 'zip_code', 'address', 'number', 'complement', 'neighborhood', 'city', 'state', 'phone', 'owner_user_id'],
+        accepts: ['name', 'zip_code', 'address', 'number', 'complement', 'neighborhood', 'city', 'state', 'phone', 'email', 'owner_user_id'],
     );
     $router->get(
         '/api/dealerships/{id}',
         [$dealershipController, 'show'],
-        roles: $adminOrSeller,
-        description: 'Returns a single dealership.',
+        publicRead: true,
+        description: 'Returns a dealership -- full profile for its owner/admin, public-safe profile (name only, no other seller data) for anyone else, including no account at all. Only active dealerships are visible to non-owners.',
     );
     $router->patch(
         '/api/dealerships/{id}',
         [$dealershipController, 'update'],
         roles: $adminOrSeller,
         description: 'Updates dealership profile fields. Admin may also send owner_user_id to reassign it to another seller.',
-        accepts: ['name', 'zip_code', 'address', 'number', 'complement', 'neighborhood', 'city', 'state', 'phone', 'owner_user_id'],
+        accepts: ['name', 'zip_code', 'address', 'number', 'complement', 'neighborhood', 'city', 'state', 'phone', 'email', 'owner_user_id'],
     );
     $router->delete(
         '/api/dealerships/{id}',
@@ -244,5 +245,11 @@ return static function (Router $router, Container $container, Application $app):
         [$jobController, 'events'],
         roles: $anyAuthenticatedRole,
         description: 'Streams the status of an async job via Server-Sent Events until it finishes.',
+    );
+
+    $router->get(
+        '/api/zip-codes/{zip_code}',
+        [$container->get(ZipCodeController::class), 'show'],
+        description: 'Resolves a Brazilian CEP into street/neighborhood/city/state (ViaCEP, cached after the first lookup).',
     );
 };

@@ -43,6 +43,8 @@ isolamento     -> independente, roda em qualquer ordem
 - código em inglês; nomes de teste e comentários podem ficar em português;
 - `make test` roda a suíte.
 
+Nunca contra o banco de dev, nem local: `phpunit.xml` força `DB_DATABASE=autoschedule_test`, um banco irmão no mesmo servidor Postgres (`bin/setup_test_database.php` cria da primeira vez, `make test` migra/seeda de novo a cada rodada -- idempotente). Sessão manual/E2E contra o banco de dev deixa `oauth_refresh_tokens` reais que quebram teste algum dia (ex: `SeederRunnerTest` resetando o admin seedado) -- isolar o banco elimina essa classe de falha por completo, sem precisar resetar nada na mão. CI já era isolado por natureza (Postgres efêmero via `services:`), só o nome do banco (`autoschedule_test`) foi alinhado por consistência.
+
 ## Testes de carga
 
 `backend/load-tests/` (k6, via Docker) valida performance e o comportamento do rate limiting sob concorrência real — não substitui a suíte PHPUnit, que valida regra de negócio. `make load-test` roda a suíte; detalhes de cada cenário em `backend/load-tests/README.md`.
@@ -50,6 +52,8 @@ isolamento     -> independente, roda em qualquer ordem
 ## Testes E2E (Playwright)
 
 `frontend/e2e/` valida os fluxos reais pelo browser contra o build de produção (nginx, não o dev server) -- login, registro, reset de senha (Mailpit real, não mock), logout, self-upgrade pra seller, navegação por teclado e WCAG 2.1 AA (axe-core). Roda em 2 viewports (desktop + mobile). `make e2e` sobe o ambiente e roda a suíte via Docker; detalhes do rate limit relaxado durante o teste em `Makefile`.
+
+Mailpit é dependência real do próprio stack (container do compose) -- mocar não faria sentido. Já um serviço de terceiro genuinamente externo (ex: ViaCEP no formulário de concessionária) é mocado via `page.route()`: resultado determinístico, sem depender da rede/disponibilidade de quem não é dono nem opera.
 
 ## Qualidade estática
 
