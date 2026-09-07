@@ -82,8 +82,8 @@ final class OAuthFlowsTest extends TestCase
         $this->assertFalse($tokenPair->accountRestored);
         $this->assertSame([AuditEvent::LoginSucceeded], $this->audit->events);
         // Actor e target são a mesma pessoa: quem logou é quem "sofreu" o evento.
-        $this->assertSame($this->customer->id, $this->audit->calls[0]['actorId']);
-        $this->assertSame($this->customer->id, $this->audit->calls[0]['targetUserId']);
+        $this->assertSame($this->customer->id, $this->audit->entries[0]->actorId);
+        $this->assertSame($this->customer->id, $this->audit->entries[0]->auditableId);
     }
 
     #[Test]
@@ -112,8 +112,8 @@ final class OAuthFlowsTest extends TestCase
             $this->assertSame([AuditEvent::LoginFailed], $this->audit->events);
             // Identidade não provada (senha errada) -- sem actor, mas o alvo é
             // conhecido porque o email existe.
-            $this->assertNull($this->audit->calls[0]['actorId']);
-            $this->assertSame($this->customer->id, $this->audit->calls[0]['targetUserId']);
+            $this->assertNull($this->audit->entries[0]->actorId);
+            $this->assertSame($this->customer->id, $this->audit->entries[0]->auditableId);
         }
     }
 
@@ -126,8 +126,8 @@ final class OAuthFlowsTest extends TestCase
         } catch (DomainException $exception) {
             $this->assertSame('Invalid credentials.', $exception->getMessage());
             // Nem o email existe -- nem actor nem target pra apontar.
-            $this->assertNull($this->audit->calls[0]['actorId']);
-            $this->assertNull($this->audit->calls[0]['targetUserId']);
+            $this->assertNull($this->audit->entries[0]->actorId);
+            $this->assertNull($this->audit->entries[0]->auditableId);
         }
     }
 
@@ -179,11 +179,10 @@ final class OAuthFlowsTest extends TestCase
             self::fail('Expected a RefreshTokenReused audit event.');
         }
 
-        $reuseCall = $this->audit->calls[$reuseIndex];
-        // Quem reusou o token não provou identidade nenhuma -- sem actor. O
-        // alvo é o dono da família de tokens, não quem reusou.
-        $this->assertNull($reuseCall['actorId']);
-        $this->assertSame($this->customer->id, $reuseCall['targetUserId']);
+        // Quem reusou o token não provou identidade nenhuma: sem ator, e o alvo é o dono da família.
+        $reuse = $this->audit->entries[$reuseIndex];
+        $this->assertNull($reuse->actorId);
+        $this->assertSame($this->customer->id, $reuse->auditableId);
 
         $this->expectException(DomainException::class);
         ($this->refreshAccessToken())('autoschedule-web', $rotated, $this->context());
@@ -218,7 +217,7 @@ final class OAuthFlowsTest extends TestCase
 
         $this->assertNotSame('', $tokenPair->accessToken);
         $this->assertSame([AuditEvent::LoginSucceeded], $this->audit->events);
-        $this->assertSame($this->customer->id, $this->audit->calls[0]['actorId']);
+        $this->assertSame($this->customer->id, $this->audit->entries[0]->actorId);
     }
 
     #[Test]
@@ -311,8 +310,8 @@ final class OAuthFlowsTest extends TestCase
         $this->assertSame(['service:internal'], $tokenPair->scopes);
         $this->assertSame([AuditEvent::ServiceTokenIssued], $this->audit->events);
         // Não é um usuário se autenticando -- sem actor nem target.
-        $this->assertNull($this->audit->calls[0]['actorId']);
-        $this->assertNull($this->audit->calls[0]['targetUserId']);
+        $this->assertNull($this->audit->entries[0]->actorId);
+        $this->assertNull($this->audit->entries[0]->auditableId);
     }
 
     #[Test]

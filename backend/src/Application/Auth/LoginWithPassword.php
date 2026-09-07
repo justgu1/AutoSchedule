@@ -33,7 +33,7 @@ final readonly class LoginWithPassword
 
         if (!$user instanceof User || !$user->verifyPassword($password)) {
             // Sem actor: identidade não foi provada. O alvo só é conhecido quando o e-mail existe.
-            $this->audit->record(AuditEvent::LoginFailed, null, 'User', $user?->id, ['email' => $email], $context->ipAddress, $context->userAgent);
+            $this->audit->record($context->audits(AuditEvent::LoginFailed, $user?->id, ['email' => $email]));
 
             // Mesma resposta pra e-mail inexistente e senha errada: não pode vazar se a conta existe.
             throw new DomainException('Invalid credentials.', DomainErrorType::Unauthorized);
@@ -42,7 +42,7 @@ final readonly class LoginWithPassword
         $restored = $this->accountRestorer->restoreIfTrashed($user, $context);
 
         $tokenPair = $this->tokenPairs->issue($client, $user->id, $user->role, $client->allowedScopes, $restored);
-        $this->audit->record(AuditEvent::LoginSucceeded, $user->id, 'User', $user->id, [], $context->ipAddress, $context->userAgent);
+        $this->audit->record($context->actedBy($user->id)->audits(AuditEvent::LoginSucceeded, $user->id));
 
         return $tokenPair;
     }

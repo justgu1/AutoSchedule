@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Infrastructure\Scheduler;
 
+use App\Domain\Audit\AuditableType;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Dealership\Dealership;
 use App\Domain\Shared\Address;
@@ -40,7 +41,6 @@ final class PurgeTrashedDealershipsTaskTest extends TestCase
             repository: $this->repository,
             audit: $this->audit,
             event: AuditEvent::DealershipPurged,
-            auditableType: 'Dealership',
         );
     }
 
@@ -85,8 +85,8 @@ final class PurgeTrashedDealershipsTaskTest extends TestCase
         $this->task->run();
 
         $this->assertSame([AuditEvent::DealershipPurged], $this->audit->events);
-        $this->assertSame($longTrashed->id, $this->audit->calls[0]['targetUserId']);
-        $this->assertSame('Dealership', $this->audit->calls[0]['auditableType']);
+        $this->assertSame($longTrashed->id, $this->audit->entries[0]->auditableId);
+        $this->assertSame(AuditableType::Dealership, $this->audit->entries[0]->auditableType());
     }
 
     #[Test]

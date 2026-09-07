@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Infrastructure\Queue;
 
 use App\Application\Ports\QueuedJob;
+use App\Infrastructure\Queue\QueueMessage;
 use App\Infrastructure\Queue\RedisQueue;
 use App\Infrastructure\Redis\RedisConnection;
 use PHPUnit\Framework\Attributes\Group;
@@ -41,7 +42,7 @@ final class RedisQueueTest extends TestCase
         $this->queue->push(QueuedJob::SendEmail, ['a' => 1]);
 
         $envelope = $this->queue->pop(timeoutSeconds: 2);
-        assert($envelope !== null);
+        assert($envelope instanceof QueueMessage);
 
         $this->assertSame(QueuedJob::SendEmail, $envelope->job);
         $this->assertSame(['a' => 1], $envelope->payload);
@@ -59,12 +60,12 @@ final class RedisQueueTest extends TestCase
     {
         $this->queue->push(QueuedJob::SendEmail, []);
         $envelope = $this->queue->pop(timeoutSeconds: 2);
-        assert($envelope !== null);
+        assert($envelope instanceof QueueMessage);
 
         $this->queue->retryOrFail($envelope);
 
         $requeued = $this->queue->pop(timeoutSeconds: 2);
-        assert($requeued !== null);
+        assert($requeued instanceof QueueMessage);
         $this->assertSame(1, $requeued->attempts);
     }
 
@@ -73,12 +74,12 @@ final class RedisQueueTest extends TestCase
     {
         $this->queue->push(QueuedJob::SendEmail, []);
         $envelope = $this->queue->pop(timeoutSeconds: 2);
-        assert($envelope !== null);
+        assert($envelope instanceof QueueMessage);
 
         for ($i = 0; $i < 2; $i++) {
             $this->queue->retryOrFail($envelope);
             $envelope = $this->queue->pop(timeoutSeconds: 2);
-            assert($envelope !== null);
+            assert($envelope instanceof QueueMessage);
         }
 
         $this->queue->retryOrFail($envelope);

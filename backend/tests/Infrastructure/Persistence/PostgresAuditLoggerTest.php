@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Infrastructure\Persistence;
 
+use App\Domain\Audit\AuditEntry;
 use App\Domain\Audit\AuditEvent;
 use App\Infrastructure\Persistence\PostgresAuditLogger;
 use App\Infrastructure\Persistence\PostgresConnection;
@@ -36,7 +37,7 @@ final class PostgresAuditLoggerTest extends TestCase
     {
         $logger = new PostgresAuditLogger($this->connection, new NullLogger());
 
-        $logger->record(AuditEvent::LoginFailed, null, 'User', null, ['email' => 'ada@example.com'], '203.0.113.9', 'phpunit-agent');
+        $logger->record(new AuditEntry(AuditEvent::LoginFailed, context: ['email' => 'ada@example.com'], ipAddress: '203.0.113.9', userAgent: 'phpunit-agent'));
 
         $row = $this->connection->pdo()
             ->query('SELECT event, auditable_type, ip_address, user_agent, new_values FROM audit_logs ORDER BY created_at DESC LIMIT 1')
@@ -56,7 +57,7 @@ final class PostgresAuditLoggerTest extends TestCase
         $target = $this->insertUser('target@example.com');
         $logger = new PostgresAuditLogger($this->connection, new NullLogger());
 
-        $logger->record(AuditEvent::UserCreated, $admin, 'User', $target, ['role' => 'seller'], '203.0.113.9', 'phpunit-agent');
+        $logger->record(new AuditEntry(AuditEvent::UserCreated, $admin, $target, ['role' => 'seller'], '203.0.113.9', 'phpunit-agent'));
 
         $row = $this->connection->pdo()
             ->query('SELECT actor_id, user_id FROM audit_logs ORDER BY created_at DESC LIMIT 1')
@@ -67,13 +68,13 @@ final class PostgresAuditLoggerTest extends TestCase
     }
 
     #[Test]
-    public function auditable_type_diferente_de_user_nao_preenche_user_id(): void
+    public function evento_de_dominio_que_nao_e_usuario_nao_preenche_user_id(): void
     {
         // user_id tem FK pra users e auditable_id não, daí a assimetria.
         $dealershipId = '00000000-0000-4000-8000-000000000001';
         $logger = new PostgresAuditLogger($this->connection, new NullLogger());
 
-        $logger->record(AuditEvent::DealershipCreated, null, 'Dealership', $dealershipId, [], '203.0.113.9', 'phpunit-agent');
+        $logger->record(new AuditEntry(AuditEvent::DealershipCreated, auditableId: $dealershipId, ipAddress: '203.0.113.9'));
 
         $row = $this->connection->pdo()
             ->query('SELECT auditable_type, auditable_id, user_id FROM audit_logs ORDER BY created_at DESC LIMIT 1')
@@ -90,7 +91,7 @@ final class PostgresAuditLoggerTest extends TestCase
         // PDO quebrado de propósito: auditoria nunca pode derrubar a resposta principal.
         $logger = new PostgresAuditLogger(new FixedConnection(new \PDO('sqlite::memory:')), new NullLogger());
 
-        $logger->record(AuditEvent::LoginSucceeded, null, 'User', null, [], '127.0.0.1', null);
+        $logger->record(new AuditEntry(AuditEvent::LoginSucceeded, ipAddress: '127.0.0.1'));
 
         $this->addToAssertionCount(1);
     }

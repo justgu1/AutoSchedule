@@ -30,6 +30,6 @@ final readonly class PurgeAccount
         }
 
         $this->users->purge($user->anonymized());
-        $this->audit->record(AuditEvent::AccountPurged, $context->actorId, 'User', $user->id, [], $context->ipAddress, $context->userAgent);
+        $this->audit->record($context->audits(AuditEvent::AccountPurged, $user->id));
     }
 }

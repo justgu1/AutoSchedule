@@ -37,6 +37,6 @@ final readonly class TrashAccount
         $this->refreshTokens->revokeAllForUser($user->id);
         // Marcada como cascata pra o restore devolver só o que caiu por causa da conta, não o que o dono já tinha arquivado.
         $this->dealerships->trashAllOwnedBy($user->id);
-        $this->audit->record(AuditEvent::AccountTrashed, $context->actorId, 'User', $user->id, [], $context->ipAddress, $context->userAgent);
+        $this->audit->record($context->audits(AuditEvent::AccountTrashed, $user->id));
     }
 }

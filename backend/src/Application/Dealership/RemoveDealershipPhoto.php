@@ -32,6 +32,6 @@ final readonly class RemoveDealershipPhoto
         $oldPhotoFileId = $dealership->photoFileId;
         $this->dealerships->update($dealership->withPhoto(null));
         $this->photos->delete($oldPhotoFileId);
-        $this->audit->record(AuditEvent::DealershipPhotoRemoved, $context->actorId, 'Dealership', $dealership->id, [], $context->ipAddress, $context->userAgent);
+        $this->audit->record($context->audits(AuditEvent::DealershipPhotoRemoved, $dealership->id));
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Scheduler;
 
+use App\Domain\Audit\AuditEntry;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
 use App\Domain\Shared\Ports\TrashableRepository;
@@ -17,7 +18,6 @@ final readonly class PurgeTrashedEntitiesTask implements ScheduledTask
         private TrashableRepository $repository,
         private AuditLogger $audit,
         private AuditEvent $event,
-        private string $auditableType,
     ) {
     }
 
@@ -41,7 +41,7 @@ final readonly class PurgeTrashedEntitiesTask implements ScheduledTask
             }
 
             $this->repository->purge($entity->anonymized());
-            $this->audit->record($this->event, null, $this->auditableType, $entity->id, [], null, null);
+            $this->audit->record(new AuditEntry($this->event, auditableId: $entity->id));
         }
     }
 }

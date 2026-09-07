@@ -7,6 +7,7 @@ namespace App\Application\Dealership;
 use App\Application\File\UploadFile;
 use App\Application\Ports\JobProgress;
 use App\Application\Ports\TempFileStore;
+use App\Domain\Audit\AuditEntry;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
 use App\Domain\Dealership\Dealership;
@@ -51,7 +52,7 @@ final readonly class ProcessDealershipPhoto
             $this->dealerships->update($dealership->withPhoto($file->id));
             $this->photos->delete($oldPhotoFileId);
 
-            $this->audit->record(AuditEvent::DealershipPhotoUpdated, $uploadedBy, 'Dealership', $dealership->id, [], null, null);
+            $this->audit->record(new AuditEntry(AuditEvent::DealershipPhotoUpdated, $uploadedBy, $dealership->id));
 
             $this->jobProgress->update($jobId, 'done', 'done', 100, [
                 'result' => ['photo_url' => $this->storage->url($file->path)],

@@ -33,6 +33,6 @@ final readonly class PurgeDealership
         $oldPhotoFileId = $dealership->photoFileId;
         $this->dealerships->update($dealership->anonymized());
         $this->photos->delete($oldPhotoFileId);
-        $this->audit->record(AuditEvent::DealershipPurged, $context->actorId, 'Dealership', $dealership->id, [], $context->ipAddress, $context->userAgent);
+        $this->audit->record($context->audits(AuditEvent::DealershipPurged, $dealership->id));
     }
 }

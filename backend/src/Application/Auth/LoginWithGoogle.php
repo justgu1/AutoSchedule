@@ -53,7 +53,7 @@ final readonly class LoginWithGoogle
             }
 
             $restored = $this->accountRestorer->restoreIfTrashed($user, $context);
-            $this->audit->record(AuditEvent::LoginSucceeded, $user->id, 'User', $user->id, ['via' => 'google'], $context->ipAddress, $context->userAgent);
+            $this->audit->record($context->actedBy($user->id)->audits(AuditEvent::LoginSucceeded, $user->id, ['via' => 'google']));
 
             return $this->tokenPairs->issue($client, $user->id, $user->role, $client->allowedScopes, $restored);
         }
@@ -63,7 +63,7 @@ final readonly class LoginWithGoogle
         if ($existingByEmail instanceof User) {
             $this->identities->insert(UserIdentity::link($existingByEmail->id, 'google', $claims->subject, $email));
             $restored = $this->accountRestorer->restoreIfTrashed($existingByEmail, $context);
-            $this->audit->record(AuditEvent::LoginSucceeded, $existingByEmail->id, 'User', $existingByEmail->id, ['via' => 'google', 'linked' => true], $context->ipAddress, $context->userAgent);
+            $this->audit->record($context->actedBy($existingByEmail->id)->audits(AuditEvent::LoginSucceeded, $existingByEmail->id, ['via' => 'google', 'linked' => true]));
 
             return $this->tokenPairs->issue($client, $existingByEmail->id, $existingByEmail->role, $client->allowedScopes, $restored);
         }
@@ -72,7 +72,7 @@ final readonly class LoginWithGoogle
         $newUser = User::register($claims->name, $email, null, bin2hex(random_bytes(32)), UserRole::Customer);
         $this->users->insert($newUser);
         $this->identities->insert(UserIdentity::link($newUser->id, 'google', $claims->subject, $email));
-        $this->audit->record(AuditEvent::UserCreated, $newUser->id, 'User', $newUser->id, ['role' => $newUser->role->value, 'via' => 'google'], $context->ipAddress, $context->userAgent);
+        $this->audit->record($context->actedBy($newUser->id)->audits(AuditEvent::UserCreated, $newUser->id, ['role' => $newUser->role->value, 'via' => 'google']));
 
         return $this->tokenPairs->issue($client, $newUser->id, $newUser->role, $client->allowedScopes);
     }

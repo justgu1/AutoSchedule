@@ -41,18 +41,14 @@ final readonly class UpdateDealership
         }
 
         $this->dealerships->update($updated);
-        $this->audit->record(AuditEvent::DealershipUpdated, $context->actorId, 'Dealership', $updated->id, ['fields' => $changes->fields()], $context->ipAddress, $context->userAgent);
+        $this->audit->record($context->audits(AuditEvent::DealershipUpdated, $updated->id, ['fields' => $changes->fields()]));
 
         if ($updated->ownerUserId !== $previousOwnerUserId) {
-            $this->audit->record(
+            $this->audit->record($context->audits(
                 AuditEvent::DealershipOwnerReassigned,
-                $context->actorId,
-                'Dealership',
                 $updated->id,
                 ['from' => $previousOwnerUserId, 'to' => $updated->ownerUserId],
-                $context->ipAddress,
-                $context->userAgent,
-            );
+            ));
         }
 
         return DealershipProfile::fromDealership($updated, $this->photos->urlFor($updated));

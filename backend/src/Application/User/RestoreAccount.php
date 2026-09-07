@@ -33,6 +33,6 @@ final readonly class RestoreAccount
 
         $this->users->restore($user->id);
         $this->dealerships->restoreAutoTrashedOwnedBy($user->id);
-        $this->audit->record(AuditEvent::AccountRestored, $context->actorId, 'User', $user->id, [], $context->ipAddress, $context->userAgent);
+        $this->audit->record($context->audits(AuditEvent::AccountRestored, $user->id));
     }
 }

@@ -43,7 +43,7 @@ final readonly class CreateDealership
         );
 
         $this->dealerships->insert($dealership);
-        $this->audit->record(AuditEvent::DealershipCreated, $context->actorId, 'Dealership', $dealership->id, [], $context->ipAddress, $context->userAgent);
+        $this->audit->record($context->audits(AuditEvent::DealershipCreated, $dealership->id));
 
         return DealershipProfile::fromDealership($dealership, $this->photos->urlFor($dealership));
     }

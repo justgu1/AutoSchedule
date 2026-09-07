@@ -226,7 +226,6 @@ final class ContainerFactory
                     repository: $c->get(UserRepository::class),
                     audit: $c->get(AuditLogger::class),
                     event: AuditEvent::AccountPurged,
-                    auditableType: 'User',
                 ),
                 new PurgeTrashedEntitiesTask(
                     name: 'purge-trashed-dealerships',
@@ -234,7 +233,6 @@ final class ContainerFactory
                     repository: $c->get(DealershipRepository::class),
                     audit: $c->get(AuditLogger::class),
                     event: AuditEvent::DealershipPurged,
-                    auditableType: 'Dealership',
                 ),
             ],
         ));

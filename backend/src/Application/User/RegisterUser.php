@@ -36,7 +36,7 @@ final readonly class RegisterUser
 
         // Cadastro público não tem ator autenticado, então a conta criada é o próprio ator.
         $actorId = $context->actorId ?? $user->id;
-        $this->audit->record(AuditEvent::UserCreated, $actorId, 'User', $user->id, ['role' => $user->role->value], $context->ipAddress, $context->userAgent);
+        $this->audit->record($context->actedBy($actorId)->audits(AuditEvent::UserCreated, $user->id, ['role' => $user->role->value]));
 
         return $user;
     }

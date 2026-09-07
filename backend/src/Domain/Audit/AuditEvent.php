@@ -25,4 +25,14 @@ enum AuditEvent: string
     case DealershipOwnerReassigned = 'dealership.owner_reassigned';
     case DealershipPhotoUpdated = 'dealership.photo_updated';
     case DealershipPhotoRemoved = 'dealership.photo_removed';
+
+    /** O afetado sai do próprio evento. Sem `default`: domínio novo tem que aparecer aqui, não virar 'User' calado. */
+    public function auditableType(): AuditableType
+    {
+        return match (explode('.', $this->value)[0]) {
+            'auth', 'user' => AuditableType::User,
+            'dealership' => AuditableType::Dealership,
+            default => throw new \LogicException(sprintf('Event "%s" has no auditable type.', $this->value)),
+        };
+    }
 }

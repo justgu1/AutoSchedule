@@ -43,7 +43,7 @@ final readonly class UpdateUserProfile
             $auditContext['role'] = ['from' => $previousRole->value, 'to' => $user->role->value];
         }
 
-        $this->audit->record(AuditEvent::ProfileUpdated, $context->actorId, 'User', $user->id, $auditContext, $context->ipAddress, $context->userAgent);
+        $this->audit->record($context->audits(AuditEvent::ProfileUpdated, $user->id, $auditContext));
 
         return $user;
     }

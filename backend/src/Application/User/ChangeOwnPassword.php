@@ -30,6 +30,6 @@ final readonly class ChangeOwnPassword
         }
 
         $this->users->update($user->withNewPassword($newPassword));
-        $this->audit->record(AuditEvent::PasswordChanged, $user->id, 'User', $user->id, ['via' => 'self'], $context->ipAddress, $context->userAgent);
+        $this->audit->record($context->audits(AuditEvent::PasswordChanged, $user->id, ['via' => 'self']));
     }
 }

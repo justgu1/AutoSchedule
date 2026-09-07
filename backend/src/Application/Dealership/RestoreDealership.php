@@ -29,6 +29,6 @@ final readonly class RestoreDealership
         }
 
         $this->dealerships->restore($dealership->id);
-        $this->audit->record(AuditEvent::DealershipRestored, $context->actorId, 'Dealership', $dealership->id, [], $context->ipAddress, $context->userAgent);
+        $this->audit->record($context->audits(AuditEvent::DealershipRestored, $dealership->id));
     }
 }

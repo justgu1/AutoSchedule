@@ -36,7 +36,7 @@ final readonly class ResetPassword
         }
 
         $this->users->update($user->withNewPassword($newPassword));
-        $this->audit->record(AuditEvent::PasswordChanged, $user->id, 'User', $user->id, ['via' => 'reset'], $context->ipAddress, $context->userAgent);
+        $this->audit->record($context->actedBy($user->id)->audits(AuditEvent::PasswordChanged, $user->id, ['via' => 'reset']));
 
         $this->passwordResetTokens->markUsed($token->id);
         // Invalida os outros links pendentes: nenhum e-mail antigo pode continuar valendo.
