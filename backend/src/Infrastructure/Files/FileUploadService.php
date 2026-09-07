@@ -7,6 +7,7 @@ namespace App\Infrastructure\Files;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
 use App\Domain\Files\Ports\FileRepository;
+use App\Domain\Files\Ports\ImageOptimizer;
 use App\Domain\Files\StoredFile;
 use App\Domain\Ports\StorageProvider;
 use App\Domain\Support\Uuid;
@@ -27,8 +28,25 @@ final readonly class FileUploadService
     public function __construct(
         private StorageProvider $storage,
         private FileRepository $files,
+        private ImageOptimizer $imageOptimizer,
         private string $tempPath,
     ) {
+    }
+
+    /**
+     * Toda foto do site passa por aqui em vez de `upload()` direto -- converte
+     * pra WebP e redimensiona pro padrão do site antes de gravar, então o
+     * MIME permitido é sempre só `image/webp` (o que sai do otimizador).
+     */
+    public function uploadImage(string $uploadedTmpPath, string $originalName, ?string $uploadedBy): StoredFile
+    {
+        $optimized = $this->imageOptimizer->optimizeToWebp($uploadedTmpPath);
+
+        try {
+            return $this->upload($optimized->path, $originalName, ['image/webp'], $uploadedBy);
+        } finally {
+            @unlink($optimized->path);
+        }
     }
 
     /**

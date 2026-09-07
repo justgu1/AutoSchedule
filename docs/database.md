@@ -70,19 +70,11 @@ Table dealerships {
   longitude decimal(10,7)
   google_place_id varchar(255)
   phone varchar(20)
+  photo_file_id uuid
   status dealership_status [not null, default: 'active']
   trashed_by_owner_deactivation boolean [not null, default: false]
   trashed_at timestamptz
   anonymized_at timestamptz
-  created_at timestamptz [not null]
-  updated_at timestamptz [not null]
-}
-
-Table dealership_images {
-  id uuid [pk]
-  dealership_id uuid [not null]
-  file_id uuid [not null]
-  position smallint [not null]
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 }
@@ -187,8 +179,7 @@ Table audit_logs {
 }
 
 Ref: dealerships.owner_user_id > users.id
-Ref: dealership_images.dealership_id > dealerships.id
-Ref: dealership_images.file_id > files.id
+Ref: dealerships.photo_file_id > files.id
 Ref: files.uploaded_by > users.id
 Ref: vehicles.dealership_id > dealerships.id
 Ref: vehicle_images.vehicle_id > vehicles.id
@@ -202,11 +193,11 @@ Ref: audit_logs.user_id > users.id
 Ref: audit_logs.actor_id > users.id
 ```
 
-## Galeria (concessionária e veículo)
+## Imagens (concessionária e veículo)
 
-As imagens são armazenadas no MinIO. O PostgreSQL mantém somente a referência ao objeto e sua posição na galeria.
+As imagens são armazenadas no MinIO. O PostgreSQL mantém somente a referência ao objeto.
 
-`dealership_images` referencia `files` (metadado genérico de upload, reaproveitado por qualquer domínio); `vehicle_images` guarda o `path` direto -- domínio de veículo ainda não migrou pro mesmo padrão.
+Concessionária tem só uma foto -- `dealerships.photo_file_id` referencia `files` (metadado genérico de upload, reaproveitado por qualquer domínio) direto, sem tabela de junção nem posição. Veículo terá galeria de verdade (várias fotos, ordenadas por `position`) quando esse domínio for implementado -- `vehicle_images` na modelagem abaixo ainda não existe de fato.
 
 ```text
 position = 0 → primeira imagem
@@ -280,14 +271,11 @@ WHERE deleted_at IS NULL
 
 ## Imagens
 
-Cada posição da galeria deve ser única dentro de um veículo ou de uma concessionária:
+Cada posição da galeria de veículo deve ser única dentro do próprio veículo (concessionária não tem galeria, só uma foto, sem posição pra ter conflito):
 
 ```sql
 CREATE UNIQUE INDEX vehicle_images_position_unique
 ON vehicle_images (vehicle_id, position);
-
-CREATE UNIQUE INDEX dealership_images_position_unique
-ON dealership_images (dealership_id, position);
 ```
 
 ## Busca

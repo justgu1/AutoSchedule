@@ -51,7 +51,7 @@ final readonly class PurgeTrashedEntitiesTask implements ScheduledTask
     {
         foreach (($this->findEligible)($this->graceDays, new \DateTimeImmutable()) as $entity) {
             ($this->purge)($entity);
-            $this->audit->record($this->event, null, $this->auditableType, ($this->identify)($entity), [], '', null);
+            $this->audit->record($this->event, null, $this->auditableType, ($this->identify)($entity), [], null, null);
         }
     }
 }

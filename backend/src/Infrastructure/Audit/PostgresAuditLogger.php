@@ -17,7 +17,7 @@ final readonly class PostgresAuditLogger implements AuditLogger
     }
 
     /** @param array<string, mixed> $context */
-    public function record(AuditEvent $event, ?string $actorId, string $auditableType, ?string $auditableId, array $context, string $ipAddress, ?string $userAgent): void
+    public function record(AuditEvent $event, ?string $actorId, string $auditableType, ?string $auditableId, array $context, ?string $ipAddress, ?string $userAgent): void
     {
         try {
             $statement = $this->pdo->prepare(<<<'SQL'

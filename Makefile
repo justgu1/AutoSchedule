@@ -118,16 +118,30 @@ load-test:
 
 e2e-setup:
 	@docker compose build nginx
-	@RATE_LIMIT_AUTH_MAX=1000 docker compose up -d nginx mailpit backend worker
+	@RATE_LIMIT_AUTH_MAX=1000 docker compose up -d nginx mailpit minio backend worker
 	@echo "==> instalando dependências do backend (imagem é --no-dev, bind-mount local some com o vendor/)..."
 	@docker compose exec backend composer install --no-interaction --prefer-dist
 	@echo "==> aplicando migrations e seeders (banco pode estar vazio -- ambiente novo/CI)..."
 	@docker compose exec backend php bin/migrate.php
 	@docker compose exec backend php bin/seed.php
-	@docker compose run --rm e2e npm ci
+	@echo "==> criando o bucket do MinIO (upload de foto de concessionária precisa dele)..."
+	@MINIO_PORT=$$(docker compose port minio 9000 | cut -d: -f2); \
+	MINIO_USER=$$(docker compose exec minio printenv MINIO_ROOT_USER); \
+	MINIO_PASS=$$(docker compose exec minio printenv MINIO_ROOT_PASSWORD); \
+	for i in $$(seq 1 20); do curl -sf http://127.0.0.1:$$MINIO_PORT/minio/health/live && break; sleep 1; done; \
+	docker run --rm --network host --entrypoint sh minio/mc -c "\
+		mc alias set local http://127.0.0.1:$$MINIO_PORT $$MINIO_USER $$MINIO_PASS && \
+		mc mb --ignore-existing local/autoschedule && \
+		mc anonymous set download local/autoschedule"
+	@docker compose run --rm --no-deps e2e npm ci
 
+# `--no-deps`: sem isso, `docker compose run` reconcilia as dependências do
+# serviço `e2e` a cada chamada -- e recriar `backend` sozinho (sem recriar
+# `nginx` junto) deixa o `nginx` com a resolução de DNS antiga em cache,
+# apontando pro IP morto do container anterior (502 Bad Gateway em toda
+# rota da API, apesar do backend novo estar de pé e saudável).
 e2e: e2e-setup
-	@RATE_LIMIT_AUTH_MAX=1000 docker compose run --rm e2e npx playwright test
+	@RATE_LIMIT_AUTH_MAX=1000 docker compose run --rm --no-deps e2e npx playwright test
 	@echo "==> restaurando rate limit padrão do backend..."
 	@docker compose up -d backend
 

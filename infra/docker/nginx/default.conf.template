@@ -5,10 +5,26 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
-    client_max_body_size 20M;
+    client_max_body_size 21M;
 
     location / {
         try_files $uri $uri/ /index.html;
+    }
+
+    # Antes da location geral de /api de propósito: nginx casa location
+    # regex na ordem do arquivo, a primeira que bater vence -- SSE (job de
+    # foto de concessionária, e qualquer job assíncrono futuro) precisa de
+    # buffering desligado, senão o cliente só vê tudo de uma vez no final.
+    location ~ ^/api/jobs/[^/]+/events$ {
+        include fastcgi_params;
+
+        fastcgi_param SCRIPT_FILENAME /var/www/html/public/index.php;
+        fastcgi_param SCRIPT_NAME /index.php;
+        fastcgi_param PATH_INFO $uri;
+
+        fastcgi_pass ${BACKEND_UPSTREAM};
+        fastcgi_buffering off;
+        fastcgi_read_timeout 70s;
     }
 
     location ~ ^/api(/.*)?$ {

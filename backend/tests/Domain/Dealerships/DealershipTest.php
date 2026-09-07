@@ -64,6 +64,21 @@ final class DealershipTest extends TestCase
     }
 
     #[Test]
+    public function with_photo_substitui_a_referencia_mas_preserva_o_resto(): void
+    {
+        $dealership = $this->registerFixture();
+        $this->assertNull($dealership->photoFileId);
+
+        $withPhoto = $dealership->withPhoto('file-1');
+        $this->assertSame('file-1', $withPhoto->photoFileId);
+        $this->assertSame($dealership->id, $withPhoto->id);
+        $this->assertSame($dealership->name, $withPhoto->name);
+
+        $withoutPhoto = $withPhoto->withPhoto(null);
+        $this->assertNull($withoutPhoto->photoFileId);
+    }
+
+    #[Test]
     public function is_eligible_for_restore_permite_so_trashed_ainda_nao_anonimizado(): void
     {
         $active = $this->registerFixture();
@@ -93,7 +108,7 @@ final class DealershipTest extends TestCase
     #[Test]
     public function anonymized_escruba_identificador_direto_mas_preserva_geolocalizacao(): void
     {
-        $dealership = $this->registerFixture();
+        $dealership = $this->registerFixture()->withPhoto('file-1');
 
         $anonymized = $dealership->anonymized();
 
@@ -110,6 +125,7 @@ final class DealershipTest extends TestCase
         $this->assertSame($dealership->state, $anonymized->state);
         $this->assertSame(TrashableStatus::Deleted, $anonymized->status);
         $this->assertNotNull($anonymized->anonymizedAt);
+        $this->assertNull($anonymized->photoFileId);
     }
 
     private function registerFixture(): Dealership
@@ -147,6 +163,7 @@ final class DealershipTest extends TestCase
             longitude: $dealership->longitude,
             googlePlaceId: $dealership->googlePlaceId,
             phone: $dealership->phone,
+            photoFileId: $dealership->photoFileId,
             status: TrashableStatus::Trashed,
             trashedByOwnerDeactivation: false,
             trashedAt: $trashedAt ?? new \DateTimeImmutable(),

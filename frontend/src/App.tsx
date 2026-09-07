@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router-dom';
 import { AuthLayout } from './layouts/AuthLayout';
 import { AuthenticatedLayout } from './layouts/AuthenticatedLayout';
 import { PublicLayout } from './layouts/PublicLayout';
+import { DealershipsPage } from './pages/DealershipsPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
@@ -23,6 +24,7 @@ export default function App() {
             </Route>
             <Route element={<AuthenticatedLayout />}>
                 <Route path="/me" element={<MePage />} />
+                <Route path="/dealerships" element={<DealershipsPage />} />
             </Route>
         </Routes>
     );

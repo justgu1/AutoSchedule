@@ -40,9 +40,11 @@ Só a lixeira em cascata é restaurada automaticamente quando o dono volta a log
 
 Anonimização escruba identificador direto (nome vira "Concessionária removida", endereço/complemento/telefone/`google_place_id` apagados) mas preserva CEP/cidade/estado/geolocalização -- não são dado pessoal, e mantêm o histórico de agendamento localizável.
 
-### Fotos
+### Foto
 
-Validadas por MIME (`image/jpeg`, `image/png`, `image/webp`) antes do upload pro MinIO, mesmo `FileUploadService` do resto da aplicação. `position` calculada automaticamente (próxima livre), sem endpoint de reordenar ainda.
+Uma só, não galeria -- `POST /dealerships/{id}/photo` substitui a anterior (que é apagada do storage, não fica órfã); `DELETE` remove. Até 20MB por upload; validada por MIME real, não só a extensão.
+
+Processada fora do request: o endpoint só valida o essencial (arquivo presente, tamanho) e enfileira, devolvendo `202` com um `job_id` na hora -- quem chamou acompanha o resultado por `GET /jobs/{job_id}` (snapshot) ou `GET /jobs/{job_id}/events` (SSE, evento por mudança de status: `queued` → `processing` → `done`/`failed`). O worker é quem converte pro padrão do site (WebP, redimensionada a até 1600px no lado maior) antes de gravar -- pensado pra reaproveitar no futuro import em lote da galeria de veículo, mesmo mecanismo.
 
 ## Veículos
 

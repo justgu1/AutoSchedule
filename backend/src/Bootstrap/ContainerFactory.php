@@ -17,6 +17,7 @@ use App\Domain\Auth\Ports\UserIdentityRepository;
 use App\Domain\Dealerships\Dealership;
 use App\Domain\Dealerships\Ports\DealershipRepository;
 use App\Domain\Files\Ports\FileRepository;
+use App\Domain\Files\Ports\ImageOptimizer;
 use App\Domain\Notifications\Ports\MailProvider;
 use App\Domain\Ports\DatabaseConnection;
 use App\Domain\Ports\Queue;
@@ -34,10 +35,13 @@ use App\Infrastructure\Container\Container;
 use App\Infrastructure\Database\PostgresConnection;
 use App\Infrastructure\Dealerships\PostgresDealershipRepository;
 use App\Infrastructure\Files\FileUploadService;
+use App\Infrastructure\Files\GdImageOptimizer;
 use App\Infrastructure\Files\PostgresFileRepository;
 use App\Infrastructure\Http\Controllers\DealershipController;
+use App\Infrastructure\Http\Controllers\JobController;
 use App\Infrastructure\Http\Controllers\OAuthController;
 use App\Infrastructure\Http\Controllers\UserController;
+use App\Infrastructure\Jobs\JobStatusStore;
 use App\Infrastructure\Logging\Logger;
 use App\Infrastructure\Mail\SymfonyMailProvider;
 use App\Infrastructure\Pagination\PaginationPolicy;
@@ -137,9 +141,14 @@ final class ContainerFactory
             FileRepository::class,
             static fn (Container $c): FileRepository => new PostgresFileRepository($c->get(DatabaseConnection::class)->pdo()),
         );
+        $container->set(
+            ImageOptimizer::class,
+            static fn (): ImageOptimizer => new GdImageOptimizer($app->config('storage')['temp_path']),
+        );
         $container->set(FileUploadService::class, static fn (Container $c): FileUploadService => new FileUploadService(
             storage: $c->get(StorageProvider::class),
             files: $c->get(FileRepository::class),
+            imageOptimizer: $c->get(ImageOptimizer::class),
             tempPath: $app->config('storage')['temp_path'],
         ));
         $container->set(
@@ -245,14 +254,24 @@ final class ContainerFactory
                 passwordResetTemplatePath: dirname(__DIR__, 2) . '/resources/mail/password-reset.html',
             );
         });
+        $container->set(
+            JobStatusStore::class,
+            static fn (Container $c): JobStatusStore => new JobStatusStore($c->get(RedisConnection::class)),
+        );
         $container->set(DealershipController::class, static fn (Container $c): DealershipController => new DealershipController(
             dealerships: $c->get(DealershipRepository::class),
             files: $c->get(FileRepository::class),
-            uploads: $c->get(FileUploadService::class),
             storage: $c->get(StorageProvider::class),
+            queue: $c->get(Queue::class),
+            jobStatus: $c->get(JobStatusStore::class),
             audit: $c->get(AuditLogger::class),
             pagination: $c->get(PaginationPolicy::class),
+            tempPath: $app->config('storage')['temp_path'],
         ));
+        $container->set(
+            JobController::class,
+            static fn (Container $c): JobController => new JobController($c->get(JobStatusStore::class)),
+        );
 
         return $container;
     }

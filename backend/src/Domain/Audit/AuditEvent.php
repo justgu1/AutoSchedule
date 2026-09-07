@@ -23,6 +23,6 @@ enum AuditEvent: string
     case DealershipRestored = 'dealership.restored';
     case DealershipPurged = 'dealership.purged';
     case DealershipOwnerReassigned = 'dealership.owner_reassigned';
-    case DealershipImageAdded = 'dealership.image_added';
-    case DealershipImageRemoved = 'dealership.image_removed';
+    case DealershipPhotoUpdated = 'dealership.photo_updated';
+    case DealershipPhotoRemoved = 'dealership.photo_removed';
 }

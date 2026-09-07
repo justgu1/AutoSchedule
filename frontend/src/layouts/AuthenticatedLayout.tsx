@@ -6,7 +6,7 @@ import Container from '@mui/material/Container';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Navigate, Outlet, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, Navigate, Outlet, useNavigate } from 'react-router-dom';
 import { getMe, logout } from '../lib/auth';
 
 /**
@@ -45,9 +45,19 @@ export function AuthenticatedLayout() {
         <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
             <AppBar position="static" color="default" elevation={1}>
                 <Toolbar sx={{ justifyContent: 'space-between' }}>
-                    <Typography variant="h6" component="span">
-                        AutoSchedule
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <Typography variant="h6" component="span">
+                            AutoSchedule
+                        </Typography>
+                        <Button component={RouterLink} to="/me" size="small">
+                            Meu perfil
+                        </Button>
+                        {(me.data.role === 'admin' || me.data.role === 'seller') && (
+                            <Button component={RouterLink} to="/dealerships" size="small">
+                                Concessionárias
+                            </Button>
+                        )}
+                    </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                         <Typography variant="body2">{me.data.name}</Typography>
                         <Button size="small" onClick={handleLogout}>
