@@ -535,12 +535,6 @@ parameters:
 			path: src/Infrastructure/Http/Request.php
 
 		-
-			message: '#^Parameter \#3 \$options of function setcookie expects array\{expires\?\: int, path\?\: string, domain\?\: string, secure\?\: bool, httponly\?\: bool, samesite\?\: ''Lax''\|''lax''\|''None''\|''none''\|''Strict''\|''strict''\}, array\{expires\: int\<\-3599, max\>, path\: ''/'', httponly\: bool, samesite\: string, secure\: bool\} given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Infrastructure/Http/Response.php
-
-		-
 			message: '#^Argument of an invalid type list\<string\>\|false supplied for foreach, only iterables are supported\.$#'
 			identifier: foreach.nonIterable
 			count: 1

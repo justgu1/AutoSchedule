@@ -38,7 +38,7 @@ Node.js só existe durante o build -- a imagem final não carrega `node_modules`
 
 ## Backend
 
-PHP 8.4, PHP-FPM, Composer. Nginx cuida da camada HTTP, PHP-FPM executa a aplicação.
+PHP 8.5, PHP-FPM, Composer. Nginx cuida da camada HTTP, PHP-FPM executa a aplicação.
 
 ## Camadas
 

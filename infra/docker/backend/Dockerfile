@@ -1,4 +1,4 @@
-FROM php:8.4-fpm-alpine
+FROM php:8.5-fpm-alpine
 
 WORKDIR /var/www/html
 
@@ -16,9 +16,9 @@ RUN apk add --no-cache \
         libwebp-dev \
         freetype-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
+    # opcache não entra aqui: a partir do PHP 8.5 já vem compilada na imagem oficial.
     && docker-php-ext-install \
         pdo_pgsql \
-        opcache \
         gd \
     && apk del .build-deps
 

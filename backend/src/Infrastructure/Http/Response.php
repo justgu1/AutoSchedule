@@ -8,7 +8,7 @@ class Response
 {
     /**
      * @param array<string, string> $headers
-     * @param array<string, array{value: string, maxAge: int, httpOnly: bool, sameSite: string, secure: bool}> $cookies
+     * @param array<string, Cookie> $cookies
      */
     public function __construct(
         protected readonly string $body = '',
@@ -32,7 +32,7 @@ class Response
         return $this->headers;
     }
 
-    /** @return array<string, array{value: string, maxAge: int, httpOnly: bool, sameSite: string, secure: bool}> */
+    /** @return array<string, Cookie> */
     public function cookies(): array
     {
         return $this->cookies;
@@ -84,23 +84,16 @@ class Response
         return $clone;
     }
 
-    /** $maxAge em segundos; 0 = cookie de sessão (some ao fechar o browser); negativo = apaga o cookie (logout). */
     public function withCookie(
         string $name,
         string $value,
         int $maxAge = 0,
         bool $httpOnly = true,
-        string $sameSite = 'Strict',
+        SameSite $sameSite = SameSite::Strict,
         bool $secure = false,
     ): static {
         $clone = clone $this;
-        $clone->cookies[$name] = [
-            'value' => $value,
-            'maxAge' => $maxAge,
-            'httpOnly' => $httpOnly,
-            'sameSite' => $sameSite,
-            'secure' => $secure,
-        ];
+        $clone->cookies[$name] = new Cookie($value, $maxAge, $httpOnly, $sameSite, $secure);
 
         return $clone;
     }
@@ -114,18 +107,12 @@ class Response
         }
 
         foreach ($this->cookies as $name => $cookie) {
-            $expires = match (true) {
-                $cookie['maxAge'] > 0 => time() + $cookie['maxAge'],
-                $cookie['maxAge'] < 0 => time() - 3600,
-                default => 0,
-            };
-
-            setcookie($name, $cookie['value'], [
-                'expires' => $expires,
+            setcookie($name, $cookie->value, [
+                'expires' => $cookie->expiresAt(),
                 'path' => '/',
-                'httponly' => $cookie['httpOnly'],
-                'samesite' => $cookie['sameSite'],
-                'secure' => $cookie['secure'],
+                'httponly' => $cookie->httpOnly,
+                'samesite' => $cookie->sameSite->value,
+                'secure' => $cookie->secure,
             ]);
         }
 

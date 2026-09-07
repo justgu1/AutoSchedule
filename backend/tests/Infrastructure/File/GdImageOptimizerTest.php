@@ -96,7 +96,6 @@ final class GdImageOptimizerTest extends TestCase
 
         $path = $this->tempFilePath('optimizer-source-') . '.png';
         imagepng($image, $path);
-        imagedestroy($image);
 
         return $path;
     }
@@ -106,7 +105,6 @@ final class GdImageOptimizerTest extends TestCase
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
         $this->assertNotFalse($finfo);
         $mimeType = finfo_file($finfo, $path);
-        finfo_close($finfo);
 
         return $mimeType !== false ? $mimeType : 'application/octet-stream';
     }
