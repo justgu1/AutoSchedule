@@ -25,6 +25,7 @@ final readonly class QueueMessage
         return new self(QueuedJob::from($decoded['job']), $decoded['payload'], $decoded['attempts']);
     }
 
+    #[\NoDiscard]
     public function retried(): self
     {
         return new self($this->job, $this->payload, $this->attempts + 1);

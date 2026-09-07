@@ -13,6 +13,7 @@ use App\Application\Auth\LoginWithPassword;
 use App\Application\Auth\Logout;
 use App\Application\Auth\RefreshAccessToken;
 use App\Application\Auth\TokenPairIssuer;
+use App\Application\Auth\TokenTtl;
 use App\Application\Shared\ActorContext;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Auth\ClientType;
@@ -388,9 +389,14 @@ final class OAuthFlowsTest extends TestCase
         return new ClientAuthenticator(new InMemoryOAuthClientRepository(array_values($clients)));
     }
 
+    private function ttl(): TokenTtl
+    {
+        return new TokenTtl(accessSeconds: 900, refreshSeconds: 1_209_600);
+    }
+
     private function tokenPairs(): TokenPairIssuer
     {
-        return new TokenPairIssuer(new FakeTokenIssuer(), $this->refreshTokens, 900, 1_209_600);
+        return new TokenPairIssuer(new FakeTokenIssuer(), $this->refreshTokens, $this->ttl());
     }
 
     private function accountRestorer(): AccountRestorer
@@ -417,8 +423,7 @@ final class OAuthFlowsTest extends TestCase
             $this->users,
             new FakeTokenIssuer(),
             $this->audit,
-            900,
-            1_209_600,
+            $this->ttl(),
         );
     }
 
@@ -437,7 +442,7 @@ final class OAuthFlowsTest extends TestCase
 
     private function issueServiceToken(ClientAuthenticator $clients): IssueServiceToken
     {
-        return new IssueServiceToken($clients, new FakeTokenIssuer(), $this->audit, 900);
+        return new IssueServiceToken($clients, new FakeTokenIssuer(), $this->audit, $this->ttl());
     }
 
     private function logout(): Logout

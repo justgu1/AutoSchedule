@@ -6,6 +6,10 @@ namespace App\Infrastructure\Http;
 
 final readonly class Cookie
 {
+    public const string ACCESS_TOKEN = 'access_token';
+    public const string REFRESH_TOKEN = 'refresh_token';
+    public const string CSRF = 'XSRF-TOKEN';
+
     /** $maxAge em segundos; 0 = cookie de sessão, negativo = apaga o cookie. */
     public function __construct(
         public string $value,

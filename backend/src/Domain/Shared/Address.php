@@ -19,6 +19,7 @@ final readonly class Address
     }
 
     /** A anonimização derruba o que localiza a porta e mantém o que só serve agregado. */
+    #[\NoDiscard]
     public function withoutStreetLevelDetail(): self
     {
         return clone($this, ['street' => '', 'number' => '', 'complement' => null]);

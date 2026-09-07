@@ -11,7 +11,7 @@ interface DealershipRepository extends TrashableRepository
 {
     public function findById(string $id): ?Dealership;
 
-    /** Página pública (`/concessionarias/{slug}`) -- URL amigável, nunca o id. */
+    /** A página pública identifica pelo slug, nunca pelo id. */
     public function findBySlug(string $slug): ?Dealership;
 
     public function insert(Dealership $dealership): void;

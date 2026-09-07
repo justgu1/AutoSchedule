@@ -24,12 +24,7 @@ final readonly class AccessTokenClaims
     ) {
     }
 
-    /**
-     * Monta as claims de um access token novo: gera o jti e calcula o
-     * expiresAt a partir do TTL informado.
-     *
-     * @param list<string> $scopes
-     */
+    /** @param list<string> $scopes */
     public static function issue(
         string $subject,
         string $clientId,

@@ -16,9 +16,7 @@ final readonly class MinioAdapter implements StorageProvider
 
     /**
      * @param string $endpoint Endpoint S3-compatível do MinIO, ex: `http://minio:9000`.
-     * @param string $publicUrl Base pra montar a URL pública do objeto -- o bucket
-     * precisa ter policy de leitura pública nesse prefixo (galeria de fotos é
-     * conteúdo público, não tem dado sensível).
+     * @param string $publicUrl Base da URL pública do objeto; o bucket precisa de policy de leitura pública nesse prefixo.
      */
     public function __construct(
         string $endpoint,

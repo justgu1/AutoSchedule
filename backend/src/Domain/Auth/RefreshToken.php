@@ -41,6 +41,7 @@ final readonly class RefreshToken
      *
      * @return array{0: string, 1: self} token em texto puro, entidade pra persistir
      */
+    #[\NoDiscard]
     public function rotate(int $ttlSeconds): array
     {
         return self::mint($this->oauthClientId, $this->userId, $this->scopes, $ttlSeconds, $this->familyId);

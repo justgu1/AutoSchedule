@@ -55,11 +55,13 @@ final readonly class User implements Trashable
         return password_verify($plainPassword, $this->passwordHash);
     }
 
+    #[\NoDiscard]
     public function withProfile(string $name, ?string $phone): self
     {
         return clone($this, ['name' => $name, 'phone' => $phone, 'updatedAt' => new \DateTimeImmutable()]);
     }
 
+    #[\NoDiscard]
     public function withNewPassword(string $plainPassword): self
     {
         $now = new \DateTimeImmutable();
@@ -77,12 +79,14 @@ final readonly class User implements Trashable
         return $this->role === UserRole::Customer && $to === UserRole::Seller;
     }
 
+    #[\NoDiscard]
     public function withRole(UserRole $role): self
     {
         return clone($this, ['role' => $role, 'updatedAt' => new \DateTimeImmutable()]);
     }
 
     /** Escruba PII (LGPD Art. 12) e preserva id/role/timestamps, senão a auditoria que referencia o usuário perde sentido. */
+    #[\NoDiscard]
     public function anonymized(): static
     {
         return clone($this, [

@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace App\Bootstrap;
 
-use App\Application\Auth\ClientAuthenticator;
 use App\Application\Auth\IssueServiceToken;
 use App\Application\Auth\LoginWithGoogle;
 use App\Application\Auth\LoginWithPassword;
 use App\Application\Auth\Logout;
 use App\Application\Auth\RefreshAccessToken;
-use App\Application\Auth\TokenPairIssuer;
+use App\Application\Auth\TokenTtl;
 use App\Application\Notification\SendEmail;
 use App\Application\Ports\JobProgress;
 use App\Application\Ports\MailTemplateRenderer;
@@ -168,28 +167,9 @@ final class ContainerFactory
             $config->int('pagination.max_per_page'),
         ));
 
-        $container->singleton(TokenPairIssuer::class, static fn (Container $c): TokenPairIssuer => new TokenPairIssuer(
-            tokens: $c->get(TokenIssuer::class),
-            refreshTokens: $c->get(RefreshTokenRepository::class),
-            accessTokenTtl: $config->int('auth.access_token_ttl'),
-            refreshTokenTtl: $config->int('auth.refresh_token_ttl'),
-        ));
-
-        $container->singleton(RefreshAccessToken::class, static fn (Container $c): RefreshAccessToken => new RefreshAccessToken(
-            clients: $c->get(ClientAuthenticator::class),
-            refreshTokens: $c->get(RefreshTokenRepository::class),
-            users: $c->get(UserRepository::class),
-            tokens: $c->get(TokenIssuer::class),
-            audit: $c->get(AuditLogger::class),
-            accessTokenTtl: $config->int('auth.access_token_ttl'),
-            refreshTokenTtl: $config->int('auth.refresh_token_ttl'),
-        ));
-
-        $container->singleton(IssueServiceToken::class, static fn (Container $c): IssueServiceToken => new IssueServiceToken(
-            clients: $c->get(ClientAuthenticator::class),
-            tokens: $c->get(TokenIssuer::class),
-            audit: $c->get(AuditLogger::class),
-            accessTokenTtl: $config->int('auth.access_token_ttl'),
+        $container->singleton(TokenTtl::class, static fn (): TokenTtl => new TokenTtl(
+            accessSeconds: $config->int('auth.access_token_ttl'),
+            refreshSeconds: $config->int('auth.refresh_token_ttl'),
         ));
 
         $container->singleton(RequestPasswordReset::class, static fn (Container $c): RequestPasswordReset => new RequestPasswordReset(
@@ -208,7 +188,7 @@ final class ContainerFactory
             loginWithGoogle: $c->get(LoginWithGoogle::class),
             issueServiceToken: $c->get(IssueServiceToken::class),
             revokeSession: $c->get(Logout::class),
-            refreshTokenTtl: $config->int('auth.refresh_token_ttl'),
+            ttl: $c->get(TokenTtl::class),
             cookieSecure: $config->bool('security.cookie_secure'),
         ));
 

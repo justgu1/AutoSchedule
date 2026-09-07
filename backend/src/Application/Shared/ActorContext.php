@@ -25,12 +25,14 @@ final readonly class ActorContext
     }
 
     /** @param array<string, mixed> $context */
+    #[\NoDiscard]
     public function audits(AuditEvent $event, ?string $auditableId = null, array $context = []): AuditEntry
     {
         return new AuditEntry($event, $this->actorId, $auditableId, $context, $this->ipAddress, $this->userAgent);
     }
 
     /** Login prova a identidade no meio do fluxo: antes da senha conferir não há ator para registrar. */
+    #[\NoDiscard]
     public function actedBy(string $actorId): self
     {
         return new self($actorId, $this->role, $this->ipAddress, $this->userAgent);

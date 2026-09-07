@@ -11,5 +11,6 @@ interface Trashable
 
     public TrashState $trash { get; }
 
+    #[\NoDiscard]
     public function anonymized(): static;
 }

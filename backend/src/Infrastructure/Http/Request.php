@@ -28,7 +28,7 @@ final class Request
         private readonly array $cookies = [],
         private readonly array $files = [],
     ) {
-        // Normaliza aqui, sai sempre normalizado.
+        // No construtor e não em `path()`: assim toda comparação de rota parte da mesma forma.
         $this->path = self::normalizePath($path);
     }
 
@@ -116,6 +116,7 @@ final class Request
     }
 
     /** @param array<string, string> $params */
+    #[\NoDiscard]
     public function withParams(array $params): self
     {
         $clone = clone $this;
@@ -148,12 +149,12 @@ final class Request
             return substr($header, 7);
         }
 
-        return $this->cookie('access_token');
+        return $this->cookie(Cookie::ACCESS_TOKEN);
     }
 
     public function usesCookieAuth(): bool
     {
-        return $this->header('authorization') === null && $this->cookie('access_token') !== null;
+        return $this->header('authorization') === null && $this->cookie(Cookie::ACCESS_TOKEN) !== null;
     }
 
     /** Casada uma vez por `ResolveRouteMiddleware`; null quando nenhuma rota bate. */
@@ -169,6 +170,7 @@ final class Request
         return $this->attributes[$key] ?? $default;
     }
 
+    #[\NoDiscard]
     public function withAttribute(string $key, mixed $value): self
     {
         $clone = clone $this;

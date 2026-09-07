@@ -46,16 +46,19 @@ final readonly class TrashState
         return $this->trashedAt <= $now->modify('-' . self::GRACE_DAYS . ' days');
     }
 
+    #[\NoDiscard]
     public function trashed(?\DateTimeImmutable $at = null): self
     {
         return new self(TrashableStatus::Trashed, $at ?? new \DateTimeImmutable(), $this->anonymizedAt);
     }
 
+    #[\NoDiscard]
     public function restored(): self
     {
         return new self(TrashableStatus::Active, null, $this->anonymizedAt);
     }
 
+    #[\NoDiscard]
     public function anonymized(): self
     {
         return new self(TrashableStatus::Deleted, $this->trashedAt, new \DateTimeImmutable());

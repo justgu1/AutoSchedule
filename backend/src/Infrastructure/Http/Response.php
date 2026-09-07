@@ -74,6 +74,7 @@ class Response
         return new JsonResponse($payload, $status);
     }
 
+    #[\NoDiscard]
     public function withHeader(string $name, string $value): static
     {
         $this->assertSafeHeader($name, $value);
@@ -84,6 +85,7 @@ class Response
         return $clone;
     }
 
+    #[\NoDiscard]
     public function withCookie(
         string $name,
         string $value,

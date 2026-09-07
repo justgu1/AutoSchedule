@@ -10,8 +10,10 @@ use App\Application\Auth\LoginWithGoogle;
 use App\Application\Auth\LoginWithPassword;
 use App\Application\Auth\Logout;
 use App\Application\Auth\RefreshAccessToken;
+use App\Application\Auth\TokenTtl;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
+use App\Infrastructure\Http\Cookie;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\RequestActor;
 use App\Infrastructure\Http\Response;
@@ -25,7 +27,7 @@ final readonly class OAuthController
         private LoginWithGoogle $loginWithGoogle,
         private IssueServiceToken $issueServiceToken,
         private Logout $revokeSession,
-        private int $refreshTokenTtl,
+        private TokenTtl $ttl,
         private bool $cookieSecure,
     ) {
     }
@@ -134,15 +136,15 @@ final readonly class OAuthController
     /** Sem cookie não há o quê revogar, mas os cookies do client são limpos de todo jeito. */
     public function logout(Request $request): Response
     {
-        $rawRefreshToken = $request->cookie('refresh_token');
+        $rawRefreshToken = $request->cookie(Cookie::REFRESH_TOKEN);
 
         if ($rawRefreshToken !== null) {
             ($this->revokeSession)($rawRefreshToken);
         }
 
         return Response::success(['message' => 'Logged out.'])
-            ->withCookie('access_token', '', maxAge: -1, secure: $this->cookieSecure)
-            ->withCookie('refresh_token', '', maxAge: -1, secure: $this->cookieSecure);
+            ->withCookie(Cookie::ACCESS_TOKEN, '', maxAge: -1, secure: $this->cookieSecure)
+            ->withCookie(Cookie::REFRESH_TOKEN, '', maxAge: -1, secure: $this->cookieSecure);
     }
 
     /** Token vai no corpo e no cookie: script usa o corpo, SPA confia só no cookie HttpOnly. */
@@ -158,7 +160,7 @@ final readonly class OAuthController
         ]);
 
         $response = $response->withCookie(
-            'access_token',
+            Cookie::ACCESS_TOKEN,
             $tokenPair->accessToken,
             maxAge: $tokenPair->expiresIn,
             secure: $this->cookieSecure,
@@ -166,9 +168,9 @@ final readonly class OAuthController
 
         if ($tokenPair->refreshToken !== null) {
             return $response->withCookie(
-                'refresh_token',
+                Cookie::REFRESH_TOKEN,
                 $tokenPair->refreshToken,
-                maxAge: $this->refreshTokenTtl,
+                maxAge: $this->ttl->refreshSeconds,
                 secure: $this->cookieSecure,
             );
         }

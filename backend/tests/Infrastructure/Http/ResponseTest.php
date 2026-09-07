@@ -36,7 +36,7 @@ final class ResponseTest extends TestCase
 
         $this->expectException(\InvalidArgumentException::class);
 
-        $response->withHeader("X-Foo\r\nX-Injected", '1');
+        (void) $response->withHeader("X-Foo\r\nX-Injected", '1');
     }
 
     #[Test]

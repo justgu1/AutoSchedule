@@ -54,6 +54,7 @@ final readonly class Dealership implements Trashable
         );
     }
 
+    #[\NoDiscard]
     public function withProfile(string $name, Address $address, ?string $phone, ?Email $email): self
     {
         return clone($this, [
@@ -66,12 +67,14 @@ final readonly class Dealership implements Trashable
     }
 
     /** Admin reassociando a concessionária a outro seller. */
+    #[\NoDiscard]
     public function withOwner(string $ownerUserId): self
     {
         return clone($this, ['ownerUserId' => $ownerUserId, 'updatedAt' => new \DateTimeImmutable()]);
     }
 
     /** Só uma foto por concessionária -- setar substitui a anterior (quem chama cuida de remover o arquivo velho do storage). */
+    #[\NoDiscard]
     public function withPhoto(?string $photoFileId): self
     {
         return clone($this, ['photoFileId' => $photoFileId, 'updatedAt' => new \DateTimeImmutable()]);
@@ -81,6 +84,7 @@ final readonly class Dealership implements Trashable
      * Mesmo espírito de User::anonymized(): cai o que identifica direto, fica o que só serve agregado.
      * O slug troca junto porque nasce do nome, e URL pública antiga não pode seguir divulgando o negócio.
      */
+    #[\NoDiscard]
     public function anonymized(): static
     {
         return clone($this, [

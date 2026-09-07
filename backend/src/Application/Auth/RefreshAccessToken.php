@@ -27,8 +27,7 @@ final readonly class RefreshAccessToken
         private UserRepository $users,
         private TokenIssuer $tokens,
         private AuditLogger $audit,
-        private int $accessTokenTtl,
-        private int $refreshTokenTtl,
+        private TokenTtl $ttl,
     ) {
     }
 
@@ -60,7 +59,7 @@ final readonly class RefreshAccessToken
             throw new DomainException('Invalid or expired refresh token.', DomainErrorType::Unauthorized);
         }
 
-        [$rawNext, $next] = $current->rotate($this->refreshTokenTtl);
+        [$rawNext, $next] = $current->rotate($this->ttl->refreshSeconds);
 
         try {
             $this->refreshTokens->rotate($current, $next);
@@ -74,9 +73,9 @@ final readonly class RefreshAccessToken
             clientId: $client->clientId,
             role: $user?->role,
             scopes: $current->scopes,
-            ttlSeconds: $this->accessTokenTtl,
+            ttlSeconds: $this->ttl->accessSeconds,
         ));
 
-        return new TokenPair($accessToken, $this->accessTokenTtl, $current->scopes, $rawNext);
+        return new TokenPair($accessToken, $this->ttl->accessSeconds, $current->scopes, $rawNext);
     }
 }
