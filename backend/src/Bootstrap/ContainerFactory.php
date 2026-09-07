@@ -53,6 +53,8 @@ use App\Infrastructure\File\GdImageOptimizer;
 use App\Infrastructure\File\LocalTempFileStore;
 use App\Infrastructure\File\PostgresFileRepository;
 use App\Infrastructure\Http\Controllers\OAuthController;
+use App\Infrastructure\Http\ExceptionHandler;
+use App\Infrastructure\Http\Router;
 use App\Infrastructure\Jobs\JobStatusStore;
 use App\Infrastructure\Logging\Logger;
 use App\Infrastructure\Mail\MailTemplate;
@@ -148,6 +150,13 @@ final class ContainerFactory
         $container->singleton(MailProvider::class, static fn (): MailProvider => new SymfonyMailProvider(
             $config->string('mail.dsn'),
             $config->string('mail.from'),
+        ));
+
+        $container->singleton(Router::class, static fn (Container $c): Router => new Router($c));
+
+        $container->singleton(ExceptionHandler::class, static fn (Container $c): ExceptionHandler => new ExceptionHandler(
+            debug: $config->bool('debug'),
+            logger: $c->get(LoggerInterface::class),
         ));
 
         $container->singleton(ImageOptimizer::class, static fn (): ImageOptimizer => new GdImageOptimizer($config->string('storage.temp_path')));
