@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\User;
 
+use App\Application\Ports\Transaction;
 use App\Application\Shared\ActorContext;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
@@ -22,6 +23,7 @@ final readonly class TrashAccount
         private DealershipRepository $dealerships,
         private LastAdminGuard $lastAdminGuard,
         private AuditLogger $audit,
+        private Transaction $transaction,
     ) {
     }
 
@@ -33,10 +35,13 @@ final readonly class TrashAccount
             $this->lastAdminGuard->assertNotLastAdmin();
         }
 
-        $this->users->trash($user->id);
-        $this->refreshTokens->revokeAllForUser($user->id);
-        // Marcada como cascata pra o restore devolver só o que caiu por causa da conta, não o que o dono já tinha arquivado.
-        $this->dealerships->trashAllOwnedBy($user->id);
+        $this->transaction->run(function () use ($user): void {
+            $this->users->trash($user->id);
+            $this->refreshTokens->revokeAllForUser($user->id);
+            // Marcada como cascata pra o restore devolver só o que caiu por causa da conta, não o que o dono já tinha arquivado.
+            $this->dealerships->trashAllOwnedBy($user->id);
+        });
+
         $this->audit->record($context->audits(AuditEvent::AccountTrashed, $user->id));
     }
 }

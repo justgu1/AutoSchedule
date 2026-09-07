@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Dealership;
 
+use App\Application\Ports\Transaction;
 use App\Application\Shared\ActorContext;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
@@ -19,6 +20,7 @@ final readonly class PurgeDealership
         private DealershipRepository $dealerships,
         private DealershipPhotos $photos,
         private AuditLogger $audit,
+        private Transaction $transaction,
     ) {
     }
 
@@ -30,9 +32,12 @@ final readonly class PurgeDealership
             throw new DomainException('This dealership is not in the trash.', DomainErrorType::Conflict);
         }
 
-        $oldPhotoFileId = $dealership->photoFileId;
-        $this->dealerships->update($dealership->anonymized());
-        $this->photos->delete($oldPhotoFileId);
+        $this->transaction->run(function () use ($dealership): void {
+            $oldPhotoFileId = $dealership->photoFileId;
+            $this->dealerships->update($dealership->anonymized());
+            $this->photos->delete($oldPhotoFileId);
+        });
+
         $this->audit->record($context->audits(AuditEvent::DealershipPurged, $dealership->id));
     }
 }

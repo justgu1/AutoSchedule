@@ -10,6 +10,7 @@ use App\Domain\Dealership\Dealership;
 use App\Domain\Shared\Address;
 use App\Domain\Shared\TrashableStatus;
 use App\Domain\Shared\Uf;
+use App\Infrastructure\Persistence\PdoTransaction;
 use App\Infrastructure\Persistence\PostgresDealershipRepository;
 use App\Infrastructure\Scheduler\PurgeTrashedEntitiesTask;
 use PHPUnit\Framework\Attributes\Group;
@@ -41,6 +42,7 @@ final class PurgeTrashedDealershipsTaskTest extends TestCase
             repository: $this->repository,
             audit: $this->audit,
             event: AuditEvent::DealershipPurged,
+            transaction: new PdoTransaction($connection),
         );
     }
 

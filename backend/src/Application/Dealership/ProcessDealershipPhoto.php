@@ -7,12 +7,14 @@ namespace App\Application\Dealership;
 use App\Application\File\UploadFile;
 use App\Application\Ports\JobProgress;
 use App\Application\Ports\TempFileStore;
+use App\Application\Ports\Transaction;
 use App\Domain\Audit\AuditEntry;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
 use App\Domain\Dealership\Dealership;
 use App\Domain\Dealership\Ports\DealershipRepository;
 use App\Domain\File\Ports\StorageProvider;
+use App\Domain\File\StoredFile;
 
 /** Ver `EnqueueDealershipPhoto` pro motivo de isto rodar fora do request. */
 final readonly class ProcessDealershipPhoto
@@ -25,6 +27,7 @@ final readonly class ProcessDealershipPhoto
         private AuditLogger $audit,
         private JobProgress $jobProgress,
         private TempFileStore $tempFiles,
+        private Transaction $transaction,
     ) {
     }
 
@@ -45,12 +48,18 @@ final readonly class ProcessDealershipPhoto
             }
 
             $this->jobProgress->update($jobId, 'processing', 'optimizing', 25);
-            $file = $this->uploads->uploadImage($sourcePath, $originalName, $uploadedBy);
 
-            $this->jobProgress->update($jobId, 'processing', 'saving', 75);
-            $oldPhotoFileId = $dealership->photoFileId;
-            $this->dealerships->update($dealership->withPhoto($file->id));
-            $this->photos->delete($oldPhotoFileId);
+            // Fora do request não há transação nenhuma: sem isto, falhar no meio deixa arquivo gravado e foto não trocada.
+            $file = $this->transaction->run(function () use ($dealership, $sourcePath, $originalName, $uploadedBy, $jobId): StoredFile {
+                $file = $this->uploads->uploadImage($sourcePath, $originalName, $uploadedBy);
+
+                $this->jobProgress->update($jobId, 'processing', 'saving', 75);
+                $oldPhotoFileId = $dealership->photoFileId;
+                $this->dealerships->update($dealership->withPhoto($file->id));
+                $this->photos->delete($oldPhotoFileId);
+
+                return $file;
+            });
 
             $this->audit->record(new AuditEntry(AuditEvent::DealershipPhotoUpdated, $uploadedBy, $dealership->id));
 

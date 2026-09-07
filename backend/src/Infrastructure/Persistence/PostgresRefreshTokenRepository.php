@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Persistence;
 
+use App\Application\Ports\Transaction;
 use App\Domain\Auth\Ports\RefreshTokenRepository;
 use App\Domain\Auth\RefreshToken;
 use App\Domain\Auth\RefreshTokenAlreadyRotated;
@@ -12,8 +13,10 @@ final readonly class PostgresRefreshTokenRepository implements RefreshTokenRepos
 {
     private const string COLUMNS = 'id, token_hash, family_id, client_id, user_id, scopes, expires_at, revoked_at, replaced_by_id';
 
-    public function __construct(private DatabaseConnection $connection)
-    {
+    public function __construct(
+        private DatabaseConnection $connection,
+        private Transaction $transaction,
+    ) {
     }
 
     public function insert(RefreshToken $token): void
@@ -45,6 +48,11 @@ final readonly class PostgresRefreshTokenRepository implements RefreshTokenRepos
 
     public function rotate(RefreshToken $current, RefreshToken $next): void
     {
+        $this->transaction->run(fn (): null => $this->rotateInPlace($current, $next));
+    }
+
+    private function rotateInPlace(RefreshToken $current, RefreshToken $next): null
+    {
         // A ordem é obrigatória: replaced_by_id tem FK pra própria tabela, e revogar condicionado a
         // revoked_at IS NULL é a trava de concorrência -- quem perder a corrida pega rowCount() = 0.
         $revoke = $this->connection->execute(
@@ -62,6 +70,8 @@ final readonly class PostgresRefreshTokenRepository implements RefreshTokenRepos
             'UPDATE oauth_refresh_tokens SET replaced_by_id = :next_id WHERE id = :current_id',
             ['next_id' => $next->id, 'current_id' => $current->id],
         );
+
+        return null;
     }
 
     public function revokeFamily(string $familyId): void

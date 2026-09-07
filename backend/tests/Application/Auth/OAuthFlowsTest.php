@@ -40,6 +40,7 @@ use App\Domain\User\User;
 use App\Domain\User\UserRole;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\DirectTransaction;
 use Tests\Support\FakeAuditLogger;
 
 /** Os quatro fluxos de `POST /oauth/token` mais o logout, cada um no seu caso de uso, sobre os mesmos dublês. */
@@ -394,7 +395,7 @@ final class OAuthFlowsTest extends TestCase
 
     private function accountRestorer(): AccountRestorer
     {
-        return new AccountRestorer($this->users, new InMemoryDealershipRepository(), $this->audit);
+        return new AccountRestorer($this->users, new InMemoryDealershipRepository(), $this->audit, new DirectTransaction());
     }
 
     private function loginWithPassword(?ClientAuthenticator $clients = null): LoginWithPassword

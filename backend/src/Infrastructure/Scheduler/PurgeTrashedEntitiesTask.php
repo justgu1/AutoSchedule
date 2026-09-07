@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Scheduler;
 
+use App\Application\Ports\Transaction;
 use App\Domain\Audit\AuditEntry;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
@@ -18,6 +19,7 @@ final readonly class PurgeTrashedEntitiesTask implements ScheduledTask
         private TrashableRepository $repository,
         private AuditLogger $audit,
         private AuditEvent $event,
+        private Transaction $transaction,
     ) {
     }
 
@@ -40,7 +42,8 @@ final readonly class PurgeTrashedEntitiesTask implements ScheduledTask
                 continue;
             }
 
-            $this->repository->purge($entity->anonymized());
+            // Uma transação por entidade: uma linha problemática não desfaz as que já foram anonimizadas.
+            $this->transaction->run(fn (): null => $this->repository->purge($entity->anonymized()));
             $this->audit->record(new AuditEntry($this->event, auditableId: $entity->id));
         }
     }

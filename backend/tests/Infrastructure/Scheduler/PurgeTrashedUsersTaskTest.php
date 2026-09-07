@@ -9,6 +9,7 @@ use App\Domain\Audit\AuditEvent;
 use App\Domain\Shared\Email;
 use App\Domain\User\User;
 use App\Domain\User\UserRole;
+use App\Infrastructure\Persistence\PdoTransaction;
 use App\Infrastructure\Persistence\PostgresUserRepository;
 use App\Infrastructure\Scheduler\PurgeTrashedEntitiesTask;
 use PHPUnit\Framework\Attributes\Group;
@@ -41,6 +42,7 @@ final class PurgeTrashedUsersTaskTest extends TestCase
             repository: $this->repository,
             audit: $this->audit,
             event: AuditEvent::AccountPurged,
+            transaction: new PdoTransaction($connection),
         );
     }
 

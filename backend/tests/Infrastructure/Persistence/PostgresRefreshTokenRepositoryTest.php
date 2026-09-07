@@ -6,6 +6,7 @@ namespace Tests\Infrastructure\Persistence;
 
 use App\Domain\Auth\RefreshToken;
 use App\Domain\Auth\RefreshTokenAlreadyRotated;
+use App\Infrastructure\Persistence\PdoTransaction;
 use App\Infrastructure\Persistence\PostgresRefreshTokenRepository;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
@@ -30,7 +31,7 @@ final class PostgresRefreshTokenRepositoryTest extends TestCase
         $this->pdo = $connection->pdo();
 
         $this->pdo->beginTransaction();
-        $this->repository = new PostgresRefreshTokenRepository($connection);
+        $this->repository = new PostgresRefreshTokenRepository($connection, new PdoTransaction($connection));
         $this->clientId = $this->insertClient();
         $this->userId = $this->insertUser();
     }

@@ -16,6 +16,7 @@ use App\Application\Ports\JobProgress;
 use App\Application\Ports\MailTemplateRenderer;
 use App\Application\Ports\Queue;
 use App\Application\Ports\TempFileStore;
+use App\Application\Ports\Transaction;
 use App\Application\User\RequestPasswordReset;
 use App\Config;
 use App\Domain\Address\Ports\ZipCodeCacheRepository;
@@ -49,6 +50,7 @@ use App\Infrastructure\Mail\MailTemplate;
 use App\Infrastructure\Mail\SymfonyMailProvider;
 use App\Infrastructure\Pagination\PaginationPolicy;
 use App\Infrastructure\Persistence\DatabaseConnection;
+use App\Infrastructure\Persistence\PdoTransaction;
 use App\Infrastructure\Persistence\PostgresAuditLogger;
 use App\Infrastructure\Persistence\PostgresConnection;
 use App\Infrastructure\Persistence\PostgresDealershipRepository;
@@ -102,6 +104,7 @@ final class ContainerFactory
         $container->bind(RateLimiter::class, RedisRateLimiter::class);
         $container->bind(Queue::class, RedisQueue::class);
         $container->bind(JobProgress::class, JobStatusStore::class);
+        $container->bind(Transaction::class, PdoTransaction::class);
     }
 
     private static function bindConfigured(Container $container, Config $config): void
@@ -226,6 +229,7 @@ final class ContainerFactory
                     repository: $c->get(UserRepository::class),
                     audit: $c->get(AuditLogger::class),
                     event: AuditEvent::AccountPurged,
+                    transaction: $c->get(Transaction::class),
                 ),
                 new PurgeTrashedEntitiesTask(
                     name: 'purge-trashed-dealerships',
@@ -233,6 +237,7 @@ final class ContainerFactory
                     repository: $c->get(DealershipRepository::class),
                     audit: $c->get(AuditLogger::class),
                     event: AuditEvent::DealershipPurged,
+                    transaction: $c->get(Transaction::class),
                 ),
             ],
         ));

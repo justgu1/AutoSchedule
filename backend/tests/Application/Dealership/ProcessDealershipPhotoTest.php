@@ -24,6 +24,7 @@ use App\Infrastructure\Redis\RedisConnection;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\DirectTransaction;
 use Tests\Support\FakeAuditLogger;
 
 /** O que importa aqui é a orquestração; o único ponto real é o `JobStatusStore`. */
@@ -63,6 +64,7 @@ final class ProcessDealershipPhotoTest extends TestCase
             $this->audit,
             $this->jobStatus,
             $tempFiles,
+            new DirectTransaction(),
         );
 
         $this->sourcePath = $this->tempPath . '/upload-source';

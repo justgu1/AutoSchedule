@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\User;
 
+use App\Application\Ports\Transaction;
 use App\Application\Shared\ActorContext;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
@@ -23,6 +24,7 @@ final readonly class ResetPassword
         private UserRepository $users,
         private RefreshTokenRepository $refreshTokens,
         private AuditLogger $audit,
+        private Transaction $transaction,
     ) {
     }
 
@@ -35,12 +37,14 @@ final readonly class ResetPassword
             throw new DomainException('Invalid or expired reset token.', DomainErrorType::Unauthorized);
         }
 
-        $this->users->update($user->withNewPassword($newPassword));
-        $this->audit->record($context->actedBy($user->id)->audits(AuditEvent::PasswordChanged, $user->id, ['via' => 'reset']));
+        $this->transaction->run(function () use ($user, $newPassword, $token): void {
+            $this->users->update($user->withNewPassword($newPassword));
+            $this->passwordResetTokens->markUsed($token->id);
+            // Invalida os outros links pendentes: nenhum e-mail antigo pode continuar valendo.
+            $this->passwordResetTokens->invalidateAllForUser($user->id);
+            $this->refreshTokens->revokeAllForUser($user->id);
+        });
 
-        $this->passwordResetTokens->markUsed($token->id);
-        // Invalida os outros links pendentes: nenhum e-mail antigo pode continuar valendo.
-        $this->passwordResetTokens->invalidateAllForUser($user->id);
-        $this->refreshTokens->revokeAllForUser($user->id);
+        $this->audit->record($context->actedBy($user->id)->audits(AuditEvent::PasswordChanged, $user->id, ['via' => 'reset']));
     }
 }

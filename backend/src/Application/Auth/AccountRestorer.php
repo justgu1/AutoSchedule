@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Auth;
 
+use App\Application\Ports\Transaction;
 use App\Application\Shared\ActorContext;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
@@ -21,6 +22,7 @@ final readonly class AccountRestorer
         private UserRepository $users,
         private DealershipRepository $dealerships,
         private AuditLogger $audit,
+        private Transaction $transaction,
     ) {
     }
 
@@ -30,8 +32,11 @@ final readonly class AccountRestorer
             return false;
         }
 
-        $this->users->restore($user->id);
-        $this->dealerships->restoreAutoTrashedOwnedBy($user->id);
+        $this->transaction->run(function () use ($user): void {
+            $this->users->restore($user->id);
+            $this->dealerships->restoreAutoTrashedOwnedBy($user->id);
+        });
+
         $this->audit->record($context->actedBy($user->id)->audits(AuditEvent::AccountRestored, $user->id));
 
         return true;
