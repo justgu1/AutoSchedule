@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Mail;
 
-use App\Domain\Notifications\Ports\MailProvider;
+use App\Domain\Notification\Ports\MailProvider;
 use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Mailer\Transport;
 use Symfony\Component\Mime\Email;

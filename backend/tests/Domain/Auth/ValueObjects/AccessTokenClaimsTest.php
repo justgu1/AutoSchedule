@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Domain\Auth\ValueObjects;
 
 use App\Domain\Auth\ValueObjects\AccessTokenClaims;
-use App\Domain\Users\UserRole;
+use App\Domain\User\UserRole;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
