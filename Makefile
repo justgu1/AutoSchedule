@@ -118,12 +118,21 @@ load-test:
 
 e2e-setup:
 	@docker compose build nginx
-	@RATE_LIMIT_AUTH_MAX=1000 docker compose up -d nginx mailpit backend worker
+	@RATE_LIMIT_AUTH_MAX=1000 docker compose up -d nginx mailpit minio backend worker
 	@echo "==> instalando dependências do backend (imagem é --no-dev, bind-mount local some com o vendor/)..."
 	@docker compose exec backend composer install --no-interaction --prefer-dist
 	@echo "==> aplicando migrations e seeders (banco pode estar vazio -- ambiente novo/CI)..."
 	@docker compose exec backend php bin/migrate.php
 	@docker compose exec backend php bin/seed.php
+	@echo "==> criando o bucket do MinIO (upload de foto de concessionária precisa dele)..."
+	@MINIO_PORT=$$(docker compose port minio 9000 | cut -d: -f2); \
+	MINIO_USER=$$(docker compose exec minio printenv MINIO_ROOT_USER); \
+	MINIO_PASS=$$(docker compose exec minio printenv MINIO_ROOT_PASSWORD); \
+	for i in $$(seq 1 20); do curl -sf http://127.0.0.1:$$MINIO_PORT/minio/health/live && break; sleep 1; done; \
+	docker run --rm --network host --entrypoint sh minio/mc -c "\
+		mc alias set local http://127.0.0.1:$$MINIO_PORT $$MINIO_USER $$MINIO_PASS && \
+		mc mb --ignore-existing local/autoschedule && \
+		mc anonymous set download local/autoschedule"
 	@docker compose run --rm e2e npm ci
 
 e2e: e2e-setup
