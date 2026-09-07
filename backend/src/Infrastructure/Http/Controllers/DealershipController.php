@@ -8,6 +8,7 @@ use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
 use App\Domain\Dealerships\Dealership;
 use App\Domain\Dealerships\DTO\DealershipProfile;
+use App\Domain\Dealerships\DTO\PublicDealershipProfile;
 use App\Domain\Dealerships\Ports\DealershipRepository;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
@@ -17,6 +18,8 @@ use App\Domain\Ports\Queue;
 use App\Domain\Ports\StorageProvider;
 use App\Domain\Shared\TrashableStatus;
 use App\Domain\Support\Uuid;
+use App\Domain\Users\Ports\UserRepository;
+use App\Domain\Users\User;
 use App\Domain\Users\UserRole;
 use App\Infrastructure\Dealerships\Jobs\ProcessDealershipPhotoJob;
 use App\Infrastructure\Http\Request;
@@ -30,6 +33,11 @@ use App\Infrastructure\Validation\Validator;
  * Admin vê/gerencia qualquer concessionária; seller só as próprias -- RLS já
  * escopa isso na leitura (linha de outro dono nem aparece pro `findById`),
  * então "não encontrada" e "não é sua" são a mesma resposta (404), de propósito.
+ *
+ * `show()` é a exceção: responde qualquer um, autenticado ou não -- dono/admin
+ * recebem o perfil completo, todo o resto (outro seller, customer, sem conta
+ * nenhuma) recebe o perfil público de uma concessionária `active` (RLS
+ * garante isso na leitura em si; ver migration da policy pública).
  */
 final readonly class DealershipController
 {
@@ -44,6 +52,7 @@ final readonly class DealershipController
         private JobStatusStore $jobStatus,
         private AuditLogger $audit,
         private PaginationPolicy $pagination,
+        private UserRepository $users,
         private string $tempPath,
     ) {
     }
@@ -74,8 +83,20 @@ final readonly class DealershipController
     public function show(Request $request): Response
     {
         $dealership = $this->requireDealership($request);
+        $claims = $request->attribute('auth');
 
-        return Response::success($this->toProfile($dealership));
+        if ($claims !== null && ($claims->role === UserRole::Admin || $claims->subject === $dealership->ownerUserId)) {
+            return Response::success($this->toProfile($dealership));
+        }
+
+        $seller = $this->users->findById($dealership->ownerUserId);
+        $profile = PublicDealershipProfile::fromDealership(
+            $dealership,
+            $this->resolvePhotoUrl($dealership),
+            $seller instanceof User ? $seller->name : null,
+        );
+
+        return Response::success($profile->toArray());
     }
 
     public function store(Request $request): Response
@@ -91,6 +112,7 @@ final readonly class DealershipController
             'city' => 'required|max:120',
             'state' => 'required|max:2',
             'phone' => 'max:20',
+            'email' => 'max:190|email',
         ];
 
         if ($claims->role === UserRole::Admin) {
@@ -111,6 +133,7 @@ final readonly class DealershipController
             city: $data['city'],
             state: $data['state'],
             phone: $data['phone'] ?? null,
+            email: $data['email'] ?? null,
         );
 
         $this->dealerships->insert($dealership);
@@ -137,6 +160,7 @@ final readonly class DealershipController
             'city' => 'max:120',
             'state' => 'max:2',
             'phone' => 'max:20',
+            'email' => 'max:190|email',
         ];
 
         if ($claims->role === UserRole::Admin) {
@@ -156,6 +180,7 @@ final readonly class DealershipController
             city: $data['city'] ?? $dealership->city,
             state: $data['state'] ?? $dealership->state,
             phone: $data['phone'] ?? $dealership->phone,
+            email: $data['email'] ?? $dealership->email,
             latitude: $dealership->latitude,
             longitude: $dealership->longitude,
             googlePlaceId: $dealership->googlePlaceId,
@@ -290,11 +315,23 @@ final readonly class DealershipController
         return Response::success(['message' => 'Photo removed.']);
     }
 
-    /** `{id}` da rota -- RLS já barra dono errado (linha nem aparece), então "não é sua" e "não existe" viram o mesmo 404. */
+    /**
+     * `{id}` da rota aceita o UUID (uso interno/gerenciamento) ou o `slug`
+     * (URL pública amigável) -- os dois formatos nunca colidem entre si. RLS
+     * já barra dono errado (linha nem aparece), então "não é sua" e "não
+     * existe" viram o mesmo 404, de propósito.
+     */
     private function requireDealership(Request $request): Dealership
     {
-        $id = $request->param('id');
-        $dealership = $id !== null ? $this->dealerships->findById($id) : null;
+        $identifier = $request->param('id');
+
+        if ($identifier === null) {
+            throw new DomainException('Dealership not found.', DomainErrorType::NotFound);
+        }
+
+        $dealership = $this->looksLikeUuid($identifier)
+            ? $this->dealerships->findById($identifier)
+            : $this->dealerships->findBySlug($identifier);
 
         if (!$dealership instanceof Dealership) {
             throw new DomainException('Dealership not found.', DomainErrorType::NotFound);
@@ -303,17 +340,26 @@ final readonly class DealershipController
         return $dealership;
     }
 
+    private function looksLikeUuid(string $value): bool
+    {
+        return preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $value) === 1;
+    }
+
     /** @return array<string, mixed> */
     private function toProfile(Dealership $dealership): array
     {
-        $photoUrl = null;
+        return DealershipProfile::fromDealership($dealership, $this->resolvePhotoUrl($dealership))->toArray();
+    }
 
-        if ($dealership->photoFileId !== null) {
-            $file = $this->files->findById($dealership->photoFileId);
-            $photoUrl = $file instanceof StoredFile ? $this->storage->url($file->path) : null;
+    private function resolvePhotoUrl(Dealership $dealership): ?string
+    {
+        if ($dealership->photoFileId === null) {
+            return null;
         }
 
-        return DealershipProfile::fromDealership($dealership, $photoUrl)->toArray();
+        $file = $this->files->findById($dealership->photoFileId);
+
+        return $file instanceof StoredFile ? $this->storage->url($file->path) : null;
     }
 
     /**

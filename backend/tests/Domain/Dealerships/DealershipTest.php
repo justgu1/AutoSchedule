@@ -25,8 +25,29 @@ final class DealershipTest extends TestCase
         $this->assertNull($dealership->anonymizedAt);
     }
 
+    /** Slug é URL amigável (`/concessionarias/{slug}`), nunca o id -- formato: nome normalizado + 6 caracteres do próprio id, sempre único por natureza. */
     #[Test]
-    public function with_profile_troca_os_dados_mas_preserva_dono_e_status(): void
+    public function register_gera_um_slug_a_partir_do_nome_sem_expor_o_id_inteiro(): void
+    {
+        $dealership = Dealership::register(
+            ownerUserId: 'owner-1',
+            name: 'Auto Center Prime!',
+            zipCode: '01000-000',
+            address: 'Rua Antiga',
+            number: '10',
+            complement: null,
+            neighborhood: 'Bairro',
+            city: 'Cidade',
+            state: 'SP',
+            phone: null,
+        );
+
+        $this->assertMatchesRegularExpression('/^auto-center-prime-[0-9a-f]{6}$/', $dealership->slug);
+        $this->assertStringNotContainsString($dealership->id, $dealership->slug);
+    }
+
+    #[Test]
+    public function with_profile_troca_os_dados_mas_preserva_dono_status_e_slug(): void
     {
         $dealership = $this->registerFixture();
 
@@ -40,6 +61,7 @@ final class DealershipTest extends TestCase
             city: 'Nova Cidade',
             state: 'SP',
             phone: '11999999999',
+            email: 'novo@example.com',
             latitude: null,
             longitude: null,
             googlePlaceId: null,
@@ -49,6 +71,7 @@ final class DealershipTest extends TestCase
         $this->assertSame($dealership->id, $updated->id);
         $this->assertSame($dealership->ownerUserId, $updated->ownerUserId);
         $this->assertSame($dealership->status, $updated->status);
+        $this->assertSame($dealership->slug, $updated->slug);
     }
 
     #[Test]
@@ -115,10 +138,12 @@ final class DealershipTest extends TestCase
         $this->assertSame($dealership->id, $anonymized->id);
         $this->assertSame($dealership->ownerUserId, $anonymized->ownerUserId);
         $this->assertNotSame('Auto Center', $anonymized->name);
+        $this->assertNotSame($dealership->slug, $anonymized->slug);
         $this->assertSame('', $anonymized->address);
         $this->assertSame('', $anonymized->number);
         $this->assertNull($anonymized->complement);
         $this->assertNull($anonymized->phone);
+        $this->assertNull($anonymized->email);
         $this->assertNull($anonymized->googlePlaceId);
         $this->assertSame($dealership->zipCode, $anonymized->zipCode);
         $this->assertSame($dealership->city, $anonymized->city);
@@ -152,6 +177,7 @@ final class DealershipTest extends TestCase
             id: $dealership->id,
             ownerUserId: $dealership->ownerUserId,
             name: $dealership->name,
+            slug: $dealership->slug,
             zipCode: $dealership->zipCode,
             address: $dealership->address,
             number: $dealership->number,
@@ -163,6 +189,7 @@ final class DealershipTest extends TestCase
             longitude: $dealership->longitude,
             googlePlaceId: $dealership->googlePlaceId,
             phone: $dealership->phone,
+            email: $dealership->email,
             photoFileId: $dealership->photoFileId,
             status: TrashableStatus::Trashed,
             trashedByOwnerDeactivation: false,

@@ -30,7 +30,7 @@ O AutoSchedule é uma aplicação para agendamento de visitas a veículos. Fluxo
 
 Os horários disponíveis são definidos por data — ao selecionar um dia, só os horários livres naquele dia são apresentados.
 
-Antes desse fluxo existir, o projeto precisou de uma base de conta/autenticação, concessionária e infraestrutura por trás dele (login com role, MinIO pra foto, fila/scheduler pra e-mail assíncrono e purga da lixeira) — é o que já está implementado hoje; veículo/disponibilidade/agendamento em si são a próxima etapa (`Worklist.md`).
+Antes desse fluxo existir, o projeto precisou de uma base de conta/autenticação, concessionária e infraestrutura por trás dele (login com role, MinIO pra foto, fila/scheduler pra e-mail assíncrono e purga da lixeira, CRUD de concessionária com página pública em `/concessionarias/{id}` já sem exigir conta) — é o que já está implementado hoje; veículo/disponibilidade/agendamento em si são a próxima etapa (`Worklist.md`).
 
 ## Stack
 
@@ -108,7 +108,7 @@ curl http://localhost:8080/health
 - **Rate limit**: `RATE_LIMIT_GENERAL_MAX`/`_WINDOW`, `RATE_LIMIT_AUTH_MAX`/`_WINDOW` — sliding window, geral vs. rotas sensíveis (login/registro/reset).
 - **Paginação**: `PAGINATION_DEFAULT_PER_PAGE`, `PAGINATION_MAX_PER_PAGE`.
 - **Segurança**: `COOKIE_SECURE`, `SECURITY_HSTS_ENABLED`, `CORS_ALLOWED_ORIGINS`.
-- **Google**: `GOOGLE_CLIENT_ID` (login social).
+- **Google**: `GOOGLE_CLIENT_ID` (login social), `GOOGLE_MAPS_API_KEY` (mapa read-only na página pública da concessionária).
 - **E-mail**: `MAIL_FROM`, `FRONTEND_URL` (link do reset de senha), `MAILPIT_UI_PORT`.
 - **MinIO**: `S3_ENDPOINT`/`S3_BUCKET`/`S3_REGION`/`S3_ACCESS_KEY`/`S3_SECRET_KEY`/`S3_PUBLIC_URL`, `TEMP_STORAGE_PATH` (backup local do upload até o MinIO confirmar).
 

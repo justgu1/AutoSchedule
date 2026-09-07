@@ -24,7 +24,7 @@ Não precisa estar associado a uma concessionária. É identificado por nome, e-
 
 Toda concessionária pertence a exatamente um seller (`owner_user_id`, `NOT NULL`) -- sem tabela de associação, sem concessionária compartilhada entre sellers. Um mesmo seller pode ser dono de mais de uma concessionária.
 
-- `seller`: cria concessionária (torna-se dono automaticamente), gerencia só as próprias (RLS já escopa a leitura -- "não é sua" e "não existe" respondem o mesmo `404`, de propósito, pra não vazar que a concessionária de outro seller existe);
+- `seller`: cria concessionária (torna-se dono automaticamente), gerencia só as próprias -- `PATCH`/`DELETE`/etc numa concessionária que não é sua (RLS já escopa isso) respondem o mesmo `404` de "não existe", de propósito. Ler uma concessionária de outro seller (`GET /dealerships/{id}`) não vaza mais que qualquer visitante sem conta veria (ver "Página pública" abaixo);
 - `admin`: gerencia qualquer concessionária, inclusive reassocia o dono (`owner_user_id` no corpo de `PATCH`, mesma rota de update -- sem endpoint paralelo só pra isso).
 
 ### Ciclo de vida (lixeira)
@@ -38,13 +38,23 @@ conta do dono desativada (DELETE /me)       -> lixeira em cascata, trashed_by_ow
 
 Só a lixeira em cascata é restaurada automaticamente quando o dono volta a logar -- a manual fica parada até o próprio seller (ou um admin) chamar `POST /dealerships/{id}/restore`. `POST /dealerships/{id}/purge` anonimiza na hora, sem esperar os 30 dias; a rotina agendada faz o mesmo pra quem não foi recuperado a tempo.
 
-Anonimização escruba identificador direto (nome vira "Concessionária removida", endereço/complemento/telefone/`google_place_id` apagados) mas preserva CEP/cidade/estado/geolocalização -- não são dado pessoal, e mantêm o histórico de agendamento localizável.
+Anonimização escruba identificador direto (nome vira "Concessionária removida", endereço/complemento/telefone/e-mail/`google_place_id` apagados, `slug` trocado por um neutro) mas preserva CEP/cidade/estado/geolocalização -- não são dado pessoal, e mantêm o histórico de agendamento localizável.
 
 ### Foto
 
 Uma só, não galeria -- `POST /dealerships/{id}/photo` substitui a anterior (que é apagada do storage, não fica órfã); `DELETE` remove. Até 20MB por upload; validada por MIME real, não só a extensão.
 
 Processada fora do request: o endpoint só valida o essencial (arquivo presente, tamanho) e enfileira, devolvendo `202` com um `job_id` na hora -- quem chamou acompanha o resultado por `GET /jobs/{job_id}` (snapshot) ou `GET /jobs/{job_id}/events` (SSE, evento por mudança de status: `queued` → `processing` → `done`/`failed`). O worker é quem converte pro padrão do site (WebP, redimensionada a até 1600px no lado maior) antes de gravar -- pensado pra reaproveitar no futuro import em lote da galeria de veículo, mesmo mecanismo.
+
+### Endereço e contato
+
+Além do endereço, a concessionária tem telefone e e-mail próprios (contato do negócio -- não é o telefone/e-mail da conta do seller). CEP autopreenche endereço, bairro, cidade e UF no formulário -- o backend proxeia o ViaCEP (`GET /zip-codes/{cep}`) e guarda o resultado num cache próprio (`zip_code_cache`, sem expiração -- CEP não muda de endereço), então o mesmo CEP nunca depende do ViaCEP de novo depois da primeira vez. Quem preenche pode digitar por cima depois, não é campo travado.
+
+### Página pública
+
+`GET /dealerships/{id}` é a mesma rota que o gerenciamento usa -- o formato da resposta muda pra quem chama, não a URL: dono/admin recebem o perfil completo, qualquer outro caso (outro seller, customer, sem conta nenhuma) recebe um perfil enxuto (nome, endereço, telefone/e-mail da concessionária, foto, só o **nome** do vendedor -- nenhum outro dado dele) e só se a concessionária estiver `active` (trashed/deleted viram `404`, igual concessionária inexistente, de propósito). `vehicles` vai vazio até a Epic Veículo existir, contrato já reservado pra não quebrar quando a listagem chegar.
+
+A URL pública (`/concessionarias/{slug}` no front) usa um `slug` gerado a partir do nome + parte do id, nunca o `id` em si -- estável mesmo se o nome mudar depois, só é trocado por um neutro na anonimização. O mapa (Google Maps Embed, só exibição por string de endereço) usa o mesmo endereço já salvo.
 
 ## Veículos
 

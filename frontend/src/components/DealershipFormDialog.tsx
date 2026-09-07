@@ -6,11 +6,11 @@ import DialogTitle from '@mui/material/DialogTitle';
 import Grid from '@mui/material/Grid';
 import InputAdornment from '@mui/material/InputAdornment';
 import Button from '@mui/material/Button';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { FormError } from './FormError';
 import { FormTextField } from './FormTextField';
 import { SubmitButton } from './SubmitButton';
-import { ApiError } from '../lib/apiClient';
+import { apiFetch, ApiError } from '../lib/apiClient';
 import { BRAZILIAN_STATES, type BrazilianState } from '../lib/brazilianStates';
 import type { Dealership, DealershipProfileInput } from '../lib/dealerships';
 
@@ -24,8 +24,27 @@ const emptyForm: DealershipProfileInput = {
     city: '',
     state: '',
     phone: '',
+    email: '',
     owner_user_id: '',
 };
+
+interface ZipCodeAddress {
+    street: string;
+    neighborhood: string;
+    city: string;
+    state: string;
+}
+
+/** Proxy do próprio backend pro ViaCEP (cacheado depois da primeira consulta) -- nunca chama o terceiro direto. */
+async function fetchAddressByZipCode(zipCode: string): Promise<ZipCodeAddress | null> {
+    const digits = zipCode.replace(/\D/g, '');
+
+    if (digits.length !== 8) {
+        return null;
+    }
+
+    return apiFetch<ZipCodeAddress>(`/zip-codes/${digits}`).catch(() => null);
+}
 
 function formFromDealership(dealership?: Dealership | null): DealershipProfileInput {
     if (!dealership) {
@@ -42,6 +61,7 @@ function formFromDealership(dealership?: Dealership | null): DealershipProfileIn
         city: dealership.city,
         state: dealership.state,
         phone: dealership.phone ?? '',
+        email: dealership.email ?? '',
         owner_user_id: dealership.owner_user_id,
     };
 }
@@ -52,8 +72,9 @@ interface DealershipFormDialogProps {
     dealership?: Dealership | null;
     /** Admin manda `owner_user_id` (obrigatório ao criar); seller nunca vê esse campo, o backend o torna dono sozinho. */
     isAdmin: boolean;
-    /** Telefone do próprio usuário logado -- preenche o campo de telefone da concessionária com um clique. */
+    /** Telefone/e-mail do próprio usuário logado -- preenchem os campos da concessionária com um clique. */
     myPhone?: string | null;
+    myEmail?: string | null;
     submitting: boolean;
     error: ApiError | null;
     onSubmit: (input: DealershipProfileInput) => void;
@@ -71,6 +92,7 @@ export function DealershipFormDialog({
     dealership,
     isAdmin,
     myPhone,
+    myEmail,
     submitting,
     error,
     onSubmit,
@@ -86,6 +108,34 @@ export function DealershipFormDialog({
         event.preventDefault();
         onSubmit(form);
     }
+
+    // CEP completo -- espera meio segundo sem digitar (debounce) e autopreenche o
+    // resto do endereço sozinho, sem travar o formulário se a busca falhar.
+    useEffect(() => {
+        if (form.zip_code.replace(/\D/g, '').length !== 8) {
+            return;
+        }
+
+        const timeout = setTimeout(() => {
+            fetchAddressByZipCode(form.zip_code)
+                .then((address) => {
+                    if (!address) {
+                        return;
+                    }
+
+                    setForm((current) => ({
+                        ...current,
+                        address: address.street || current.address,
+                        neighborhood: address.neighborhood || current.neighborhood,
+                        city: address.city,
+                        state: address.state,
+                    }));
+                })
+                .catch(() => undefined);
+        }, 500);
+
+        return () => clearTimeout(timeout);
+    }, [form.zip_code]);
 
     const selectedState = BRAZILIAN_STATES.find((state) => state.code === form.state) ?? null;
 
@@ -119,12 +169,13 @@ export function DealershipFormDialog({
                                 />
                             </Grid>
                         )}
-                        <Grid size={6}>
+                        <Grid size={12}>
                             <FormTextField
                                 label="CEP"
                                 value={form.zip_code}
                                 onChange={(event) => set('zip_code', event.target.value)}
                                 error={error?.errors?.zip_code}
+                                helperText={error?.errors?.zip_code ?? 'Preenche endereço, bairro, cidade e UF sozinho'}
                                 required
                             />
                         </Grid>
@@ -138,7 +189,35 @@ export function DealershipFormDialog({
                                     input: {
                                         endAdornment: myPhone ? (
                                             <InputAdornment position="end">
-                                                <Button size="small" onClick={() => set('phone', myPhone)}>
+                                                <Button
+                                                    size="small"
+                                                    aria-label="Usar o meu telefone"
+                                                    onClick={() => set('phone', myPhone)}
+                                                >
+                                                    Usar o meu
+                                                </Button>
+                                            </InputAdornment>
+                                        ) : undefined,
+                                    },
+                                }}
+                            />
+                        </Grid>
+                        <Grid size={6}>
+                            <FormTextField
+                                label="E-mail"
+                                type="email"
+                                value={form.email}
+                                onChange={(event) => set('email', event.target.value)}
+                                error={error?.errors?.email}
+                                slotProps={{
+                                    input: {
+                                        endAdornment: myEmail ? (
+                                            <InputAdornment position="end">
+                                                <Button
+                                                    size="small"
+                                                    aria-label="Usar o meu e-mail"
+                                                    onClick={() => set('email', myEmail)}
+                                                >
                                                     Usar o meu
                                                 </Button>
                                             </InputAdornment>

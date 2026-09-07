@@ -1,4 +1,4 @@
-import { apiFetch, apiFetchPage, apiUpload, type PageMeta } from './apiClient';
+import { apiFetch, apiFetchPage, apiUpload, ApiError, type PageMeta } from './apiClient';
 
 export type DealershipStatus = 'active' | 'trashed' | 'deleted';
 
@@ -6,6 +6,7 @@ export interface Dealership {
     id: string;
     owner_user_id: string;
     name: string;
+    slug: string;
     zip_code: string;
     address: string;
     number: string;
@@ -17,6 +18,7 @@ export interface Dealership {
     longitude: number | null;
     google_place_id: string | null;
     phone: string | null;
+    email: string | null;
     photo_url: string | null;
     status: DealershipStatus;
 }
@@ -31,6 +33,7 @@ export interface DealershipProfileInput {
     city: string;
     state: string;
     phone?: string;
+    email?: string;
     /** Só aceito pelo backend quando quem chama é admin -- seller se torna dono automaticamente. */
     owner_user_id?: string;
 }
@@ -43,6 +46,43 @@ export interface PhotoJob {
 
 export function listDealerships(page: number, perPage: number): Promise<{ data: Dealership[]; meta: PageMeta }> {
     return apiFetchPage<Dealership>(`/dealerships?page=${page}&per_page=${perPage}`);
+}
+
+export interface PublicDealership {
+    slug: string;
+    name: string;
+    zip_code: string;
+    address: string;
+    number: string;
+    complement: string | null;
+    neighborhood: string;
+    city: string;
+    state: string;
+    phone: string | null;
+    email: string | null;
+    photo_url: string | null;
+    seller_name: string | null;
+    // Sempre vazio até a Epic Veículo existir -- já tipado pra não mudar o contrato depois.
+    vehicles: unknown[];
+}
+
+/**
+ * Mesma rota de `show` (`GET /dealerships/{id_ou_slug}`) que o gerenciamento
+ * usa, só que devolve o perfil público -- o backend decide o formato pela
+ * própria request. Sem `credentials`, de propósito: a página pública tem que
+ * mostrar sempre a mesma coisa, mesmo se o dono/admin estiver logado no
+ * mesmo navegador (`apiFetch` sempre manda cookie, por isso não reaproveita
+ * daqui).
+ */
+export async function getPublicDealership(slug: string): Promise<PublicDealership> {
+    const response = await fetch(`/api/dealerships/${slug}`);
+    const payload = (await response.json().catch(() => null)) as { data?: PublicDealership; message?: string } | null;
+
+    if (!response.ok) {
+        throw new ApiError(payload?.message ?? 'Request failed.', response.status);
+    }
+
+    return payload!.data as PublicDealership;
 }
 
 export function createDealership(input: DealershipProfileInput): Promise<Dealership> {

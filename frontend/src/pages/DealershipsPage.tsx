@@ -198,6 +198,17 @@ export function DealershipsPage() {
                                         {dealership.status === 'active' && (
                                             <Button
                                                 size="small"
+                                                component="a"
+                                                href={`/concessionarias/${dealership.slug}`}
+                                                target="_blank"
+                                                rel="noopener"
+                                            >
+                                                Ver página pública
+                                            </Button>
+                                        )}
+                                        {dealership.status === 'active' && (
+                                            <Button
+                                                size="small"
                                                 color="error"
                                                 onClick={() => setConfirmAction({ type: 'trash', dealership })}
                                             >
@@ -246,6 +257,7 @@ export function DealershipsPage() {
                 dealership={editing}
                 isAdmin={isAdmin}
                 myPhone={me.data?.phone}
+                myEmail={me.data?.email}
                 submitting={createMutation.isPending || updateMutation.isPending}
                 error={formError}
                 onSubmit={handleFormSubmit}

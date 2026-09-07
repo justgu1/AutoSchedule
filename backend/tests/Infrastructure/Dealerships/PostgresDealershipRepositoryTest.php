@@ -57,6 +57,21 @@ final class PostgresDealershipRepositoryTest extends TestCase
     }
 
     #[Test]
+    public function persiste_e_encontra_por_slug(): void
+    {
+        $owner = $this->insertSellerUser();
+        $dealership = $this->registerFixture($owner);
+
+        $this->repository->insert($dealership);
+        $found = $this->repository->findBySlug($dealership->slug);
+
+        $this->assertNotNull($found);
+        $this->assertSame($dealership->id, $found->id);
+
+        $this->assertNull($this->repository->findBySlug('slug-que-nao-existe'));
+    }
+
+    #[Test]
     public function update_persiste_as_alteracoes(): void
     {
         $owner = $this->insertSellerUser();
@@ -73,6 +88,7 @@ final class PostgresDealershipRepositoryTest extends TestCase
             city: $dealership->city,
             state: $dealership->state,
             phone: $dealership->phone,
+            email: $dealership->email,
             latitude: $dealership->latitude,
             longitude: $dealership->longitude,
             googlePlaceId: $dealership->googlePlaceId,

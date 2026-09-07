@@ -10,6 +10,9 @@ interface DealershipRepository
 {
     public function findById(string $id): ?Dealership;
 
+    /** Página pública (`/concessionarias/{slug}`) -- URL amigável, nunca o id. */
+    public function findBySlug(string $slug): ?Dealership;
+
     public function insert(Dealership $dealership): void;
 
     public function update(Dealership $dealership): void;

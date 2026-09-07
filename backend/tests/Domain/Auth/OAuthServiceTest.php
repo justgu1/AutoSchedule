@@ -684,6 +684,11 @@ final class InMemoryDealershipRepository implements DealershipRepository
         return null;
     }
 
+    public function findBySlug(string $slug): ?Dealership
+    {
+        return null;
+    }
+
     public function insert(Dealership $dealership): void
     {
     }

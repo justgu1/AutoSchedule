@@ -23,16 +23,25 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
         return $row === false ? null : $this->fromRow($row);
     }
 
+    public function findBySlug(string $slug): ?Dealership
+    {
+        $statement = $this->pdo->prepare('SELECT * FROM dealerships WHERE slug = :slug');
+        $statement->execute(['slug' => $slug]);
+        $row = $statement->fetch();
+
+        return $row === false ? null : $this->fromRow($row);
+    }
+
     public function insert(Dealership $dealership): void
     {
         $statement = $this->pdo->prepare(<<<'SQL'
             INSERT INTO dealerships (
-                id, owner_user_id, name, zip_code, address, number, complement, neighborhood, city, state,
-                latitude, longitude, google_place_id, phone, photo_file_id, status,
+                id, owner_user_id, name, slug, zip_code, address, number, complement, neighborhood, city, state,
+                latitude, longitude, google_place_id, phone, email, photo_file_id, status,
                 trashed_by_owner_deactivation, trashed_at, anonymized_at, created_at, updated_at
             ) VALUES (
-                :id, :owner_user_id, :name, :zip_code, :address, :number, :complement, :neighborhood, :city, :state,
-                :latitude, :longitude, :google_place_id, :phone, :photo_file_id, :status,
+                :id, :owner_user_id, :name, :slug, :zip_code, :address, :number, :complement, :neighborhood, :city, :state,
+                :latitude, :longitude, :google_place_id, :phone, :email, :photo_file_id, :status,
                 :trashed_by_owner_deactivation, :trashed_at, :anonymized_at, :created_at, :updated_at
             )
             SQL);
@@ -40,13 +49,14 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
         $statement->execute($this->toParams($dealership));
     }
 
+    /** `slug` normalmente não muda -- só a anonimização (`Dealership::anonymized()`) troca de verdade, o resto reenvia o mesmo valor. */
     public function update(Dealership $dealership): void
     {
         $statement = $this->pdo->prepare(<<<'SQL'
             UPDATE dealerships SET
-                owner_user_id = :owner_user_id, name = :name, zip_code = :zip_code, address = :address,
+                owner_user_id = :owner_user_id, name = :name, slug = :slug, zip_code = :zip_code, address = :address,
                 number = :number, complement = :complement, neighborhood = :neighborhood, city = :city, state = :state,
-                latitude = :latitude, longitude = :longitude, google_place_id = :google_place_id, phone = :phone,
+                latitude = :latitude, longitude = :longitude, google_place_id = :google_place_id, phone = :phone, email = :email,
                 photo_file_id = :photo_file_id,
                 status = :status, trashed_by_owner_deactivation = :trashed_by_owner_deactivation,
                 trashed_at = :trashed_at, anonymized_at = :anonymized_at, updated_at = :updated_at
@@ -156,6 +166,7 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
             id: $row['id'],
             ownerUserId: $row['owner_user_id'],
             name: $row['name'],
+            slug: $row['slug'],
             zipCode: $row['zip_code'],
             address: $row['address'],
             number: $row['number'],
@@ -167,6 +178,7 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
             longitude: $row['longitude'] !== null ? (float) $row['longitude'] : null,
             googlePlaceId: $row['google_place_id'],
             phone: $row['phone'],
+            email: $row['email'],
             photoFileId: $row['photo_file_id'],
             status: TrashableStatus::from($row['status']),
             trashedByOwnerDeactivation: (bool) $row['trashed_by_owner_deactivation'],
@@ -189,6 +201,7 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
             'id' => $dealership->id,
             'owner_user_id' => $dealership->ownerUserId,
             'name' => $dealership->name,
+            'slug' => $dealership->slug,
             'zip_code' => $dealership->zipCode,
             'address' => $dealership->address,
             'number' => $dealership->number,
@@ -200,6 +213,7 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
             'longitude' => $dealership->longitude,
             'google_place_id' => $dealership->googlePlaceId,
             'phone' => $dealership->phone,
+            'email' => $dealership->email,
             'photo_file_id' => $dealership->photoFileId,
             'status' => $dealership->status->value,
             'trashed_by_owner_deactivation' => $dealership->trashedByOwnerDeactivation ? 't' : 'f',

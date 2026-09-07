@@ -241,6 +241,12 @@ parameters:
 			path: src/Bootstrap/ContainerFactory.php
 
 		-
+			message: '#^Parameter \#1 \$connection of class App\\Infrastructure\\Address\\PostgresZipCodeCacheRepository constructor expects App\\Domain\\Ports\\DatabaseConnection, object given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
 			message: '#^Parameter \#1 \$connection of class App\\Infrastructure\\RateLimit\\RedisRateLimiter constructor expects App\\Infrastructure\\Redis\\RedisConnection, object given\.$#'
 			identifier: argument.type
 			count: 1
@@ -266,6 +272,12 @@ parameters:
 
 		-
 			message: '#^Parameter \#1 \$jobStatus of class App\\Infrastructure\\Http\\Controllers\\JobController constructor expects App\\Infrastructure\\Jobs\\JobStatusStore, object given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Parameter \#1 \$lookup of class App\\Infrastructure\\Http\\Controllers\\ZipCodeController constructor expects App\\Infrastructure\\Address\\ZipCodeLookupService, object given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Bootstrap/ContainerFactory.php
@@ -392,6 +404,12 @@ parameters:
 
 		-
 			message: '#^Parameter \$bucket of class App\\Infrastructure\\Storage\\MinioAdapter constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Parameter \$cache of class App\\Infrastructure\\Address\\ZipCodeLookupService constructor expects App\\Domain\\Address\\Ports\\ZipCodeCacheRepository, object given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Bootstrap/ContainerFactory.php
@@ -577,6 +595,12 @@ parameters:
 			path: src/Bootstrap/ContainerFactory.php
 
 		-
+			message: '#^Parameter \$provider of class App\\Infrastructure\\Address\\ZipCodeLookupService constructor expects App\\Domain\\Address\\Ports\\ZipCodeProvider, object given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
 			message: '#^Parameter \$publicKeyPem of class App\\Infrastructure\\Auth\\Jwt\\JwtTokenIssuer constructor expects string, string\|false given\.$#'
 			identifier: argument.type
 			count: 1
@@ -709,10 +733,46 @@ parameters:
 			path: src/Bootstrap/ContainerFactory.php
 
 		-
+			message: '#^Parameter \$users of class App\\Infrastructure\\Http\\Controllers\\DealershipController constructor expects App\\Domain\\Users\\Ports\\UserRepository, object given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Bootstrap/ContainerFactory.php
+
+		-
 			message: '#^Parameter \$users of class App\\Infrastructure\\Http\\Controllers\\UserController constructor expects App\\Domain\\Users\\Ports\\UserRepository, object given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Bootstrap/ContainerFactory.php
+
+		-
+			message: '#^Parameter \#1 \$row of method App\\Infrastructure\\Address\\PostgresZipCodeCacheRepository\:\:fromRow\(\) expects array\<string, mixed\>, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Address/PostgresZipCodeCacheRepository.php
+
+		-
+			message: '#^Parameter \$city of class App\\Domain\\Address\\ZipCodeAddress constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Address/PostgresZipCodeCacheRepository.php
+
+		-
+			message: '#^Parameter \$neighborhood of class App\\Domain\\Address\\ZipCodeAddress constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Address/PostgresZipCodeCacheRepository.php
+
+		-
+			message: '#^Parameter \$state of class App\\Domain\\Address\\ZipCodeAddress constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Address/PostgresZipCodeCacheRepository.php
+
+		-
+			message: '#^Parameter \$street of class App\\Domain\\Address\\ZipCodeAddress constructor expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Address/PostgresZipCodeCacheRepository.php
 
 		-
 			message: '#^Method App\\Infrastructure\\Auth\\Google\\GoogleJwksIdTokenVerifier\:\:fetchJwks\(\) should return array\<string, mixed\> but returns mixed\.$#'
@@ -1029,7 +1089,7 @@ parameters:
 		-
 			message: '#^Parameter \#1 \$row of method App\\Infrastructure\\Dealerships\\PostgresDealershipRepository\:\:fromRow\(\) expects array\<string, mixed\>, mixed given\.$#'
 			identifier: argument.type
-			count: 1
+			count: 2
 			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
 
 		-
@@ -1058,6 +1118,12 @@ parameters:
 
 		-
 			message: '#^Parameter \$complement of class App\\Domain\\Dealerships\\Dealership constructor expects string\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \$email of class App\\Domain\\Dealerships\\Dealership constructor expects string\|null, mixed given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
@@ -1106,6 +1172,12 @@ parameters:
 
 		-
 			message: '#^Parameter \$photoFileId of class App\\Domain\\Dealerships\\Dealership constructor expects string\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
+
+		-
+			message: '#^Parameter \$slug of class App\\Domain\\Dealerships\\Dealership constructor expects string, mixed given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Infrastructure/Dealerships/PostgresDealershipRepository.php
@@ -1209,13 +1281,13 @@ parameters:
 		-
 			message: '#^Cannot access property \$role on mixed\.$#'
 			identifier: property.nonObject
-			count: 4
+			count: 5
 			path: src/Infrastructure/Http/Controllers/DealershipController.php
 
 		-
 			message: '#^Cannot access property \$subject on mixed\.$#'
 			identifier: property.nonObject
-			count: 11
+			count: 12
 			path: src/Infrastructure/Http/Controllers/DealershipController.php
 
 		-
@@ -1280,6 +1352,18 @@ parameters:
 
 		-
 			message: '#^Parameter \$complement of static method App\\Domain\\Dealerships\\Dealership\:\:register\(\) expects string\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \$email of method App\\Domain\\Dealerships\\Dealership\:\:withProfile\(\) expects string\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Http/Controllers/DealershipController.php
+
+		-
+			message: '#^Parameter \$email of static method App\\Domain\\Dealerships\\Dealership\:\:register\(\) expects string\|null, mixed given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Infrastructure/Http/Controllers/DealershipController.php
@@ -1693,7 +1777,7 @@ parameters:
 			path: src/Infrastructure/Http/Router.php
 
 		-
-			message: '#^Property App\\Infrastructure\\Http\\Router\:\:\$routes \(array\<string, list\<array\{path\: string, pattern\: string, paramNames\: list\<string\>, handler\: callable\(\)\: mixed, roles\: list\<string\>, serviceContext\: bool, description\: string, accepts\: list\<string\>, \.\.\.\}\>\>\) does not accept non\-empty\-array\<string, list\<array\{path\: string, pattern\: string, paramNames\: list\<string\>, handler\: callable\(\)\: mixed, roles\: array, serviceContext\: bool, description\: string, accepts\: array, \.\.\.\}\>\>\.$#'
+			message: '#^Property App\\Infrastructure\\Http\\Router\:\:\$routes \(array\<string, list\<array\{path\: string, pattern\: string, paramNames\: list\<string\>, handler\: callable\(\)\: mixed, roles\: list\<string\>, serviceContext\: bool, publicRead\: bool, description\: string, \.\.\.\}\>\>\) does not accept non\-empty\-array\<string, list\<array\{path\: string, pattern\: string, paramNames\: list\<string\>, handler\: callable\(\)\: mixed, roles\: array, serviceContext\: bool, publicRead\: bool, description\: string, \.\.\.\}\>\>\.$#'
 			identifier: assign.propertyType
 			count: 1
 			path: src/Infrastructure/Http/Router.php
@@ -2037,7 +2121,7 @@ parameters:
 		-
 			message: '#^Cannot call method fetchAll\(\) on PDOStatement\|false\.$#'
 			identifier: method.nonObject
-			count: 4
+			count: 5
 			path: tests/Infrastructure/Database/RlsPolicyTest.php
 
 		-
@@ -2073,7 +2157,7 @@ parameters:
 		-
 			message: '#^Cannot call method fetchColumn\(\) on PDOStatement\|false\.$#'
 			identifier: method.nonObject
-			count: 3
+			count: 6
 			path: tests/Infrastructure/Http/Middleware/AuthContextMiddlewareTest.php
 
 		-

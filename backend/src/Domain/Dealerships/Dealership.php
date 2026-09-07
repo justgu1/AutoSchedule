@@ -13,6 +13,7 @@ final readonly class Dealership
         public string $id,
         public string $ownerUserId,
         public string $name,
+        public string $slug,
         public string $zipCode,
         public string $address,
         public string $number,
@@ -24,6 +25,7 @@ final readonly class Dealership
         public ?float $longitude,
         public ?string $googlePlaceId,
         public ?string $phone,
+        public ?string $email,
         public ?string $photoFileId,
         public TrashableStatus $status,
         public bool $trashedByOwnerDeactivation,
@@ -45,16 +47,19 @@ final readonly class Dealership
         string $city,
         string $state,
         ?string $phone,
+        ?string $email = null,
         ?float $latitude = null,
         ?float $longitude = null,
         ?string $googlePlaceId = null,
     ): self {
         $now = new \DateTimeImmutable();
+        $id = Uuid::v7();
 
         return new self(
-            id: Uuid::v7(),
+            id: $id,
             ownerUserId: $ownerUserId,
             name: $name,
+            slug: self::buildSlug($name, $id),
             zipCode: $zipCode,
             address: $address,
             number: $number,
@@ -66,6 +71,7 @@ final readonly class Dealership
             longitude: $longitude,
             googlePlaceId: $googlePlaceId,
             phone: $phone,
+            email: $email,
             photoFileId: null,
             status: TrashableStatus::Active,
             trashedByOwnerDeactivation: false,
@@ -87,6 +93,7 @@ final readonly class Dealership
         string $city,
         string $state,
         ?string $phone,
+        ?string $email,
         ?float $latitude,
         ?float $longitude,
         ?string $googlePlaceId,
@@ -95,6 +102,7 @@ final readonly class Dealership
             id: $this->id,
             ownerUserId: $this->ownerUserId,
             name: $name,
+            slug: $this->slug,
             zipCode: $zipCode,
             address: $address,
             number: $number,
@@ -106,6 +114,7 @@ final readonly class Dealership
             longitude: $longitude,
             googlePlaceId: $googlePlaceId,
             phone: $phone,
+            email: $email,
             photoFileId: $this->photoFileId,
             status: $this->status,
             trashedByOwnerDeactivation: $this->trashedByOwnerDeactivation,
@@ -123,6 +132,7 @@ final readonly class Dealership
             id: $this->id,
             ownerUserId: $ownerUserId,
             name: $this->name,
+            slug: $this->slug,
             zipCode: $this->zipCode,
             address: $this->address,
             number: $this->number,
@@ -134,6 +144,7 @@ final readonly class Dealership
             longitude: $this->longitude,
             googlePlaceId: $this->googlePlaceId,
             phone: $this->phone,
+            email: $this->email,
             photoFileId: $this->photoFileId,
             status: $this->status,
             trashedByOwnerDeactivation: $this->trashedByOwnerDeactivation,
@@ -151,6 +162,7 @@ final readonly class Dealership
             id: $this->id,
             ownerUserId: $this->ownerUserId,
             name: $this->name,
+            slug: $this->slug,
             zipCode: $this->zipCode,
             address: $this->address,
             number: $this->number,
@@ -162,6 +174,7 @@ final readonly class Dealership
             longitude: $this->longitude,
             googlePlaceId: $this->googlePlaceId,
             phone: $this->phone,
+            email: $this->email,
             photoFileId: $photoFileId,
             status: $this->status,
             trashedByOwnerDeactivation: $this->trashedByOwnerDeactivation,
@@ -192,8 +205,10 @@ final readonly class Dealership
      * Escruba identificador direto (nome, telefone, endereço, complemento,
      * place id, foto) -- mantém zip/cidade/estado/lat/long, não identificam
      * sozinhos e servem pra estatística agregada. Mesmo espírito de
-     * `User::anonymized()`. Quem chama ainda precisa apagar o arquivo da
-     * foto do storage -- aqui só solta a referência.
+     * `User::anonymized()`. `slug` também é trocado -- ele nasce do nome, uma
+     * URL pública antiga não pode continuar divulgando o nome do negócio
+     * removido. Quem chama ainda precisa apagar o arquivo da foto do
+     * storage -- aqui só solta a referência.
      */
     public function anonymized(): self
     {
@@ -201,6 +216,7 @@ final readonly class Dealership
             id: $this->id,
             ownerUserId: $this->ownerUserId,
             name: 'Concessionária removida',
+            slug: self::buildSlug('concessionaria removida', $this->id),
             zipCode: $this->zipCode,
             address: '',
             number: '',
@@ -212,6 +228,7 @@ final readonly class Dealership
             longitude: $this->longitude,
             googlePlaceId: null,
             phone: null,
+            email: null,
             photoFileId: null,
             status: TrashableStatus::Deleted,
             trashedByOwnerDeactivation: $this->trashedByOwnerDeactivation,
@@ -220,5 +237,24 @@ final readonly class Dealership
             createdAt: $this->createdAt,
             updatedAt: $this->updatedAt,
         );
+    }
+
+    /**
+     * Slugify do nome + 6 caracteres do próprio id -- os ÚLTIMOS, não os
+     * primeiros: UUID v7 tem timestamp nos bits iniciais, então duas
+     * concessionárias criadas perto uma da outra no tempo (bem comum em
+     * teste, ou só em uso normal) teriam o mesmo prefixo e colidiriam de
+     * verdade toda vez, não só em teoria. Os últimos caracteres são a parte
+     * aleatória. Ainda não elimina colisão 100% (a fatia perde entropia),
+     * mas o `UNIQUE` da coluna é o backstop: colidir é raro o bastante pra
+     * não valer complexidade de retry, e um erro nesse caso extremo é aceitável.
+     */
+    private static function buildSlug(string $name, string $id): string
+    {
+        $transliterated = iconv('UTF-8', 'ASCII//TRANSLIT', $name);
+        $base = strtolower(trim((string) preg_replace('/[^a-zA-Z0-9]+/', '-', $transliterated !== false ? $transliterated : $name), '-'));
+        $suffix = substr(str_replace('-', '', $id), -6);
+
+        return ($base !== '' ? $base : 'concessionaria') . '-' . $suffix;
     }
 }
