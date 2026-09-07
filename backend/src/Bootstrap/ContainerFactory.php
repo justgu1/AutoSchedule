@@ -11,7 +11,7 @@ use App\Application\Auth\LoginWithPassword;
 use App\Application\Auth\Logout;
 use App\Application\Auth\RefreshAccessToken;
 use App\Application\Auth\TokenPairIssuer;
-use App\Application\Notification\SendEmailJob;
+use App\Application\Notification\SendEmail;
 use App\Application\Ports\JobProgress;
 use App\Application\Ports\MailTemplateRenderer;
 use App\Application\Ports\Queue;
@@ -211,7 +211,7 @@ final class ContainerFactory
 
         // O worker resolve o job pelo nome que veio no envelope, então registrar explícito é o que
         // garante que a fila não dependa de um autowire nunca exercitado.
-        $container->singleton(SendEmailJob::class, static fn (Container $c): SendEmailJob => new SendEmailJob($c->get(MailProvider::class)));
+        $container->singleton(SendEmail::class, static fn (Container $c): SendEmail => new SendEmail($c->get(MailProvider::class)));
     }
 
     /** Cada domínio com lixeira reversível registra a própria purga sobre a mesma ScheduledTask. */

@@ -2,20 +2,21 @@
 
 declare(strict_types=1);
 
-namespace Tests\Application\Notification;
+namespace Tests\Infrastructure\Jobs;
 
-use App\Application\Notification\SendEmailJob;
+use App\Application\Notification\SendEmail;
 use App\Domain\Notification\Ports\MailProvider;
+use App\Infrastructure\Jobs\SendEmailJob;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 final class SendEmailJobTest extends TestCase
 {
     #[Test]
-    public function handle_repassa_os_dados_do_payload_pro_mail_provider(): void
+    public function handle_traduz_o_payload_da_fila_em_argumentos_do_caso_de_uso(): void
     {
         $mail = new SpyMailProvider();
-        $job = new SendEmailJob($mail);
+        $job = new SendEmailJob(new SendEmail($mail));
 
         $job->handle(['to' => 'ada@example.com', 'subject' => 'Assunto', 'html_body' => '<p>Corpo</p>']);
 

@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace App\Application\Dealership;
 
 use App\Application\File\UploadFile;
-use App\Application\Ports\Job;
 use App\Application\Ports\JobProgress;
 use App\Application\Ports\TempFileStore;
-use App\Application\Shared\ValidatedInput;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
 use App\Domain\Dealership\Dealership;
@@ -16,7 +14,7 @@ use App\Domain\Dealership\Ports\DealershipRepository;
 use App\Domain\File\Ports\StorageProvider;
 
 /** Ver `EnqueueDealershipPhoto` pro motivo de isto rodar fora do request. */
-final readonly class ProcessDealershipPhotoJob implements Job
+final readonly class ProcessDealershipPhoto
 {
     public function __construct(
         private DealershipRepository $dealerships,
@@ -29,15 +27,13 @@ final readonly class ProcessDealershipPhotoJob implements Job
     ) {
     }
 
-    public function handle(array $payload): void
-    {
-        $input = new ValidatedInput($payload);
-        $jobId = $input->string('job_id');
-        $dealershipId = $input->string('dealership_id');
-        $sourcePath = $input->string('source_path');
-        $originalName = $input->string('original_name');
-        $uploadedBy = $input->stringOrNull('uploaded_by');
-
+    public function __invoke(
+        string $jobId,
+        string $dealershipId,
+        string $sourcePath,
+        string $originalName,
+        ?string $uploadedBy,
+    ): void {
         try {
             $dealership = $this->dealerships->findById($dealershipId);
 
@@ -61,6 +57,7 @@ final readonly class ProcessDealershipPhotoJob implements Job
                 'result' => ['photo_url' => $this->storage->url($file->path)],
             ]);
         } catch (\Throwable $exception) {
+            // Quem acompanha é o cliente pelo `job_id`, não o worker: falha vira status, não retry.
             $this->jobProgress->update($jobId, 'failed', 'failed', 100, ['error' => $exception->getMessage()]);
         } finally {
             $this->tempFiles->discard($sourcePath);

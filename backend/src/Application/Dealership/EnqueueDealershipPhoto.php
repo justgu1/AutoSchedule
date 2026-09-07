@@ -6,6 +6,7 @@ namespace App\Application\Dealership;
 
 use App\Application\Ports\JobProgress;
 use App\Application\Ports\Queue;
+use App\Application\Ports\QueuedJob;
 use App\Application\Ports\TempFileStore;
 use App\Application\Shared\ActorContext;
 use App\Domain\Exceptions\DomainErrorType;
@@ -42,7 +43,7 @@ final readonly class EnqueueDealershipPhoto
         $sourcePath = $this->tempFiles->stage($uploadedTmpPath, $jobId);
 
         $this->jobProgress->create($jobId);
-        $this->queue->push(ProcessDealershipPhotoJob::class, [
+        $this->queue->push(QueuedJob::ProcessDealershipPhoto, [
             'job_id' => $jobId,
             'dealership_id' => $dealership->id,
             'source_path' => $sourcePath,

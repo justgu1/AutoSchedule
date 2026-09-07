@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Application\User;
 
-use App\Application\Notification\SendEmailJob;
 use App\Application\Ports\MailTemplateRenderer;
 use App\Application\Ports\Queue;
+use App\Application\Ports\QueuedJob;
 use App\Domain\Auth\PasswordResetToken;
 use App\Domain\Auth\Ports\PasswordResetTokenRepository;
 use App\Domain\Shared\Email;
@@ -43,7 +43,7 @@ final readonly class RequestPasswordReset
             'EXPIRES_MINUTES' => (string) intdiv($this->passwordResetTtl, 60),
         ]);
 
-        $this->queue->push(SendEmailJob::class, [
+        $this->queue->push(QueuedJob::SendEmail, [
             'to' => $user->email->value,
             'subject' => 'Redefinir senha -- AutoSchedule',
             'html_body' => $html,

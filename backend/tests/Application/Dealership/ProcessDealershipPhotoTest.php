@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Application\Dealership;
 
 use App\Application\Dealership\DealershipPhotos;
-use App\Application\Dealership\ProcessDealershipPhotoJob;
+use App\Application\Dealership\ProcessDealershipPhoto;
 use App\Application\File\UploadFile;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Dealership\Dealership;
@@ -28,7 +28,7 @@ use Tests\Support\FakeAuditLogger;
 
 /** O que importa aqui é a orquestração; o único ponto real é o `JobStatusStore`. */
 #[Group('integration')]
-final class ProcessDealershipPhotoJobTest extends TestCase
+final class ProcessDealershipPhotoTest extends TestCase
 {
     private InMemoryDealershipRepository $dealerships;
     private InMemoryFileRepository $files;
@@ -36,7 +36,7 @@ final class ProcessDealershipPhotoJobTest extends TestCase
     private FakeAuditLogger $audit;
     private JobStatusStore $jobStatus;
     private string $tempPath;
-    private ProcessDealershipPhotoJob $job;
+    private ProcessDealershipPhoto $processPhoto;
     private string $sourcePath;
 
     protected function setUp(): void
@@ -55,7 +55,7 @@ final class ProcessDealershipPhotoJobTest extends TestCase
 
         $tempFiles = new LocalTempFileStore($this->tempPath);
         $uploads = new UploadFile($this->storage, $this->files, new FakeImageOptimizer($this->tempPath), $tempFiles);
-        $this->job = new ProcessDealershipPhotoJob(
+        $this->processPhoto = new ProcessDealershipPhoto(
             $this->dealerships,
             new DealershipPhotos($this->files, $this->storage),
             $this->storage,
@@ -85,13 +85,13 @@ final class ProcessDealershipPhotoJobTest extends TestCase
         $this->dealerships->insert($dealership);
         $this->jobStatus->create('job-1');
 
-        $this->job->handle([
-            'job_id' => 'job-1',
-            'dealership_id' => $dealership->id,
-            'source_path' => $this->sourcePath,
-            'original_name' => 'foto.jpg',
-            'uploaded_by' => 'user-1',
-        ]);
+        ($this->processPhoto)(
+            jobId: 'job-1',
+            dealershipId: $dealership->id,
+            sourcePath: $this->sourcePath,
+            originalName: 'foto.jpg',
+            uploadedBy: 'user-1',
+        );
 
         $updated = $this->dealerships->findById($dealership->id);
         $this->assertNotNull($updated);
@@ -115,13 +115,13 @@ final class ProcessDealershipPhotoJobTest extends TestCase
         $this->dealerships->insert($dealership->withPhoto($oldFile->id));
         $this->jobStatus->create('job-2');
 
-        $this->job->handle([
-            'job_id' => 'job-2',
-            'dealership_id' => $dealership->id,
-            'source_path' => $this->sourcePath,
-            'original_name' => 'foto.jpg',
-            'uploaded_by' => 'user-1',
-        ]);
+        ($this->processPhoto)(
+            jobId: 'job-2',
+            dealershipId: $dealership->id,
+            sourcePath: $this->sourcePath,
+            originalName: 'foto.jpg',
+            uploadedBy: 'user-1',
+        );
 
         $this->assertNull($this->files->findByPath('old-path'), 'foto antiga precisa sumir de `files`, não ficar órfã');
         $this->assertNull($this->storage->contentsOf('old-path'));
@@ -134,13 +134,13 @@ final class ProcessDealershipPhotoJobTest extends TestCase
         $this->dealerships->insert($dealership);
         $this->jobStatus->create('job-3');
 
-        $this->job->handle([
-            'job_id' => 'job-3',
-            'dealership_id' => $dealership->id,
-            'source_path' => $this->sourcePath,
-            'original_name' => 'foto.jpg',
-            'uploaded_by' => 'user-1',
-        ]);
+        ($this->processPhoto)(
+            jobId: 'job-3',
+            dealershipId: $dealership->id,
+            sourcePath: $this->sourcePath,
+            originalName: 'foto.jpg',
+            uploadedBy: 'user-1',
+        );
 
         $this->assertFileDoesNotExist($this->sourcePath);
     }
@@ -150,13 +150,13 @@ final class ProcessDealershipPhotoJobTest extends TestCase
     {
         $this->jobStatus->create('job-4');
 
-        $this->job->handle([
-            'job_id' => 'job-4',
-            'dealership_id' => 'does-not-exist',
-            'source_path' => $this->sourcePath,
-            'original_name' => 'foto.jpg',
-            'uploaded_by' => 'user-1',
-        ]);
+        ($this->processPhoto)(
+            jobId: 'job-4',
+            dealershipId: 'does-not-exist',
+            sourcePath: $this->sourcePath,
+            originalName: 'foto.jpg',
+            uploadedBy: 'user-1',
+        );
 
         $status = $this->jobStatus->get('job-4');
         $this->assertNotNull($status);
