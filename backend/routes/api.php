@@ -2,253 +2,128 @@
 
 declare(strict_types=1);
 
-use App\Application\User\DTO\UserProfile;
-use App\Config;
-use App\Domain\User\Ports\UserRepository;
 use App\Domain\User\UserRole;
-use App\Infrastructure\Container\Container;
+use App\Infrastructure\Http\Controllers\ApiCatalogController;
 use App\Infrastructure\Http\Controllers\DealershipController;
 use App\Infrastructure\Http\Controllers\JobController;
 use App\Infrastructure\Http\Controllers\OAuthController;
 use App\Infrastructure\Http\Controllers\UserController;
 use App\Infrastructure\Http\Controllers\ZipCodeController;
-use App\Infrastructure\Http\Request;
-use App\Infrastructure\Http\Response;
 use App\Infrastructure\Http\Router;
-use App\Infrastructure\RateLimit\RateLimitPolicy;
 
-/**
- * Registra toda rota da API. Só sabe QUAIS rotas existem e qual handler cada
- * uma usa -- quem monta cada dependência é o Bootstrap\ContainerFactory.
- */
-return static function (Router $router, Container $container, Config $app): void {
-    // Catálogo: lista toda rota pública + toda rota cujo role exigido bate com
-    // o Bearer enviado (se houver) -- só mostra pro cliente o que ele de fato
-    // pode chamar, por isso `roles` não vai na resposta (o cliente não decide
-    // nada com isso, só filtramos aqui). $router->catalog() é lido em
-    // request-time, não aqui, então já reflete toda rota registrada abaixo
-    // mesmo estando declarada antes.
-    $router->get('/api', static function (Request $request) use ($container, $router): Response {
-        $claims = $request->attribute('auth');
-        $role = $claims?->role?->value;
+return static function (Router $router): void {
+    $anyRole = [UserRole::Admin, UserRole::Seller, UserRole::Customer];
+    $adminOrSeller = [UserRole::Admin, UserRole::Seller];
 
-        $endpoints = array_values(array_map(
-            static fn (array $route): array => [
-                'path' => $route['path'],
-                'methods' => $route['methods'],
-                'description' => $route['description'],
-                'accepts' => $route['accepts'],
-            ],
-            array_filter(
-                $router->catalog(),
-                static fn (array $route): bool => $route['roles'] === [] || ($role !== null && in_array($role, $route['roles'], true)),
-            ),
-        ));
+    $router->get('/api', [ApiCatalogController::class, 'show'])
+        ->describes('Lists the endpoints your role can access.');
 
-        $me = null;
+    $router->post('/api/oauth/token', [OAuthController::class, 'token'])
+        ->serviceContext()
+        ->rateLimit('auth')
+        ->describes('Logs in with email+password, renews tokens when refresh_token is sent, logs in with Google when id_token is sent, or issues a machine-to-machine token with client_id+client_secret.')
+        ->accepts('client_id', 'email', 'password', 'refresh_token', 'id_token', 'client_secret');
 
-        if ($claims !== null) {
-            $user = $container->get(UserRepository::class)->findById($claims->subject);
-            $me = $user !== null ? UserProfile::fromUser($user)->toArray() : null;
-        }
+    $router->post('/api/register', [UserController::class, 'register'])
+        ->serviceContext()
+        ->rateLimit('auth')
+        ->describes('Creates a seller or customer account.')
+        ->accepts('name', 'email', 'phone', 'password', 'role');
 
-        return Response::success(['endpoints' => $endpoints, 'me' => $me]);
-    }, description: 'Lists the endpoints your role can access.');
+    $router->post('/api/password-reset', [UserController::class, 'requestPasswordReset'])
+        ->serviceContext()
+        ->rateLimit('auth')
+        ->describes('Sends a password reset link by email, if the address is registered.')
+        ->accepts('email');
 
+    // Pública porque aceita os dois caminhos: `current_password` autenticado, ou `reset_token` sem Bearer nenhum.
+    $router->put('/api/me/password', [UserController::class, 'updatePassword'])
+        ->serviceContext()
+        ->rateLimit('auth')
+        ->describes('Changes your password (current_password when authenticated, or reset_token from the reset email).')
+        ->accepts('current_password', 'reset_token', 'password');
 
-    $oauthController = $container->get(OAuthController::class);
-    $router->post(
-        '/api/oauth/token',
-        $oauthController->token(...),
-        serviceContext: true,
-        description: 'Logs in with email+password, renews tokens when refresh_token is sent, logs in with Google when id_token is sent, or issues a machine-to-machine token with client_id+client_secret.',
-        accepts: ['client_id', 'email', 'password', 'refresh_token', 'id_token', 'client_secret'],
-        rateLimit: new RateLimitPolicy('auth', $app->int('rate_limit.auth.max_attempts'), $app->int('rate_limit.auth.window_seconds')),
-    );
+    $router->get('/api/dealerships/{id}', [DealershipController::class, 'show'])
+        ->publicRead()
+        ->describes('Returns a dealership -- full profile for its owner/admin, public-safe profile (name only, no other seller data) for anyone else, including no account at all. Only active dealerships are visible to non-owners.');
 
-    $anyAuthenticatedRole = array_map(static fn (UserRole $role): string => $role->value, UserRole::cases());
-    $router->post(
-        '/api/logout',
-        $oauthController->logout(...),
-        roles: $anyAuthenticatedRole,
-        description: 'Revokes the current refresh token family and clears auth cookies.',
-    );
-    $userController = $container->get(UserController::class);
-    $router->post(
-        '/api/register',
-        $userController->register(...),
-        serviceContext: true,
-        description: 'Creates a seller or customer account.',
-        accepts: ['name', 'email', 'phone', 'password', 'role'],
-        rateLimit: new RateLimitPolicy('auth', $app->int('rate_limit.auth.max_attempts'), $app->int('rate_limit.auth.window_seconds')),
-    );
-    $router->get(
-        '/api/me',
-        $userController->show(...),
-        roles: $anyAuthenticatedRole,
-        description: 'Returns your profile.',
-    );
-    $router->patch(
-        '/api/me',
-        $userController->update(...),
-        roles: $anyAuthenticatedRole,
-        description: 'Updates your name and/or phone; customer accounts may also self-upgrade to seller.',
-        accepts: ['name', 'phone', 'role'],
-    );
-    $router->post(
-        '/api/password-reset',
-        $userController->requestPasswordReset(...),
-        serviceContext: true,
-        description: 'Sends a password reset link by email, if the address is registered.',
-        accepts: ['email'],
-        rateLimit: new RateLimitPolicy('auth', $app->int('rate_limit.auth.max_attempts'), $app->int('rate_limit.auth.window_seconds')),
-    );
-    // Pública (sem `roles`) -- aceita ou `current_password` (autenticado,
-    // troca a própria senha) ou `reset_token` (sem Bearer, veio do e-mail de
-    // reset). `serviceContext` é o que permite o segundo caminho mexer em
-    // `users` sem contexto de usuário nenhum.
-    $router->put(
-        '/api/me/password',
-        $userController->updatePassword(...),
-        serviceContext: true,
-        description: 'Changes your password (current_password when authenticated, or reset_token from the reset email).',
-        accepts: ['current_password', 'reset_token', 'password'],
-        rateLimit: new RateLimitPolicy('auth', $app->int('rate_limit.auth.max_attempts'), $app->int('rate_limit.auth.window_seconds')),
-    );
-    $router->delete(
-        '/api/me',
-        $userController->destroy(...),
-        roles: $anyAuthenticatedRole,
-        description: 'Moves your account to trash (recoverable for 30 days by logging in again, or restored/purged by an admin).',
-    );
-    $router->post(
-        '/api/me/purge',
-        $userController->purge(...),
-        roles: $anyAuthenticatedRole,
-        description: 'Permanently anonymizes your trashed account now, without waiting 30 days.',
-    );
+    $router->get('/api/zip-codes/{zip_code}', [ZipCodeController::class, 'show'])
+        ->describes('Resolves a Brazilian CEP into street/neighborhood/city/state (ViaCEP, cached after the first lookup).');
 
-    $router->get(
-        '/api/users',
-        $userController->index(...),
-        roles: ['admin'],
-        description: 'Lists users, paginated (query: page, per_page).',
-    );
-    $router->get(
-        '/api/users/{id}',
-        $userController->show(...),
-        roles: ['admin'],
-        description: 'Returns a single user.',
-    );
-    $router->post(
-        '/api/users',
-        $userController->store(...),
-        roles: ['admin'],
-        description: 'Creates a user.',
-        accepts: ['name', 'email', 'phone', 'password', 'role'],
-    );
-    $router->patch(
-        '/api/users/{id}',
-        $userController->update(...),
-        roles: ['admin'],
-        description: 'Updates another user\'s name, phone and/or role. Fails if it would leave no admin.',
-        accepts: ['name', 'phone', 'role'],
-    );
-    $router->delete(
-        '/api/users/{id}',
-        $userController->destroy(...),
-        roles: ['admin'],
-        description: 'Moves a user to trash. Fails if it is the last admin.',
-    );
-    $router->post(
-        '/api/users/{id}/restore',
-        $userController->restore(...),
-        roles: ['admin'],
-        description: 'Restores a trashed user before the 30-day window expires.',
-    );
-    $router->post(
-        '/api/users/{id}/purge',
-        $userController->purge(...),
-        roles: ['admin'],
-        description: 'Permanently anonymizes a trashed user now, without waiting 30 days.',
-    );
+    $router->group($anyRole, static function (Router $router): void {
+        $router->post('/api/logout', [OAuthController::class, 'logout'])
+            ->describes('Revokes the current refresh token family and clears auth cookies.');
 
-    $adminOrSeller = ['admin', 'seller'];
-    $dealershipController = $container->get(DealershipController::class);
-    $router->get(
-        '/api/dealerships',
-        $dealershipController->index(...),
-        roles: $adminOrSeller,
-        description: 'Lists dealerships -- admin sees all (paginated), seller sees only their own.',
-    );
-    $router->post(
-        '/api/dealerships',
-        $dealershipController->store(...),
-        roles: $adminOrSeller,
-        description: 'Creates a dealership. Seller becomes the owner automatically; admin must send owner_user_id.',
-        accepts: ['name', 'zip_code', 'address', 'number', 'complement', 'neighborhood', 'city', 'state', 'phone', 'email', 'owner_user_id'],
-    );
-    $router->get(
-        '/api/dealerships/{id}',
-        $dealershipController->show(...),
-        publicRead: true,
-        description: 'Returns a dealership -- full profile for its owner/admin, public-safe profile (name only, no other seller data) for anyone else, including no account at all. Only active dealerships are visible to non-owners.',
-    );
-    $router->patch(
-        '/api/dealerships/{id}',
-        $dealershipController->update(...),
-        roles: $adminOrSeller,
-        description: 'Updates dealership profile fields. Admin may also send owner_user_id to reassign it to another seller.',
-        accepts: ['name', 'zip_code', 'address', 'number', 'complement', 'neighborhood', 'city', 'state', 'phone', 'email', 'owner_user_id'],
-    );
-    $router->delete(
-        '/api/dealerships/{id}',
-        $dealershipController->destroy(...),
-        roles: $adminOrSeller,
-        description: 'Moves a dealership to trash.',
-    );
-    $router->post(
-        '/api/dealerships/{id}/restore',
-        $dealershipController->restore(...),
-        roles: $adminOrSeller,
-        description: 'Restores a trashed dealership before the 30-day window expires.',
-    );
-    $router->post(
-        '/api/dealerships/{id}/purge',
-        $dealershipController->purge(...),
-        roles: $adminOrSeller,
-        description: 'Permanently anonymizes a trashed dealership now, without waiting 30 days.',
-    );
-    $router->post(
-        '/api/dealerships/{id}/photo',
-        $dealershipController->setPhoto(...),
-        roles: $adminOrSeller,
-        description: 'Sets the dealership photo (multipart, field name "image", max 20MB) -- replaces the previous one, if any.',
-    );
-    $router->delete(
-        '/api/dealerships/{id}/photo',
-        $dealershipController->removePhoto(...),
-        roles: $adminOrSeller,
-        description: 'Removes the dealership photo.',
-    );
+        $router->get('/api/me', [UserController::class, 'show'])
+            ->describes('Returns your profile.');
 
-    $jobController = $container->get(JobController::class);
-    $router->get(
-        '/api/jobs/{id}',
-        $jobController->show(...),
-        roles: $anyAuthenticatedRole,
-        description: 'Returns the current status of an async job (queued/processing/done/failed).',
-    );
-    $router->get(
-        '/api/jobs/{id}/events',
-        $jobController->events(...),
-        roles: $anyAuthenticatedRole,
-        description: 'Streams the status of an async job via Server-Sent Events until it finishes.',
-    );
+        $router->patch('/api/me', [UserController::class, 'update'])
+            ->describes('Updates your name and/or phone; customer accounts may also self-upgrade to seller.')
+            ->accepts('name', 'phone', 'role');
 
-    $router->get(
-        '/api/zip-codes/{zip_code}',
-        [$container->get(ZipCodeController::class), 'show'],
-        description: 'Resolves a Brazilian CEP into street/neighborhood/city/state (ViaCEP, cached after the first lookup).',
-    );
+        $router->delete('/api/me', [UserController::class, 'destroy'])
+            ->describes('Moves your account to trash (recoverable for 30 days by logging in again, or restored/purged by an admin).');
+
+        $router->post('/api/me/purge', [UserController::class, 'purge'])
+            ->describes('Permanently anonymizes your trashed account now, without waiting 30 days.');
+
+        $router->get('/api/jobs/{id}', [JobController::class, 'show'])
+            ->describes('Returns the current status of an async job (queued/processing/done/failed).');
+
+        $router->get('/api/jobs/{id}/events', [JobController::class, 'events'])
+            ->describes('Streams the status of an async job via Server-Sent Events until it finishes.');
+    });
+
+    $router->group([UserRole::Admin], static function (Router $router): void {
+        $router->get('/api/users', [UserController::class, 'index'])
+            ->describes('Lists users, paginated (query: page, per_page).');
+
+        $router->get('/api/users/{id}', [UserController::class, 'show'])
+            ->describes('Returns a single user.');
+
+        $router->post('/api/users', [UserController::class, 'store'])
+            ->describes('Creates a user.')
+            ->accepts('name', 'email', 'phone', 'password', 'role');
+
+        $router->patch('/api/users/{id}', [UserController::class, 'update'])
+            ->describes('Updates another user\'s name, phone and/or role. Fails if it would leave no admin.')
+            ->accepts('name', 'phone', 'role');
+
+        $router->delete('/api/users/{id}', [UserController::class, 'destroy'])
+            ->describes('Moves a user to trash. Fails if it is the last admin.');
+
+        $router->post('/api/users/{id}/restore', [UserController::class, 'restore'])
+            ->describes('Restores a trashed user before the 30-day window expires.');
+
+        $router->post('/api/users/{id}/purge', [UserController::class, 'purge'])
+            ->describes('Permanently anonymizes a trashed user now, without waiting 30 days.');
+    });
+
+    $router->group($adminOrSeller, static function (Router $router): void {
+        $router->get('/api/dealerships', [DealershipController::class, 'index'])
+            ->describes('Lists dealerships -- admin sees all (paginated), seller sees only their own.');
+
+        $router->post('/api/dealerships', [DealershipController::class, 'store'])
+            ->describes('Creates a dealership. Seller becomes the owner automatically; admin must send owner_user_id.')
+            ->accepts('name', 'zip_code', 'address', 'number', 'complement', 'neighborhood', 'city', 'state', 'phone', 'email', 'owner_user_id');
+
+        $router->patch('/api/dealerships/{id}', [DealershipController::class, 'update'])
+            ->describes('Updates dealership profile fields. Admin may also send owner_user_id to reassign it to another seller.')
+            ->accepts('name', 'zip_code', 'address', 'number', 'complement', 'neighborhood', 'city', 'state', 'phone', 'email', 'owner_user_id');
+
+        $router->delete('/api/dealerships/{id}', [DealershipController::class, 'destroy'])
+            ->describes('Moves a dealership to trash.');
+
+        $router->post('/api/dealerships/{id}/restore', [DealershipController::class, 'restore'])
+            ->describes('Restores a trashed dealership before the 30-day window expires.');
+
+        $router->post('/api/dealerships/{id}/purge', [DealershipController::class, 'purge'])
+            ->describes('Permanently anonymizes a trashed dealership now, without waiting 30 days.');
+
+        $router->post('/api/dealerships/{id}/photo', [DealershipController::class, 'setPhoto'])
+            ->describes('Sets the dealership photo (multipart, field name "image", max 20MB) -- replaces the previous one, if any.');
+
+        $router->delete('/api/dealerships/{id}/photo', [DealershipController::class, 'removePhoto'])
+            ->describes('Removes the dealership photo.');
+    });
 };
