@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Tests\Infrastructure\Persistence;
+namespace Tests\Infrastructure\Persistence\Schema;
 
-use App\Infrastructure\Persistence\SeederRunner;
+use App\Infrastructure\Persistence\Schema\SeederRunner;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -33,7 +33,7 @@ final class SeederRunnerTest extends TestCase
         $statement = $this->pdo->prepare('DELETE FROM oauth_clients WHERE client_id IN (?, ?)');
         $statement->execute(['autoschedule-web', 'autoschedule-service']);
 
-        $this->runner = new SeederRunner($this->pdo, dirname(__DIR__, 3) . '/database/seeders');
+        $this->runner = new SeederRunner($this->pdo, dirname(__DIR__, 4) . '/database/seeders');
     }
 
     protected function tearDown(): void

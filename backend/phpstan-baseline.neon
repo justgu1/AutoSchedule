@@ -136,25 +136,25 @@ parameters:
 			message: '#^Cannot call method fetchAll\(\) on PDOStatement\|false\.$#'
 			identifier: method.nonObject
 			count: 1
-			path: src/Infrastructure/Persistence/MigrationRunner.php
+			path: src/Infrastructure/Persistence/Schema/MigrationRunner.php
 
 		-
 			message: '#^Cannot call method fetchColumn\(\) on PDOStatement\|false\.$#'
 			identifier: method.nonObject
 			count: 2
-			path: src/Infrastructure/Persistence/MigrationRunner.php
+			path: src/Infrastructure/Persistence/Schema/MigrationRunner.php
 
 		-
-			message: '#^Method App\\Infrastructure\\Persistence\\MigrationRunner\:\:appliedMigrations\(\) should return list\<string\> but returns array\.$#'
+			message: '#^Method App\\Infrastructure\\Persistence\\Schema\\MigrationRunner\:\:appliedMigrations\(\) should return list\<string\> but returns array\.$#'
 			identifier: return.type
 			count: 1
-			path: src/Infrastructure/Persistence/MigrationRunner.php
+			path: src/Infrastructure/Persistence/Schema/MigrationRunner.php
 
 		-
-			message: '#^Method App\\Infrastructure\\Persistence\\MigrationRunner\:\:migrationsInBatch\(\) should return list\<string\> but returns array\.$#'
+			message: '#^Method App\\Infrastructure\\Persistence\\Schema\\MigrationRunner\:\:migrationsInBatch\(\) should return list\<string\> but returns array\.$#'
 			identifier: return.type
 			count: 1
-			path: src/Infrastructure/Persistence/MigrationRunner.php
+			path: src/Infrastructure/Persistence/Schema/MigrationRunner.php
 
 		-
 			message: '#^Cannot call method fetchColumn\(\) on PDOStatement\|false\.$#'
@@ -340,13 +340,13 @@ parameters:
 			message: '#^Cannot call method fetchAll\(\) on PDOStatement\|false\.$#'
 			identifier: method.nonObject
 			count: 1
-			path: tests/Infrastructure/Persistence/MigrationRunnerTest.php
+			path: tests/Infrastructure/Persistence/Schema/MigrationRunnerTest.php
 
 		-
 			message: '#^Cannot call method fetchColumn\(\) on PDOStatement\|false\.$#'
 			identifier: method.nonObject
 			count: 3
-			path: tests/Infrastructure/Persistence/MigrationRunnerTest.php
+			path: tests/Infrastructure/Persistence/Schema/MigrationRunnerTest.php
 
 		-
 			message: '#^Cannot access offset ''actor_id'' on mixed\.$#'
@@ -514,31 +514,31 @@ parameters:
 			message: '#^Cannot access offset ''password'' on mixed\.$#'
 			identifier: offsetAccess.nonOffsetAccessible
 			count: 1
-			path: tests/Infrastructure/Persistence/SeederRunnerTest.php
+			path: tests/Infrastructure/Persistence/Schema/SeederRunnerTest.php
 
 		-
 			message: '#^Cannot access offset ''role'' on mixed\.$#'
 			identifier: offsetAccess.nonOffsetAccessible
 			count: 1
-			path: tests/Infrastructure/Persistence/SeederRunnerTest.php
+			path: tests/Infrastructure/Persistence/Schema/SeederRunnerTest.php
 
 		-
 			message: '#^Cannot access offset ''secret_hash'' on mixed\.$#'
 			identifier: offsetAccess.nonOffsetAccessible
 			count: 2
-			path: tests/Infrastructure/Persistence/SeederRunnerTest.php
+			path: tests/Infrastructure/Persistence/Schema/SeederRunnerTest.php
 
 		-
 			message: '#^Cannot access offset ''type'' on mixed\.$#'
 			identifier: offsetAccess.nonOffsetAccessible
 			count: 2
-			path: tests/Infrastructure/Persistence/SeederRunnerTest.php
+			path: tests/Infrastructure/Persistence/Schema/SeederRunnerTest.php
 
 		-
 			message: '#^Parameter \#2 \$hash of function password_verify expects string, mixed given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Infrastructure/Persistence/SeederRunnerTest.php
+			path: tests/Infrastructure/Persistence/Schema/SeederRunnerTest.php
 
 		-
 			message: '#^Cannot cast mixed to string\.$#'

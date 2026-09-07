@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Tests\Infrastructure\Persistence;
+namespace Tests\Infrastructure\Persistence\Schema;
 
-use App\Infrastructure\Persistence\MigrationRunner;
+use App\Infrastructure\Persistence\Schema\MigrationRunner;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -43,7 +43,7 @@ final class MigrationRunnerTest extends TestCase
             $this->pdo->exec('DELETE FROM migrations');
         }
 
-        $this->runner = new MigrationRunner($this->pdo, dirname(__DIR__, 3) . '/database/migrations');
+        $this->runner = new MigrationRunner($this->pdo, dirname(__DIR__, 4) . '/database/migrations');
     }
 
     protected function tearDown(): void

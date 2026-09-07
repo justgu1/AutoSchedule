@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Infrastructure\Persistence\Migration;
+use App\Infrastructure\Persistence\Schema\Migration;
 
 /** E-mail próprio da concessionária (contato do negócio) -- mesma nulidade opcional do `phone` que já existia. */
 return new class () implements Migration {

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Infrastructure\Persistence;
+namespace App\Infrastructure\Persistence\Schema;
 
 interface Seeder
 {

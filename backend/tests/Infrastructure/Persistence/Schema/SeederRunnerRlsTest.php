@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Tests\Infrastructure\Persistence;
+namespace Tests\Infrastructure\Persistence\Schema;
 
-use App\Infrastructure\Persistence\SeederRunner;
+use App\Infrastructure\Persistence\Schema\SeederRunner;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -22,7 +22,7 @@ final class SeederRunnerRlsTest extends TestCase
     {
         $rls = TestDatabase::connectAsApp()->pdo();
 
-        $runner = new SeederRunner($rls, dirname(__DIR__, 3) . '/database/seeders');
+        $runner = new SeederRunner($rls, dirname(__DIR__, 4) . '/database/seeders');
 
         // Sem o SET LOCAL dentro do próprio SeederRunner, o INSERT do admin viola a policy de RLS.
         $executed = $runner->run();

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Infrastructure\Persistence\Migration;
+use App\Infrastructure\Persistence\Schema\Migration;
 
 /**
  * O UNIQUE de `users.email` é case-sensitive, então uma linha em caixa mista fica inalcançável agora
