@@ -6,62 +6,38 @@ namespace App;
 
 final class Config
 {
+    /** Lista explícita, não `glob()`: dá pra saber o que a aplicação carrega sem rodar nada. */
+    private const array FILES = [
+        'app',
+        'auth',
+        'cors',
+        'google',
+        'mail',
+        'pagination',
+        'rate_limit',
+        'redis',
+        'security',
+        'storage',
+    ];
+
     /** @var array<string, mixed> */
-    private array $config;
+    private array $values = [];
 
-    public function __construct()
+    public function __construct(?string $directory = null)
     {
-        $this->config = $this->load(dirname(__DIR__) . '/config/app.php');
+        $directory ??= dirname(__DIR__) . '/config';
 
-        // Todo outro config/*.php é carregado como chave própria de topo (pelo
-        // nome do arquivo), no mesmo formato que 'database' já é dentro do
-        // próprio app.php.
-        foreach (glob(dirname(__DIR__) . '/config/*.php') ?: [] as $path) {
-            $key = basename($path, '.php');
+        foreach (self::FILES as $file) {
+            $loaded = $this->load($directory . '/' . $file . '.php');
 
-            if ($key !== 'app') {
-                $this->config[$key] = $this->load($path);
-            }
+            // app.php é a raiz; os outros entram como grupo com o nome do arquivo.
+            $this->values = $file === 'app' ? $loaded : [...$this->values, $file => $loaded];
         }
-
-        // Secrets selados (SealedSecret/kubeseal) e outras fontes de env
-        // costumam carregar um `\n` sobrando quando o valor original foi
-        // gerado com `echo` em vez de `printf`/`echo -n`. Em vez de depender
-        // de cada fonte de env estar sempre byte-perfeita, corta espaço em
-        // branco nas bordas de todo valor de config aqui, uma vez só --
-        // string comparada/parseada contra um valor externo limpo (ex: aud
-        // claim de um JWT, DSN do mailer) nunca mais quebra por causa disso.
-        $this->config = $this->trimStrings($this->config);
 
         date_default_timezone_set($this->string('timezone'));
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function load(string $path): array
-    {
-        $values = require $path;
-
-        if (!is_array($values)) {
-            throw new \RuntimeException(sprintf('Config file "%s" must return an array.', $path));
-        }
-
-        // Chave numérica não é config nomeada -- descartar aqui é o que mantém
-        // o mapa tipado sem precisar confiar no arquivo.
-        return array_filter($values, is_string(...), ARRAY_FILTER_USE_KEY);
-    }
-
-    public function config(string $key, mixed $default = null): mixed
-    {
-        return $this->config[$key] ?? $default;
-    }
-
-    /**
-     * Acesso tipado por caminho pontuado (`auth.jwt.issuer`). Chave ausente ou
-     * com tipo diferente do pedido é erro de configuração do ambiente, não algo
-     * pra tratar em runtime -- explode no boot, não numa request qualquer.
-     */
+    /** Caminho pontuado (`auth.jwt.issuer`). Chave ausente ou de outro tipo é erro de ambiente: explode no boot. */
     public function string(string $path): string
     {
         $value = $this->value($path);
@@ -100,9 +76,21 @@ final class Config
         return $value;
     }
 
+    /** @return list<string> */
+    public function stringList(string $path): array
+    {
+        $value = $this->value($path);
+
+        if (!is_array($value)) {
+            throw new \RuntimeException(sprintf('Config "%s" is not a list.', $path));
+        }
+
+        return array_values(array_filter($value, is_string(...)));
+    }
+
     private function value(string $path): mixed
     {
-        $value = $this->config;
+        $value = $this->values;
 
         foreach (explode('.', $path) as $segment) {
             if (!is_array($value) || !array_key_exists($segment, $value)) {
@@ -115,20 +103,15 @@ final class Config
         return $value;
     }
 
-    /**
-     * @template TKey of array-key
-     * @param array<TKey, mixed> $config
-     * @return array<TKey, mixed>
-     */
-    private function trimStrings(array $config): array
+    /** @return array<string, mixed> */
+    private function load(string $path): array
     {
-        return array_map(
-            fn (mixed $value): mixed => match (true) {
-                is_string($value) => trim($value),
-                is_array($value) => $this->trimStrings($value),
-                default => $value,
-            },
-            $config,
-        );
+        $values = require $path;
+
+        if (!is_array($values)) {
+            throw new \RuntimeException(sprintf('Config file "%s" must return an array.', $path));
+        }
+
+        return array_filter($values, is_string(...), ARRAY_FILTER_USE_KEY);
     }
 }

@@ -10,15 +10,13 @@ use App\Infrastructure\Database\PostgresConnection;
 use App\Infrastructure\Database\SeederRunner;
 
 $app = new Config();
-$config = $app->config('database');
-
 $connection = new PostgresConnection(
-    $config['driver'],
-    $config['host'],
-    $config['port'],
-    $config['database'],
-    $config['username'],
-    $config['password'],
+    $app->string('database.driver'),
+    $app->string('database.host'),
+    $app->int('database.port'),
+    $app->string('database.database'),
+    $app->string('database.username'),
+    $app->string('database.password'),
 );
 
 $runner = new SeederRunner($connection->pdo(), dirname(__DIR__) . '/database/seeders');

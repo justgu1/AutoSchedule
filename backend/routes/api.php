@@ -55,7 +55,6 @@ return static function (Router $router, Container $container, Config $app): void
         return Response::success(['endpoints' => $endpoints, 'me' => $me]);
     }, description: 'Lists the endpoints your role can access.');
 
-    $authRateLimit = $app->config('rate_limit')['auth'];
 
     $oauthController = $container->get(OAuthController::class);
     $router->post(
@@ -64,7 +63,7 @@ return static function (Router $router, Container $container, Config $app): void
         serviceContext: true,
         description: 'Logs in with email+password, renews tokens when refresh_token is sent, logs in with Google when id_token is sent, or issues a machine-to-machine token with client_id+client_secret.',
         accepts: ['client_id', 'email', 'password', 'refresh_token', 'id_token', 'client_secret'],
-        rateLimit: new RateLimitPolicy('auth', $authRateLimit['max_attempts'], $authRateLimit['window_seconds']),
+        rateLimit: new RateLimitPolicy('auth', $app->int('rate_limit.auth.max_attempts'), $app->int('rate_limit.auth.window_seconds')),
     );
 
     $anyAuthenticatedRole = array_map(static fn (UserRole $role): string => $role->value, UserRole::cases());
@@ -81,7 +80,7 @@ return static function (Router $router, Container $container, Config $app): void
         serviceContext: true,
         description: 'Creates a seller or customer account.',
         accepts: ['name', 'email', 'phone', 'password', 'role'],
-        rateLimit: new RateLimitPolicy('auth', $authRateLimit['max_attempts'], $authRateLimit['window_seconds']),
+        rateLimit: new RateLimitPolicy('auth', $app->int('rate_limit.auth.max_attempts'), $app->int('rate_limit.auth.window_seconds')),
     );
     $router->get(
         '/api/me',
@@ -102,7 +101,7 @@ return static function (Router $router, Container $container, Config $app): void
         serviceContext: true,
         description: 'Sends a password reset link by email, if the address is registered.',
         accepts: ['email'],
-        rateLimit: new RateLimitPolicy('auth', $authRateLimit['max_attempts'], $authRateLimit['window_seconds']),
+        rateLimit: new RateLimitPolicy('auth', $app->int('rate_limit.auth.max_attempts'), $app->int('rate_limit.auth.window_seconds')),
     );
     // Pública (sem `roles`) -- aceita ou `current_password` (autenticado,
     // troca a própria senha) ou `reset_token` (sem Bearer, veio do e-mail de
@@ -114,7 +113,7 @@ return static function (Router $router, Container $container, Config $app): void
         serviceContext: true,
         description: 'Changes your password (current_password when authenticated, or reset_token from the reset email).',
         accepts: ['current_password', 'reset_token', 'password'],
-        rateLimit: new RateLimitPolicy('auth', $authRateLimit['max_attempts'], $authRateLimit['window_seconds']),
+        rateLimit: new RateLimitPolicy('auth', $app->int('rate_limit.auth.max_attempts'), $app->int('rate_limit.auth.window_seconds')),
     );
     $router->delete(
         '/api/me',

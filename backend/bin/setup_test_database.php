@@ -22,12 +22,10 @@ use App\Config;
 const TEST_DATABASE = 'autoschedule_test';
 
 $app = new Config();
-$config = $app->config('database');
-
 $pdo = new \PDO(
-    sprintf('%s:host=%s;port=%d;dbname=postgres', $config['driver'], $config['host'], $config['port']),
-    $config['username'],
-    $config['password'],
+    sprintf('%s:host=%s;port=%d;dbname=postgres', $app->string('database.driver'), $app->string('database.host'), $app->int('database.port')),
+    $app->string('database.username'),
+    $app->string('database.password'),
     [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION],
 );
 

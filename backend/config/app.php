@@ -2,26 +2,25 @@
 
 declare(strict_types=1);
 
+use App\Env;
+
 return [
     'name' => 'AutoSchedule',
 
-    'env' => getenv('APP_ENV') ?: 'production',
+    'env' => Env::string('APP_ENV', 'production'),
 
-    'debug' => filter_var(
-        getenv('APP_DEBUG') ?: false,
-        FILTER_VALIDATE_BOOL
-    ),
+    'debug' => Env::bool('APP_DEBUG', false),
 
-    'timezone' => getenv('APP_TIMEZONE') ?: 'America/Sao_Paulo',
+    'timezone' => Env::string('APP_TIMEZONE', 'America/Sao_Paulo'),
 
     'database' => [
-        'driver' => getenv('DB_DRIVER') ?: 'pgsql',
-        'host' => getenv('DB_HOST') ?: '127.0.0.1',
-        'port' => (int) (getenv('DB_PORT') ?: 5432),
-        'database' => getenv('DB_DATABASE') ?: 'autoschedule',
-        'username' => getenv('DB_USERNAME') ?: 'pgsql',
-        'password' => getenv('DB_PASSWORD') ?: 'password',
-        'app_username' => getenv('DB_APP_USERNAME') ?: 'autoschedule_app',
-        'app_password' => getenv('DB_APP_PASSWORD') ?: 'changeme',
+        'driver' => Env::string('DB_DRIVER', 'pgsql'),
+        'host' => Env::string('DB_HOST', '127.0.0.1'),
+        'port' => Env::int('DB_PORT', 5432),
+        'database' => Env::string('DB_DATABASE', 'autoschedule'),
+        'username' => Env::string('DB_USERNAME', 'pgsql'),
+        'password' => Env::string('DB_PASSWORD', 'password'),
+        'app_username' => Env::string('DB_APP_USERNAME', 'autoschedule_app'),
+        'app_password' => Env::string('DB_APP_PASSWORD', 'changeme'),
     ],
 ];

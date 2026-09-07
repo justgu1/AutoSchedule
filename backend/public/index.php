@@ -31,15 +31,13 @@ $container = ContainerFactory::build($app);
 $router = new Router();
 (require dirname(__DIR__) . '/routes/api.php')($router, $container, $app);
 
-$generalRateLimit = $app->config('rate_limit')['general'];
-$security = $app->config('security');
 
 $pipeline = new Pipeline([
     new LoggingMiddleware(log: static fn (string $line): mixed => $logger->info($line)),
-    new SecurityHeadersMiddleware($security['hsts_enabled']),
+    new SecurityHeadersMiddleware($app->bool('security.hsts_enabled')),
     // Preflight sai direto daqui, antes do rate limit -- OPTIONS nunca pode
     // ser barrado por cota.
-    new CorsMiddleware($app->config('cors')['allowed_origins']),
+    new CorsMiddleware($app->stringList('cors.allowed_origins')),
     // Antes de AuthContextMiddleware -- barra abuso com um round-trip ao
     // Redis só, sem nem abrir transação no Postgres.
     // Construído na mão (não via $container->get()) porque precisa do $router,
@@ -47,16 +45,16 @@ $pipeline = new Pipeline([
     new RateLimitMiddleware(
         $container->get(RateLimiter::class),
         $router,
-        new RateLimitPolicy('general', $generalRateLimit['max_attempts'], $generalRateLimit['window_seconds']),
+        new RateLimitPolicy('general', $app->int('rate_limit.general.max_attempts'), $app->int('rate_limit.general.window_seconds')),
         $container->get(TokenIssuer::class),
         $logger,
     ),
-    new CsrfMiddleware($security['cookie_secure']),
+    new CsrfMiddleware($app->bool('security.cookie_secure')),
     new AuthContextMiddleware($container->get(TokenIssuer::class), $container->get(DatabaseConnection::class), $router),
     new RoleMiddleware($router),
 ]);
 
-$exceptionHandler = new ExceptionHandler(debug: (bool) $app->config('debug'), logger: $logger);
+$exceptionHandler = new ExceptionHandler(debug: $app->bool('debug'), logger: $logger);
 
 // O dispatch do router fica embrulhado aqui dentro, no destino do pipeline,
 // não em volta do pipeline inteiro -- assim todo middleware ainda roda sua
