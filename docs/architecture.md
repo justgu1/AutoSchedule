@@ -40,6 +40,38 @@ Node.js só existe durante o build -- a imagem final não carrega `node_modules`
 
 PHP 8.4, PHP-FPM, Composer. Nginx cuida da camada HTTP, PHP-FPM executa a aplicação.
 
+## Camadas
+
+```text
+src/
+├── Application/    caso de uso: orquestra o domínio, compõe contextos, abre transação
+├── Domain/         entidade, value object, invariante, port do próprio contexto
+├── Infrastructure/ adapter (Postgres/Redis/MinIO/SMTP), HTTP, fila, scheduler
+└── Bootstrap/      composition root (ContainerFactory) + App\Config
+```
+
+Regra de dependência, checada por Deptrac (`backend/deptrac.yaml`, `make arch`) e não só declarada aqui:
+
+```text
+Http (controller) -> Application -> Domain
+                     Infrastructure -> Domain, Application (implementa os ports)
+                     Bootstrap -> todas (é o lugar que liga uma na outra)
+Domain -> ninguém
+```
+
+O controller traduz HTTP: valida o corpo (`Validator` devolve um `ValidatedInput` tipado), monta o `ActorContext` (quem, com que role, de onde) e serializa a resposta. Ele não conhece repositório nenhum. **Regra de negócio nunca fica no controller** -- vai pro caso de uso quando é sequenciamento/composição, ou pra entidade quando é invariante de um objeto só.
+
+Onde cada coisa mora, na prática:
+
+```text
+Application/Auth/LoginWithPassword         sequência login -> restore -> emite par -> audita
+Domain/Auth/RefreshToken::isExpired()      invariante do próprio token
+Application/User/LastAdminGuard            invariante do CONJUNTO (não cabe em User)
+Application/Dealership/ProcessDealership…  caso de uso disparado pela fila, não por HTTP
+```
+
+Job é caso de uso com outro gatilho -- por isso mora em `Application/`, não em `Infrastructure/`.
+
 ## Domínio
 
 ```text
@@ -52,20 +84,25 @@ Availability  planejado
 Appointment   planejado
 ```
 
-Regra de negócio fica perto do domínio a que pertence; controller cuida de entrada/saída HTTP e coordena, nunca concentra regra.
+Pasta de contexto no singular (`Domain/Dealership/`, não `Dealerships/`) -- nomeia o contexto, não uma coleção.
 
 ## Ports & Adapters
 
-Port só é criado quando trocar de adapter é um cenário real, não por padrão de projeto. Em uso hoje:
+Port só é criado quando trocar de adapter é um cenário real, não por padrão de projeto. Cada port mora na camada que depende dele: `Domain/<Contexto>/Ports/` quando é o domínio que precisa da abstração, `Application/Ports/` quando quem precisa é o caso de uso. Em uso hoje:
 
 ```text
-StorageProvider -> MinioAdapter (Flysystem S3)
-MailProvider    -> SymfonyMailProvider (SMTP, Mailpit em dev)
-TokenIssuer     -> JwtTokenIssuer (RS256)
-Queue           -> RedisQueue
+Domain/File/Ports/StorageProvider       -> MinioAdapter (Flysystem S3)
+Domain/Notification/Ports/MailProvider  -> SymfonyMailProvider (SMTP, Mailpit em dev)
+Domain/Auth/Ports/TokenIssuer           -> JwtTokenIssuer (RS256)
+Application/Ports/Queue                 -> RedisQueue
+Application/Ports/JobProgress           -> JobStatusStore (Redis)
+Application/Ports/TempFileStore         -> LocalTempFileStore (volume compartilhado com o worker)
+Application/Ports/MailTemplateRenderer  -> MailTemplate
 ```
 
-Google Maps Embed não virou port -- é só exibição por string de endereço (sem geocoding, sem Places autocomplete), chamado direto do browser (`DealershipMap`). ViaCEP é diferente: o backend proxeia (`GET /zip-codes/{cep}` → `ZipCodeLookupService`, cache-aside sobre `zip_code_cache`) porque cachear a resposta é o próprio motivo de existir dessa camada -- ali sim vale um port (`ZipCodeProvider`, adapter `ViaCepZipCodeProvider`), já que trocar de provedor de CEP é um cenário real, diferente do mapa.
+`Queue` é da Application, não do Domain: a assinatura é `push(class-string<Job>, payload)`, e job é caso de uso -- regra de negócio nenhuma sabe que existe fila. Já `DatabaseConnection` e `ScheduledTask` nem são port de camada de dentro: são interfaces de Infrastructure, e é lá que moram.
+
+Google Maps Embed não virou port -- é só exibição por string de endereço (sem geocoding, sem Places autocomplete), chamado direto do browser (`DealershipMap`). ViaCEP é diferente: o backend proxeia (`GET /zip-codes/{cep}` → `LookupZipCode`, cache-aside sobre `zip_code_cache`) porque cachear a resposta é o próprio motivo de existir dessa camada -- ali sim vale um port (`ZipCodeProvider`, adapter `ViaCepZipCodeProvider`), já que trocar de provedor de CEP é um cenário real, diferente do mapa.
 
 ## PostgreSQL
 
@@ -112,7 +149,7 @@ Scheduler e worker rodam fora de qualquer request HTTP -- sem `current_user_id`/
 ## Processamento assíncrono
 
 ```text
-Controller -> Queue (RedisQueue) -> PHP Worker (bin/worker.php) -> Job -> MailProvider/StorageProvider/etc.
+Controller -> Caso de uso -> Queue (RedisQueue) -> PHP Worker (bin/worker.php) -> Job -> MailProvider/StorageProvider/etc.
 ```
 
 Falha reenfileira com `attempts` incrementado; passadas 3 tentativas vira dead-letter em vez de tentar pra sempre. Scheduler e worker são processos PHP CLI, mesma imagem Docker do backend com outro comando -- cada um escala e reinicia sozinho via Deployment próprio no k8s, sem precisar de supervisor porque o orquestrador já cuida disso.
@@ -144,6 +181,7 @@ Nenhum passo manual entre o merge e produção.
 ## Princípios
 
 - domínio independente de infraestrutura, regra de negócio nunca em controller;
+- regra que o CI não checa decai -- fronteira de camada é checada por Deptrac, não confiada à disciplina;
 - banco reforça o que a aplicação já valida, nunca é a única linha de defesa;
 - assíncrono só onde falha/lentidão de terceiro (e-mail, upload) não pode travar a resposta;
 - abstração só entra quando resolve um problema que já apareceu, não um hipotético.

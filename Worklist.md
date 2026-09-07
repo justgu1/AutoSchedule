@@ -62,7 +62,7 @@ Backlog do projeto: epic > issue > task. Cada `[x]` já está em `main`; `[ ]` �
 
 - [x] `StorageProvider` port + `MinioAdapter` (Flysystem S3)
 - [x] Tabela `files` (metadado: path/mime/tamanho/checksum/uploaded_by)
-- [x] `FileUploadService` -- backup local até o MinIO confirmar sucesso
+- [x] `UploadFile` -- backup local até o MinIO confirmar sucesso
 
 ## Epic: Processamento assíncrono
 
@@ -151,6 +151,18 @@ Fluxo do cliente final -- o motivo de tudo acima existir:
 - [x] Acessibilidade WCAG 2.1 AA (axe-core)
 - [ ] Suíte própria pro `UserController`/`DealershipController` (hoje cobertos indiretamente -- ver `docs/test-catalog.md`)
 - [x] E2E do domínio de concessionária
+
+### Issue: Camada de aplicação explícita
+
+- [x] `src/Application/`: caso de uso por ação (`LoginWithPassword`, `CreateDealership`, `TrashAccount`, ...), tirando a regra de negócio dos controllers -- `UserController` 351 -> 208 linhas, `DealershipController` 385 -> 183
+- [x] `Domain/Ports/` dissolvido: cada port foi pra camada de quem depende dele (`StorageProvider` -> `Domain/File/Ports/`, `Queue`/`Job` -> `Application/Ports/`, `DatabaseConnection`/`ScheduledTask` -> `Infrastructure/`)
+- [x] `OAuthService` (237 linhas, 8 ports) quebrado em 5 casos de uso + 3 colaboradores; o acoplamento `Domain\Auth -> Domain\Dealership` virou composição legítima na Application
+- [x] `Application.php` (era um config holder, não bootstrap) renomeado pra `Config`, com acesso tipado por caminho (`$app->int('auth.access_token_ttl')`)
+- [x] `Validator` devolve `ValidatedInput` tipado: `mixed` morre na fronteira HTTP em vez de vazar até a entidade
+- [x] Módulos no singular (`Domain/User/`, `Infrastructure/Dealership/`, ...) e `Domain/Support/` fundido em `Domain/Shared/`
+- [x] Deptrac no CI (`make arch`) -- a regra de dependência entre camadas deixou de ser só prosa no `docs/architecture.md`
+- [x] `#[Group('integration')]` separa os 114 testes que precisam de Postgres/Redis/MinIO dos 194 puros (`make test-unit`)
+- [x] `phpstan-baseline.neon`: 383 -> 184 entradas suprimidas, zero em `Domain/`, `Application/` e `Bootstrap/`
 
 ## Epic: CI/CD e deploy
 
