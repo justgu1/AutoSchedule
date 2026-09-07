@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Container;
 
+/** Toda resolução é memoizada: não existe escopo transiente porque nada aqui precisou de um. */
 final class Container
 {
     /** @var array<class-string, \Closure(self): object> */
@@ -16,14 +17,28 @@ final class Container
     private array $resolving = [];
 
     /**
+     * Pra quando a construção depende de config ou de uma escolha que o typehint não resolve.
+     *
      * @template T of object
      * @param class-string<T> $id
      * @param \Closure(self): T $factory
      */
-    public function set(string $id, \Closure $factory): void
+    public function singleton(string $id, \Closure $factory): void
     {
         $this->bindings[$id] = $factory;
         unset($this->instances[$id]);
+    }
+
+    /**
+     * Liga um port à implementação, que é construída por autowiring.
+     *
+     * @template TAbstract of object
+     * @param class-string<TAbstract> $abstract
+     * @param class-string<TAbstract> $concrete
+     */
+    public function bind(string $abstract, string $concrete): void
+    {
+        $this->singleton($abstract, static fn (self $container): object => $container->get($concrete));
     }
 
     /**

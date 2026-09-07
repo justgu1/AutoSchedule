@@ -39,11 +39,32 @@ final class ContainerTest extends TestCase
     }
 
     #[Test]
-    public function set_permite_binding_manual(): void
+    public function bind_liga_a_interface_a_implementacao_e_autowira_ela(): void
+    {
+        $container = new Container();
+        $container->bind(FixtureInterface::class, ImplementationFixture::class);
+
+        $needy = $container->get(NeedsInterfaceFixture::class);
+
+        $this->assertInstanceOf(ImplementationFixture::class, $needy->dependency);
+        $this->assertInstanceOf(EngineFixture::class, $needy->dependency->engine);
+    }
+
+    #[Test]
+    public function bind_devolve_a_mesma_instancia_pela_interface_e_pela_concreta(): void
+    {
+        $container = new Container();
+        $container->bind(FixtureInterface::class, ImplementationFixture::class);
+
+        $this->assertSame($container->get(FixtureInterface::class), $container->get(ImplementationFixture::class));
+    }
+
+    #[Test]
+    public function singleton_permite_binding_manual(): void
     {
         $container = new Container();
         $engine = new EngineFixture();
-        $container->set(EngineFixture::class, fn (): EngineFixture => $engine);
+        $container->singleton(EngineFixture::class, fn (): EngineFixture => $engine);
 
         $this->assertSame($engine, $container->get(EngineFixture::class));
     }
@@ -121,6 +142,13 @@ final class NeedsScalarFixture
 
 interface FixtureInterface
 {
+}
+
+final class ImplementationFixture implements FixtureInterface
+{
+    public function __construct(public EngineFixture $engine)
+    {
+    }
 }
 
 final class NeedsInterfaceFixture

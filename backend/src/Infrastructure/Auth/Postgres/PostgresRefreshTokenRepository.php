@@ -8,17 +8,18 @@ use App\Domain\Auth\Ports\RefreshTokenRepository;
 use App\Domain\Auth\RefreshToken;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
+use App\Infrastructure\Database\DatabaseConnection;
 use App\Infrastructure\Database\PostgresArray;
 
 final readonly class PostgresRefreshTokenRepository implements RefreshTokenRepository
 {
-    public function __construct(private \PDO $pdo)
+    public function __construct(private DatabaseConnection $connection)
     {
     }
 
     public function insert(RefreshToken $token): void
     {
-        $statement = $this->pdo->prepare(<<<'SQL'
+        $statement = $this->connection->pdo()->prepare(<<<'SQL'
             INSERT INTO oauth_refresh_tokens (id, token_hash, family_id, client_id, user_id, scopes, expires_at)
             VALUES (:id, :token_hash, :family_id, :client_id, :user_id, :scopes, :expires_at)
             SQL);
@@ -36,7 +37,7 @@ final readonly class PostgresRefreshTokenRepository implements RefreshTokenRepos
 
     public function findByRawToken(string $rawToken): ?RefreshToken
     {
-        $statement = $this->pdo->prepare('SELECT * FROM oauth_refresh_tokens WHERE token_hash = :token_hash');
+        $statement = $this->connection->pdo()->prepare('SELECT * FROM oauth_refresh_tokens WHERE token_hash = :token_hash');
         $statement->execute(['token_hash' => hash('sha256', $rawToken)]);
         $row = $statement->fetch();
 
@@ -47,7 +48,7 @@ final readonly class PostgresRefreshTokenRepository implements RefreshTokenRepos
     {
         // A ordem é obrigatória: replaced_by_id tem FK pra própria tabela, e revogar condicionado a
         // revoked_at IS NULL é a trava de concorrência -- quem perder a corrida pega rowCount() = 0.
-        $revoke = $this->pdo->prepare(
+        $revoke = $this->connection->pdo()->prepare(
             'UPDATE oauth_refresh_tokens SET revoked_at = now() WHERE id = :current_id AND revoked_at IS NULL',
         );
         $revoke->execute(['current_id' => $current->id]);
@@ -58,7 +59,7 @@ final readonly class PostgresRefreshTokenRepository implements RefreshTokenRepos
 
         $this->insert($next);
 
-        $link = $this->pdo->prepare(
+        $link = $this->connection->pdo()->prepare(
             'UPDATE oauth_refresh_tokens SET replaced_by_id = :next_id WHERE id = :current_id',
         );
         $link->execute(['next_id' => $next->id, 'current_id' => $current->id]);
@@ -66,7 +67,7 @@ final readonly class PostgresRefreshTokenRepository implements RefreshTokenRepos
 
     public function revokeFamily(string $familyId): void
     {
-        $statement = $this->pdo->prepare(<<<'SQL'
+        $statement = $this->connection->pdo()->prepare(<<<'SQL'
             UPDATE oauth_refresh_tokens SET revoked_at = now() WHERE family_id = :family_id AND revoked_at IS NULL
             SQL);
 
@@ -75,7 +76,7 @@ final readonly class PostgresRefreshTokenRepository implements RefreshTokenRepos
 
     public function revokeAllForUser(string $userId): void
     {
-        $statement = $this->pdo->prepare(<<<'SQL'
+        $statement = $this->connection->pdo()->prepare(<<<'SQL'
             UPDATE oauth_refresh_tokens SET revoked_at = now() WHERE user_id = :user_id AND revoked_at IS NULL
             SQL);
 

@@ -18,6 +18,7 @@ use App\Infrastructure\Http\Router;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\TestDatabase;
 
 #[Group('integration')]
 final class AuthContextMiddlewareTest extends TestCase
@@ -26,14 +27,7 @@ final class AuthContextMiddlewareTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->connection = new PostgresConnection(
-            driver: getenv('DB_DRIVER') ?: 'pgsql',
-            host: getenv('DB_HOST') ?: '127.0.0.1',
-            port: (int) (getenv('DB_PORT') ?: 5432),
-            database: getenv('DB_DATABASE') ?: 'autoschedule',
-            username: getenv('DB_APP_USERNAME') ?: 'autoschedule_app',
-            password: getenv('DB_APP_PASSWORD') ?: 'changeme',
-        );
+        $this->connection = TestDatabase::connectAsApp();
     }
 
     #[Test]

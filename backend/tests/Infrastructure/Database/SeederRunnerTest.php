@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Infrastructure\Database;
 
-use App\Infrastructure\Database\PostgresConnection;
 use App\Infrastructure\Database\SeederRunner;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\TestDatabase;
 
 /** Isolado por transação com rollback no tearDown, igual o MigrationRunnerTest. */
 #[Group('integration')]
@@ -21,14 +21,8 @@ final class SeederRunnerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->pdo = new PostgresConnection(
-            driver: getenv('DB_DRIVER') ?: 'pgsql',
-            host: getenv('DB_HOST') ?: '127.0.0.1',
-            port: (int) (getenv('DB_PORT') ?: 5432),
-            database: getenv('DB_DATABASE') ?: 'autoschedule',
-            username: getenv('DB_USERNAME') ?: 'pgsql',
-            password: getenv('DB_PASSWORD') ?: 'password',
-        )->pdo();
+        $connection = TestDatabase::connect();
+        $this->pdo = $connection->pdo();
 
         $this->pdo->beginTransaction();
 

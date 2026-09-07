@@ -7,10 +7,10 @@ namespace Tests\Infrastructure\Auth\Postgres;
 use App\Domain\Auth\RefreshToken;
 use App\Domain\Exceptions\DomainException;
 use App\Infrastructure\Auth\Postgres\PostgresRefreshTokenRepository;
-use App\Infrastructure\Database\PostgresConnection;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\TestDatabase;
 
 /**
  * Teste de integração: conecta no Postgres real do docker-compose. Isolado
@@ -26,17 +26,11 @@ final class PostgresRefreshTokenRepositoryTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->pdo = new PostgresConnection(
-            driver: getenv('DB_DRIVER') ?: 'pgsql',
-            host: getenv('DB_HOST') ?: '127.0.0.1',
-            port: (int) (getenv('DB_PORT') ?: 5432),
-            database: getenv('DB_DATABASE') ?: 'autoschedule',
-            username: getenv('DB_USERNAME') ?: 'pgsql',
-            password: getenv('DB_PASSWORD') ?: 'password',
-        )->pdo();
+        $connection = TestDatabase::connect();
+        $this->pdo = $connection->pdo();
 
         $this->pdo->beginTransaction();
-        $this->repository = new PostgresRefreshTokenRepository($this->pdo);
+        $this->repository = new PostgresRefreshTokenRepository($connection);
         $this->clientId = $this->insertClient();
         $this->userId = $this->insertUser();
     }

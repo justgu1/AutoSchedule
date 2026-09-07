@@ -6,16 +6,17 @@ namespace App\Infrastructure\Auth\Postgres;
 
 use App\Domain\Auth\Ports\UserIdentityRepository;
 use App\Domain\Auth\UserIdentity;
+use App\Infrastructure\Database\DatabaseConnection;
 
 final readonly class PostgresUserIdentityRepository implements UserIdentityRepository
 {
-    public function __construct(private \PDO $pdo)
+    public function __construct(private DatabaseConnection $connection)
     {
     }
 
     public function findByProvider(string $provider, string $providerUserId): ?UserIdentity
     {
-        $statement = $this->pdo->prepare(
+        $statement = $this->connection->pdo()->prepare(
             'SELECT * FROM user_identities WHERE provider = :provider AND provider_user_id = :provider_user_id',
         );
         $statement->execute(['provider' => $provider, 'provider_user_id' => $providerUserId]);
@@ -26,7 +27,7 @@ final readonly class PostgresUserIdentityRepository implements UserIdentityRepos
 
     public function insert(UserIdentity $identity): void
     {
-        $statement = $this->pdo->prepare(<<<'SQL'
+        $statement = $this->connection->pdo()->prepare(<<<'SQL'
             INSERT INTO user_identities (id, user_id, provider, provider_user_id, email)
             VALUES (:id, :user_id, :provider, :provider_user_id, :email)
             SQL);

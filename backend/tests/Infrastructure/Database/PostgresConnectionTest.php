@@ -8,6 +8,7 @@ use App\Infrastructure\Database\PostgresConnection;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\TestDatabase;
 
 #[Group('integration')]
 final class PostgresConnectionTest extends TestCase
@@ -31,13 +32,6 @@ final class PostgresConnectionTest extends TestCase
 
     private function makeConnection(): PostgresConnection
     {
-        return new PostgresConnection(
-            driver: getenv('DB_DRIVER') ?: 'pgsql',
-            host: getenv('DB_HOST') ?: '127.0.0.1',
-            port: (int) (getenv('DB_PORT') ?: 5432),
-            database: getenv('DB_DATABASE') ?: 'autoschedule',
-            username: getenv('DB_USERNAME') ?: 'pgsql',
-            password: getenv('DB_PASSWORD') ?: 'password',
-        );
+        return TestDatabase::connect();
     }
 }

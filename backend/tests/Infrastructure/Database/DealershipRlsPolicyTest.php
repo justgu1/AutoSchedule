@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Infrastructure\Database;
 
-use App\Infrastructure\Database\PostgresConnection;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\TestDatabase;
 
 /**
  * Conecta como autoschedule_app porque a role admin é superuser e ignora RLS.
@@ -26,14 +26,7 @@ final class DealershipRlsPolicyTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->admin = new PostgresConnection(
-            driver: getenv('DB_DRIVER') ?: 'pgsql',
-            host: getenv('DB_HOST') ?: '127.0.0.1',
-            port: (int) (getenv('DB_PORT') ?: 5432),
-            database: getenv('DB_DATABASE') ?: 'autoschedule',
-            username: getenv('DB_USERNAME') ?: 'pgsql',
-            password: getenv('DB_PASSWORD') ?: 'password',
-        )->pdo();
+        $this->admin = TestDatabase::connect()->pdo();
 
         $this->sellerId = $this->insertSellerUser('rls-seller@example.com');
         $this->otherSellerId = $this->insertSellerUser('rls-other-seller@example.com');
@@ -42,14 +35,7 @@ final class DealershipRlsPolicyTest extends TestCase
         $this->trashedDealershipId = $this->insertDealership($this->otherSellerId, 'RLS Trashed Center');
         $this->admin->exec("UPDATE dealerships SET status = 'trashed' WHERE id = " . $this->admin->quote($this->trashedDealershipId));
 
-        $this->rls = new PostgresConnection(
-            driver: getenv('DB_DRIVER') ?: 'pgsql',
-            host: getenv('DB_HOST') ?: '127.0.0.1',
-            port: (int) (getenv('DB_PORT') ?: 5432),
-            database: getenv('DB_DATABASE') ?: 'autoschedule',
-            username: getenv('DB_APP_USERNAME') ?: 'autoschedule_app',
-            password: getenv('DB_APP_PASSWORD') ?: 'changeme',
-        )->pdo();
+        $this->rls = TestDatabase::connectAsApp()->pdo();
     }
 
     protected function tearDown(): void

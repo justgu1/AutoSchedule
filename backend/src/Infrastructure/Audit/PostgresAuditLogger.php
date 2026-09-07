@@ -6,12 +6,13 @@ namespace App\Infrastructure\Audit;
 
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
+use App\Infrastructure\Database\DatabaseConnection;
 use Psr\Log\LoggerInterface;
 
 final readonly class PostgresAuditLogger implements AuditLogger
 {
     public function __construct(
-        private \PDO $pdo,
+        private DatabaseConnection $connection,
         private LoggerInterface $logger,
     ) {
     }
@@ -20,7 +21,7 @@ final readonly class PostgresAuditLogger implements AuditLogger
     public function record(AuditEvent $event, ?string $actorId, string $auditableType, ?string $auditableId, array $context, ?string $ipAddress, ?string $userAgent): void
     {
         try {
-            $statement = $this->pdo->prepare(<<<'SQL'
+            $statement = $this->connection->pdo()->prepare(<<<'SQL'
                 INSERT INTO audit_logs (actor_id, user_id, event, auditable_type, auditable_id, new_values, ip_address, user_agent)
                 VALUES (:actor_id, :user_id, :event, :auditable_type, :auditable_id, :new_values, :ip_address, :user_agent)
                 SQL);

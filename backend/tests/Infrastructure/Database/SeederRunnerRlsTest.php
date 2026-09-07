@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Infrastructure\Database;
 
-use App\Infrastructure\Database\PostgresConnection;
 use App\Infrastructure\Database\SeederRunner;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\TestDatabase;
 
 /**
  * Arquivo próprio porque a transação não commitada do SeederRunnerTest travaria a linha do admin
@@ -20,14 +20,7 @@ final class SeederRunnerRlsTest extends TestCase
     #[Test]
     public function run_nao_derruba_com_erro_de_rls_conectado_como_role_sem_bypass(): void
     {
-        $rls = new PostgresConnection(
-            driver: getenv('DB_DRIVER') ?: 'pgsql',
-            host: getenv('DB_HOST') ?: '127.0.0.1',
-            port: (int) (getenv('DB_PORT') ?: 5432),
-            database: getenv('DB_DATABASE') ?: 'autoschedule',
-            username: getenv('DB_APP_USERNAME') ?: 'autoschedule_app',
-            password: getenv('DB_APP_PASSWORD') ?: 'changeme',
-        )->pdo();
+        $rls = TestDatabase::connectAsApp()->pdo();
 
         $runner = new SeederRunner($rls, dirname(__DIR__, 3) . '/database/seeders');
 
