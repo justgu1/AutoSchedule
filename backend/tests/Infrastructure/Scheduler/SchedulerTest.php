@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Infrastructure\Scheduler;
 
-use App\Domain\Ports\ScheduledTask;
 use App\Infrastructure\Redis\RedisConnection;
+use App\Infrastructure\Scheduler\ScheduledTask;
 use App\Infrastructure\Scheduler\Scheduler;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 /** Teste de integração: usa o Redis real do docker-compose só pro estado de "último run". */
+#[Group('integration')]
 final class SchedulerTest extends TestCase
 {
     private RedisConnection $connection;

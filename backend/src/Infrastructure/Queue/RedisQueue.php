@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Queue;
 
-use App\Domain\Ports\Queue;
+use App\Application\Ports\Queue;
 use App\Infrastructure\Redis\RedisConnection;
 
 final readonly class RedisQueue implements Queue

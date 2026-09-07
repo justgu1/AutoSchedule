@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Infrastructure\Database;
 
 use App\Infrastructure\Database\PostgresConnection;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -14,6 +15,7 @@ use PHPUnit\Framework\TestCase;
  * e sempre ignora RLS). Duas conexões/sessões diferentes -- fixture
  * commitada pela conexão admin, limpeza no tearDown é DELETE, não rollback.
  */
+#[Group('integration')]
 final class DealershipRlsPolicyTest extends TestCase
 {
     private \PDO $admin;

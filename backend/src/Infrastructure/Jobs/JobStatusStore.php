@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Jobs;
 
+use App\Application\Ports\JobProgress;
 use App\Infrastructure\Redis\RedisConnection;
 
 /**
@@ -12,7 +13,7 @@ use App\Infrastructure\Redis\RedisConnection;
  * `RedisQueue`), só o que o job já contou de si mesmo enquanto roda.
  * TTL evita acumular chave de job antigo pra sempre.
  */
-final readonly class JobStatusStore
+final readonly class JobStatusStore implements JobProgress
 {
     private const int TTL_SECONDS = 3600;
 

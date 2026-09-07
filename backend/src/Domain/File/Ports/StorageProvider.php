@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Ports;
+namespace App\Domain\File\Ports;
 
 /**
  * Armazenamento de objetos (imagens de concessionária/veículo). Quem chama

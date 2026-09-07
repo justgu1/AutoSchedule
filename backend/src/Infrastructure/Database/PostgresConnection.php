@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Database;
 
-use App\Domain\Ports\DatabaseConnection;
-
 final class PostgresConnection implements DatabaseConnection
 {
     private ?\PDO $pdo = null;

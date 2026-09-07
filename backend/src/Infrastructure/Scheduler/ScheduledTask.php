@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Ports;
+namespace App\Infrastructure\Scheduler;
 
 interface ScheduledTask
 {

@@ -6,10 +6,12 @@ namespace Tests\Infrastructure\Jobs;
 
 use App\Infrastructure\Jobs\JobStatusStore;
 use App\Infrastructure\Redis\RedisConnection;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 /** Teste de integração: conecta no Redis real do docker-compose, igual RedisQueueTest. */
+#[Group('integration')]
 final class JobStatusStoreTest extends TestCase
 {
     private RedisConnection $connection;

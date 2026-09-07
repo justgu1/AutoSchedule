@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Infrastructure\Database;
 
 use App\Infrastructure\Database\PostgresConnection;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -14,6 +15,7 @@ use PHPUnit\Framework\TestCase;
  * `docker compose exec backend vendor/bin/phpunit`) — não alcança o
  * hostname `postgres` a partir de um container avulso fora do compose.
  */
+#[Group('integration')]
 final class PostgresConnectionTest extends TestCase
 {
     #[Test]
