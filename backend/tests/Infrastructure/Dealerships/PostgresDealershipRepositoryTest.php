@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Infrastructure\Dealerships;
 
 use App\Domain\Dealerships\Dealership;
-use App\Domain\Dealerships\DealershipImage;
 use App\Domain\Shared\TrashableStatus;
 use App\Infrastructure\Database\PostgresConnection;
 use App\Infrastructure\Dealerships\PostgresDealershipRepository;
@@ -226,28 +225,28 @@ final class PostgresDealershipRepositoryTest extends TestCase
     }
 
     #[Test]
-    public function galeria_insere_encontra_e_calcula_a_proxima_posicao(): void
+    public function persiste_a_foto_e_permite_substituir_por_outra_ou_remover(): void
     {
         $owner = $this->insertSellerUser();
         $dealership = $this->registerFixture($owner);
         $this->repository->insert($dealership);
-        $file = $this->insertFile();
+        $firstFile = $this->insertFile();
+        $secondFile = $this->insertFile();
 
-        $this->assertSame(0, $this->repository->nextImagePosition($dealership->id));
-
-        $image = DealershipImage::register($dealership->id, $file, 0);
-        $this->repository->insertImage($image);
-
-        $this->assertSame(1, $this->repository->nextImagePosition($dealership->id));
-        $found = $this->repository->findImageById($image->id);
+        $this->repository->update($dealership->withPhoto($firstFile));
+        $found = $this->repository->findById($dealership->id);
         $this->assertNotNull($found);
-        $this->assertSame($dealership->id, $found->dealershipId);
+        $this->assertSame($firstFile, $found->photoFileId);
 
-        $images = $this->repository->findImagesByDealership($dealership->id);
-        $this->assertCount(1, $images);
+        $this->repository->update($found->withPhoto($secondFile));
+        $replaced = $this->repository->findById($dealership->id);
+        $this->assertNotNull($replaced);
+        $this->assertSame($secondFile, $replaced->photoFileId);
 
-        $this->repository->deleteImage($image->id);
-        $this->assertNull($this->repository->findImageById($image->id));
+        $this->repository->update($replaced->withPhoto(null));
+        $withoutPhoto = $this->repository->findById($dealership->id);
+        $this->assertNotNull($withoutPhoto);
+        $this->assertNull($withoutPhoto->photoFileId);
     }
 
     private function registerFixture(string $ownerUserId, string $name = 'Auto Center'): Dealership

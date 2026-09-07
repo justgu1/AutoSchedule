@@ -8,6 +8,7 @@ use App\Domain\Users\Ports\UserRepository;
 use App\Domain\Users\UserRole;
 use App\Infrastructure\Container\Container;
 use App\Infrastructure\Http\Controllers\DealershipController;
+use App\Infrastructure\Http\Controllers\JobController;
 use App\Infrastructure\Http\Controllers\OAuthController;
 use App\Infrastructure\Http\Controllers\UserController;
 use App\Infrastructure\Http\Request;
@@ -191,7 +192,7 @@ return static function (Router $router, Container $container, Application $app):
         '/api/dealerships/{id}',
         [$dealershipController, 'show'],
         roles: $adminOrSeller,
-        description: 'Returns a single dealership with its photo gallery.',
+        description: 'Returns a single dealership.',
     );
     $router->patch(
         '/api/dealerships/{id}',
@@ -219,15 +220,29 @@ return static function (Router $router, Container $container, Application $app):
         description: 'Permanently anonymizes a trashed dealership now, without waiting 30 days.',
     );
     $router->post(
-        '/api/dealerships/{id}/images',
-        [$dealershipController, 'addImage'],
+        '/api/dealerships/{id}/photo',
+        [$dealershipController, 'setPhoto'],
         roles: $adminOrSeller,
-        description: 'Uploads a photo to the dealership gallery (multipart, field name "image").',
+        description: 'Sets the dealership photo (multipart, field name "image", max 20MB) -- replaces the previous one, if any.',
     );
     $router->delete(
-        '/api/dealerships/{id}/images/{imageId}',
-        [$dealershipController, 'removeImage'],
+        '/api/dealerships/{id}/photo',
+        [$dealershipController, 'removePhoto'],
         roles: $adminOrSeller,
-        description: 'Removes a photo from the dealership gallery.',
+        description: 'Removes the dealership photo.',
+    );
+
+    $jobController = $container->get(JobController::class);
+    $router->get(
+        '/api/jobs/{id}',
+        [$jobController, 'show'],
+        roles: $anyAuthenticatedRole,
+        description: 'Returns the current status of an async job (queued/processing/done/failed).',
+    );
+    $router->get(
+        '/api/jobs/{id}/events',
+        [$jobController, 'events'],
+        roles: $anyAuthenticatedRole,
+        description: 'Streams the status of an async job via Server-Sent Events until it finishes.',
     );
 };

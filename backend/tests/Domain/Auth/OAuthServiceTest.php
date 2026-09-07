@@ -20,7 +20,6 @@ use App\Domain\Auth\UserIdentity;
 use App\Domain\Auth\ValueObjects\AccessTokenClaims;
 use App\Domain\Auth\ValueObjects\GoogleIdentityClaims;
 use App\Domain\Dealerships\Dealership;
-use App\Domain\Dealerships\DealershipImage;
 use App\Domain\Dealerships\Ports\DealershipRepository;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
@@ -732,28 +731,5 @@ final class InMemoryDealershipRepository implements DealershipRepository
 
     public function restoreAutoTrashedOwnedBy(string $ownerUserId): void
     {
-    }
-
-    public function insertImage(DealershipImage $image): void
-    {
-    }
-
-    public function deleteImage(string $imageId): void
-    {
-    }
-
-    public function findImageById(string $imageId): ?DealershipImage
-    {
-        return null;
-    }
-
-    public function findImagesByDealership(string $dealershipId): array
-    {
-        return [];
-    }
-
-    public function nextImagePosition(string $dealershipId): int
-    {
-        return 0;
     }
 }

@@ -24,6 +24,7 @@ final readonly class Dealership
         public ?float $longitude,
         public ?string $googlePlaceId,
         public ?string $phone,
+        public ?string $photoFileId,
         public TrashableStatus $status,
         public bool $trashedByOwnerDeactivation,
         public ?\DateTimeImmutable $trashedAt,
@@ -65,6 +66,7 @@ final readonly class Dealership
             longitude: $longitude,
             googlePlaceId: $googlePlaceId,
             phone: $phone,
+            photoFileId: null,
             status: TrashableStatus::Active,
             trashedByOwnerDeactivation: false,
             trashedAt: null,
@@ -104,6 +106,7 @@ final readonly class Dealership
             longitude: $longitude,
             googlePlaceId: $googlePlaceId,
             phone: $phone,
+            photoFileId: $this->photoFileId,
             status: $this->status,
             trashedByOwnerDeactivation: $this->trashedByOwnerDeactivation,
             trashedAt: $this->trashedAt,
@@ -131,6 +134,35 @@ final readonly class Dealership
             longitude: $this->longitude,
             googlePlaceId: $this->googlePlaceId,
             phone: $this->phone,
+            photoFileId: $this->photoFileId,
+            status: $this->status,
+            trashedByOwnerDeactivation: $this->trashedByOwnerDeactivation,
+            trashedAt: $this->trashedAt,
+            anonymizedAt: $this->anonymizedAt,
+            createdAt: $this->createdAt,
+            updatedAt: new \DateTimeImmutable(),
+        );
+    }
+
+    /** Só uma foto por concessionária -- setar substitui a anterior (quem chama cuida de remover o arquivo velho do storage). */
+    public function withPhoto(?string $photoFileId): self
+    {
+        return new self(
+            id: $this->id,
+            ownerUserId: $this->ownerUserId,
+            name: $this->name,
+            zipCode: $this->zipCode,
+            address: $this->address,
+            number: $this->number,
+            complement: $this->complement,
+            neighborhood: $this->neighborhood,
+            city: $this->city,
+            state: $this->state,
+            latitude: $this->latitude,
+            longitude: $this->longitude,
+            googlePlaceId: $this->googlePlaceId,
+            phone: $this->phone,
+            photoFileId: $photoFileId,
             status: $this->status,
             trashedByOwnerDeactivation: $this->trashedByOwnerDeactivation,
             trashedAt: $this->trashedAt,
@@ -158,8 +190,10 @@ final readonly class Dealership
 
     /**
      * Escruba identificador direto (nome, telefone, endereço, complemento,
-     * place id) -- mantém zip/cidade/estado/lat/long, não identificam sozinhos
-     * e servem pra estatística agregada. Mesmo espírito de `User::anonymized()`.
+     * place id, foto) -- mantém zip/cidade/estado/lat/long, não identificam
+     * sozinhos e servem pra estatística agregada. Mesmo espírito de
+     * `User::anonymized()`. Quem chama ainda precisa apagar o arquivo da
+     * foto do storage -- aqui só solta a referência.
      */
     public function anonymized(): self
     {
@@ -178,6 +212,7 @@ final readonly class Dealership
             longitude: $this->longitude,
             googlePlaceId: null,
             phone: null,
+            photoFileId: null,
             status: TrashableStatus::Deleted,
             trashedByOwnerDeactivation: $this->trashedByOwnerDeactivation,
             trashedAt: $this->trashedAt,

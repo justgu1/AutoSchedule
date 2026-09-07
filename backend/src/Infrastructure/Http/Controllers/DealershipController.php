@@ -7,20 +7,22 @@ namespace App\Infrastructure\Http\Controllers;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
 use App\Domain\Dealerships\Dealership;
-use App\Domain\Dealerships\DealershipImage;
 use App\Domain\Dealerships\DTO\DealershipProfile;
 use App\Domain\Dealerships\Ports\DealershipRepository;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
 use App\Domain\Files\Ports\FileRepository;
 use App\Domain\Files\StoredFile;
+use App\Domain\Ports\Queue;
 use App\Domain\Ports\StorageProvider;
 use App\Domain\Shared\TrashableStatus;
+use App\Domain\Support\Uuid;
 use App\Domain\Users\UserRole;
-use App\Infrastructure\Files\FileUploadService;
+use App\Infrastructure\Dealerships\Jobs\ProcessDealershipPhotoJob;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
 use App\Infrastructure\Http\UploadedFile;
+use App\Infrastructure\Jobs\JobStatusStore;
 use App\Infrastructure\Pagination\PaginationPolicy;
 use App\Infrastructure\Validation\Validator;
 
@@ -31,15 +33,18 @@ use App\Infrastructure\Validation\Validator;
  */
 final readonly class DealershipController
 {
-    private const array ALLOWED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+    /** Recusa antes de sequer copiar o arquivo pra fila -- algo que vai ser rejeitado de qualquer jeito. */
+    private const int MAX_PHOTO_BYTES = 20 * 1024 * 1024;
 
     public function __construct(
         private DealershipRepository $dealerships,
         private FileRepository $files,
-        private FileUploadService $uploads,
         private StorageProvider $storage,
+        private Queue $queue,
+        private JobStatusStore $jobStatus,
         private AuditLogger $audit,
         private PaginationPolicy $pagination,
+        private string $tempPath,
     ) {
     }
 
@@ -51,7 +56,7 @@ final readonly class DealershipController
 
         if ($claims->role === UserRole::Admin) {
             $profiles = array_map(
-                static fn (Dealership $dealership): array => DealershipProfile::fromDealership($dealership)->toArray(),
+                $this->toProfile(...),
                 $this->dealerships->findPage($perPage, $offset),
             );
 
@@ -59,7 +64,7 @@ final readonly class DealershipController
         }
 
         $profiles = array_map(
-            static fn (Dealership $dealership): array => DealershipProfile::fromDealership($dealership)->toArray(),
+            $this->toProfile(...),
             $this->dealerships->findByOwner($claims->subject, $perPage, $offset),
         );
 
@@ -70,7 +75,7 @@ final readonly class DealershipController
     {
         $dealership = $this->requireDealership($request);
 
-        return Response::success($this->withImages($dealership));
+        return Response::success($this->toProfile($dealership));
     }
 
     public function store(Request $request): Response
@@ -111,7 +116,7 @@ final readonly class DealershipController
         $this->dealerships->insert($dealership);
         $this->audit->record(AuditEvent::DealershipCreated, $claims->subject, 'Dealership', $dealership->id, [], $request->ip(), $request->header('user-agent'));
 
-        return Response::success(DealershipProfile::fromDealership($dealership)->toArray(), 201);
+        return Response::success($this->toProfile($dealership), 201);
     }
 
     /**
@@ -175,7 +180,7 @@ final readonly class DealershipController
             );
         }
 
-        return Response::success(DealershipProfile::fromDealership($updated)->toArray());
+        return Response::success($this->toProfile($updated));
     }
 
     /** Move pra lixeira -- recuperável por 30 dias (`restore()`/`purge()` abaixo). */
@@ -215,13 +220,23 @@ final readonly class DealershipController
             throw new DomainException('This dealership is not in the trash.', DomainErrorType::Conflict);
         }
 
+        $oldPhotoFileId = $dealership->photoFileId;
         $this->dealerships->update($dealership->anonymized());
+        $this->deleteStoredFile($oldPhotoFileId);
         $this->audit->record(AuditEvent::DealershipPurged, $claims->subject, 'Dealership', $dealership->id, [], $request->ip(), $request->header('user-agent'));
 
         return Response::success(['message' => 'Dealership permanently deleted.']);
     }
 
-    public function addImage(Request $request): Response
+    /**
+     * Só uma foto por concessionária -- um upload novo substitui a anterior.
+     * Otimização (WebP) e gravação rodam fora do request, no worker
+     * (`ProcessDealershipPhotoJob`) -- aqui só valida o essencial (arquivo
+     * presente, tamanho) e copia pro `tempPath` compartilhado, porque o
+     * `tmp_name` do PHP some assim que a request termina. Quem chamou
+     * acompanha o progresso via `job_id` (`GET /jobs/{id}` ou `/events`).
+     */
+    public function setPhoto(Request $request): Response
     {
         $dealership = $this->requireDealership($request);
         $claims = $request->attribute('auth');
@@ -231,31 +246,48 @@ final readonly class DealershipController
             throw new DomainException('Invalid data.', DomainErrorType::Validation, ['image' => 'No valid image file was sent.']);
         }
 
-        $file = $this->uploads->upload($uploaded->tmpName, $uploaded->originalName, self::ALLOWED_IMAGE_MIME_TYPES, $claims->subject);
-        $position = $this->dealerships->nextImagePosition($dealership->id);
-        $image = DealershipImage::register($dealership->id, $file->id, $position);
-        $this->dealerships->insertImage($image);
+        if ($uploaded->size > self::MAX_PHOTO_BYTES) {
+            throw new DomainException('Invalid data.', DomainErrorType::Validation, ['image' => 'The image must be at most 20MB.']);
+        }
 
-        $this->audit->record(AuditEvent::DealershipImageAdded, $claims->subject, 'Dealership', $dealership->id, ['image_id' => $image->id], $request->ip(), $request->header('user-agent'));
+        $jobId = Uuid::v7();
+        $sourcePath = sprintf('%s/%s', rtrim($this->tempPath, '/'), $jobId);
 
-        return Response::success(['id' => $image->id, 'url' => $this->storage->url($file->path), 'position' => $image->position], 201);
+        if (!copy($uploaded->tmpName, $sourcePath)) {
+            throw new \RuntimeException('Could not stage the uploaded photo for processing.');
+        }
+
+        $this->jobStatus->create($jobId);
+        $this->queue->push(ProcessDealershipPhotoJob::class, [
+            'job_id' => $jobId,
+            'dealership_id' => $dealership->id,
+            'source_path' => $sourcePath,
+            'original_name' => $uploaded->originalName,
+            'uploaded_by' => $claims->subject,
+        ]);
+
+        return Response::success([
+            'job_id' => $jobId,
+            'status_url' => "/jobs/{$jobId}",
+            'events_url' => "/jobs/{$jobId}/events",
+        ], 202);
     }
 
-    public function removeImage(Request $request): Response
+    public function removePhoto(Request $request): Response
     {
         $dealership = $this->requireDealership($request);
         $claims = $request->attribute('auth');
-        $imageId = $request->param('imageId');
-        $image = $imageId !== null ? $this->dealerships->findImageById($imageId) : null;
 
-        if (!$image instanceof DealershipImage || $image->dealershipId !== $dealership->id) {
-            throw new DomainException('Image not found.', DomainErrorType::NotFound);
+        if ($dealership->photoFileId === null) {
+            throw new DomainException('This dealership has no photo.', DomainErrorType::NotFound);
         }
 
-        $this->dealerships->deleteImage($image->id);
-        $this->audit->record(AuditEvent::DealershipImageRemoved, $claims->subject, 'Dealership', $dealership->id, ['image_id' => $image->id], $request->ip(), $request->header('user-agent'));
+        $oldPhotoFileId = $dealership->photoFileId;
+        $this->dealerships->update($dealership->withPhoto(null));
+        $this->deleteStoredFile($oldPhotoFileId);
+        $this->audit->record(AuditEvent::DealershipPhotoRemoved, $claims->subject, 'Dealership', $dealership->id, [], $request->ip(), $request->header('user-agent'));
 
-        return Response::success(['message' => 'Image removed.']);
+        return Response::success(['message' => 'Photo removed.']);
     }
 
     /** `{id}` da rota -- RLS já barra dono errado (linha nem aparece), então "não é sua" e "não existe" viram o mesmo 404. */
@@ -272,26 +304,36 @@ final readonly class DealershipController
     }
 
     /** @return array<string, mixed> */
-    private function withImages(Dealership $dealership): array
+    private function toProfile(Dealership $dealership): array
     {
-        $payload = DealershipProfile::fromDealership($dealership)->toArray();
+        $photoUrl = null;
 
-        $payload['images'] = array_map(
-            fn (DealershipImage $image): array => [
-                'id' => $image->id,
-                'url' => $this->urlForImage($image),
-                'position' => $image->position,
-            ],
-            $this->dealerships->findImagesByDealership($dealership->id),
-        );
+        if ($dealership->photoFileId !== null) {
+            $file = $this->files->findById($dealership->photoFileId);
+            $photoUrl = $file instanceof StoredFile ? $this->storage->url($file->path) : null;
+        }
 
-        return $payload;
+        return DealershipProfile::fromDealership($dealership, $photoUrl)->toArray();
     }
 
-    private function urlForImage(DealershipImage $image): string
+    /**
+     * Content-addressed (`FileUploadService` dedupa por checksum) -- em
+     * teoria duas concessionárias poderiam acabar apontando pro mesmo
+     * arquivo se subissem bytes idênticos, e apagar aqui quebraria a outra.
+     * Aceito o risco: fotos reais nunca colidem byte a byte na prática, e
+     * não vale a complexidade de contar referências pra isso.
+     */
+    private function deleteStoredFile(?string $fileId): void
     {
-        $file = $this->files->findById($image->fileId);
+        if ($fileId === null) {
+            return;
+        }
 
-        return $file instanceof StoredFile ? $this->storage->url($file->path) : '';
+        $file = $this->files->findById($fileId);
+
+        if ($file instanceof StoredFile) {
+            $this->storage->delete($file->path);
+            $this->files->delete($file->id);
+        }
     }
 }

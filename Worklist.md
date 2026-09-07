@@ -75,10 +75,10 @@ Backlog do projeto: epic > issue > task. Cada `[x]` já está em `main`; `[ ]` �
 
 ### Issue: Domínio
 
-- [x] `Dealership`/`DealershipImage`, dono via `owner_user_id` (sem tabela de associação)
+- [x] `Dealership`, dono via `owner_user_id` (sem tabela de associação)
 - [x] CRUD (`GET`/`POST /dealerships`, `PATCH`/`DELETE /dealerships/{id}`) -- seller só as próprias, admin qualquer uma
-- [x] RLS em `dealerships`
-- [x] Galeria de fotos (upload/remoção, MinIO)
+- [x] RLS em `dealerships` (admin-or-owner + policy de serviço pra scheduler/worker)
+- [x] Foto única (não galeria) -- `POST`/`DELETE /dealerships/{id}/photo`, substitui a anterior e apaga do storage
 
 ### Issue: Ciclo de vida
 
@@ -88,11 +88,24 @@ Backlog do projeto: epic > issue > task. Cada `[x]` já está em `main`; `[ ]` �
 - [x] Rotina de purga genérica (`PurgeTrashedEntitiesTask`), reaproveitada entre usuário e concessionária
 - [x] Listagem paginada tanto pro admin quanto pro seller
 
+### Issue: Upload assíncrono de foto
+
+- [x] `POST /dealerships/{id}/photo` só enfileira (`202`+`job_id`) -- processamento roda no worker, não no request
+- [x] `ImageOptimizer` (GD): converte pro padrão do site (WebP, redimensionada a até 1600px), reaproveitável por qualquer domínio futuro (import em lote da galeria de veículo, por exemplo)
+- [x] Limite de 20MB, validado antes de enfileirar
+- [x] `JobStatusStore` (Redis) + `GET /jobs/{id}` (snapshot) e `GET /jobs/{id}/events` (SSE) -- genérico, não específico de foto de concessionária
+- [x] RLS: scheduler/worker (contexto de serviço) faltava em `dealerships` desde a Epic acima -- achado e corrigido só agora que um job de verdade passou a rodar em background sobre essa tabela
+
 ### Issue: Frontend
 
-- [ ] Telas de seller (listar/criar/editar/lixeira, upload de foto)
-- [ ] Tela de admin (qualquer concessionária, reassociar dono)
-- [ ] E2E
+- [x] Tela de seller/admin (adaptativa por role, listar/criar/editar/lixeira, foto)
+- [x] Admin reassocia dono (campo `owner_user_id` visível só pro admin, mesmo form)
+- [x] Miniatura da foto na listagem
+- [x] Upload de foto acompanhado ao vivo (SSE) com barra de progresso
+- [x] UF como campo de busca (Autocomplete), não texto livre
+- [x] Número da concessionária só aceita dígito
+- [x] Atalho "usar o meu" pra copiar o telefone do próprio seller no formulário
+- [x] E2E (seller: ciclo completo incl. foto assíncrona; admin: reassociação de dono; customer: sem acesso)
 
 ## Epic: Endereço
 
@@ -132,7 +145,7 @@ Fluxo do cliente final -- o motivo de tudo acima existir:
 - [x] Suíte de carga (k6)
 - [x] Acessibilidade WCAG 2.1 AA (axe-core)
 - [ ] Suíte própria pro `UserController`/`DealershipController` (hoje cobertos indiretamente -- ver `docs/test-catalog.md`)
-- [ ] E2E do domínio de concessionária
+- [x] E2E do domínio de concessionária
 
 ## Epic: CI/CD e deploy
 

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Tests\Infrastructure\Files;
 
 use App\Domain\Exceptions\DomainException;
+use App\Domain\Files\OptimizedImage;
 use App\Domain\Files\Ports\FileRepository;
+use App\Domain\Files\Ports\ImageOptimizer;
 use App\Domain\Files\StoredFile;
 use App\Domain\Ports\StorageProvider;
 use App\Infrastructure\Files\FileUploadService;
@@ -17,6 +19,7 @@ final class FileUploadServiceTest extends TestCase
     private string $tempPath;
     private InMemoryFileRepository $files;
     private FakeStorageProvider $storage;
+    private FakeImageOptimizer $imageOptimizer;
     private FileUploadService $service;
 
     protected function setUp(): void
@@ -26,7 +29,8 @@ final class FileUploadServiceTest extends TestCase
 
         $this->files = new InMemoryFileRepository();
         $this->storage = new FakeStorageProvider();
-        $this->service = new FileUploadService($this->storage, $this->files, $this->tempPath);
+        $this->imageOptimizer = new FakeImageOptimizer($this->tempPath);
+        $this->service = new FileUploadService($this->storage, $this->files, $this->imageOptimizer, $this->tempPath);
     }
 
     protected function tearDown(): void
@@ -97,6 +101,33 @@ final class FileUploadServiceTest extends TestCase
         $this->assertSame([], $this->files->all());
     }
 
+    #[Test]
+    public function upload_image_otimiza_antes_de_gravar_e_grava_como_webp(): void
+    {
+        $uploadedTmpPath = $this->createUpload('not really a jpeg, the optimizer is faked');
+
+        $file = $this->service->uploadImage($uploadedTmpPath, 'foto.jpg', uploadedBy: 'user-1');
+
+        $this->assertSame('image/webp', $file->mimeType);
+        $this->assertSame(1, $this->imageOptimizer->calls);
+    }
+
+    #[Test]
+    public function upload_image_apaga_o_temporario_do_otimizador_mesmo_quando_falha(): void
+    {
+        $this->storage->failNextPut = true;
+        $uploadedTmpPath = $this->createUpload('not really a jpeg, the optimizer is faked');
+
+        try {
+            $this->service->uploadImage($uploadedTmpPath, 'foto.jpg', uploadedBy: null);
+            $this->fail('Expected the storage failure to propagate.');
+        } catch (\RuntimeException) {
+            // esperado
+        }
+
+        $this->assertSame([], glob($this->tempPath . '/*.webp') ?: [], 'temporário do otimizador não pode sobrar, mesmo em falha');
+    }
+
     private function createUpload(string $contents): string
     {
         $path = tempnam(sys_get_temp_dir(), 'upload-source-');
@@ -156,6 +187,27 @@ final class InMemoryFileRepository implements FileRepository
     public function all(): array
     {
         return array_values($this->files);
+    }
+}
+
+/** Não decodifica nada de verdade -- só prova que `uploadImage()` chama o otimizador e usa o resultado dele. GD de verdade é testado em `GdImageOptimizerTest`. */
+final class FakeImageOptimizer implements ImageOptimizer
+{
+    public int $calls = 0;
+
+    public function __construct(private readonly string $tempPath)
+    {
+    }
+
+    public function optimizeToWebp(string $sourcePath): OptimizedImage
+    {
+        ++$this->calls;
+
+        $path = sprintf('%s/%s.webp', rtrim($this->tempPath, '/'), uniqid('fake-optimized-', true));
+        // Cabeçalho RIFF/WEBP mínimo -- o suficiente pro `finfo` real (usado por `FileUploadService::detectRealMimeType()`) reconhecer como `image/webp` sem precisar de um payload VP8 válido.
+        file_put_contents($path, 'RIFF' . pack('V', 12) . 'WEBP');
+
+        return new OptimizedImage($path, 100, 100);
     }
 }
 

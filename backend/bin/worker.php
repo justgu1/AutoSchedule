@@ -7,6 +7,7 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 
 use App\Application;
 use App\Bootstrap\ContainerFactory;
+use App\Domain\Ports\DatabaseConnection;
 use App\Domain\Ports\Job;
 use App\Infrastructure\Queue\RedisQueue;
 
@@ -14,6 +15,14 @@ $app = new Application();
 $container = ContainerFactory::build($app);
 /** @var RedisQueue $queue */
 $queue = $container->get(RedisQueue::class);
+
+// Sem isso, RLS esconde toda linha de `users`/`dealerships` das queries que
+// os jobs fazem -- não tem request HTTP aqui, então `current_user_id`/`role`
+// nunca são setados; a policy de serviço (mesma usada por login/registro) é
+// o único jeito de um processo em background enxergar qualquer linha.
+// `SET` (não `SET LOCAL`) porque essa conexão vive pelo processo inteiro, sem
+// transação por job.
+$container->get(DatabaseConnection::class)->pdo()->exec("SET app.is_service_context = 'true'");
 
 echo "Worker started.\n";
 

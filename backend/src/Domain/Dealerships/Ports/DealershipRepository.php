@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Domain\Dealerships\Ports;
 
 use App\Domain\Dealerships\Dealership;
-use App\Domain\Dealerships\DealershipImage;
 
 interface DealershipRepository
 {
@@ -38,16 +37,4 @@ interface DealershipRepository
 
     /** Cascata inversa: restaura só as que foram trashed por causa da desativação do dono (deixa quieto o que ele trashou manualmente). */
     public function restoreAutoTrashedOwnedBy(string $ownerUserId): void;
-
-    public function insertImage(DealershipImage $image): void;
-
-    public function deleteImage(string $imageId): void;
-
-    public function findImageById(string $imageId): ?DealershipImage;
-
-    /** @return list<DealershipImage> ordenado por position. */
-    public function findImagesByDealership(string $dealershipId): array;
-
-    /** Próxima posição livre da galeria -- 0 se ainda não tem nenhuma imagem. */
-    public function nextImagePosition(string $dealershipId): int;
 }

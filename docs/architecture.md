@@ -78,10 +78,10 @@ Hoje: rate limiting (sliding window, script Lua atômico -- ver `docs/business-r
 ## MinIO
 
 ```text
-Upload -> Backend (valida MIME de verdade, não só a extensão) -> MinIO -> tabela `files`
+Upload -> Backend (valida MIME/tamanho) -> Job assíncrono (otimiza pro padrão do site) -> MinIO -> tabela `files`
 ```
 
-PostgreSQL guarda a referência do objeto (`files`), nunca o binário. Upload confirmado no MinIO só depois disso vira linha em `files` -- nada de registro órfão apontando pra um objeto que falhou no meio do caminho.
+PostgreSQL guarda a referência do objeto (`files`), nunca o binário. Upload confirmado no MinIO só depois disso vira linha em `files` -- nada de registro órfão apontando pra um objeto que falhou no meio do caminho. Foto de site (hoje: concessionária) é convertida pro padrão do site -- WebP, redimensionada -- pelo `ImageOptimizer` (GD) antes de gravar; nunca o arquivo cru que o cliente mandou.
 
 ## Autorização e RLS
 
@@ -101,6 +101,8 @@ Rate Limiting -> Authentication -> Authorization -> DB Transaction (SET LOCAL) -
 
 Rate limiting roda primeiro -- tráfego abusivo é barrado sem gastar uma transação no Postgres.
 
+Scheduler e worker rodam fora de qualquer request HTTP -- sem `current_user_id`/role pra setar, as policies admin-or-owner esconderiam toda linha dessas conexões. Mesma policy de serviço que já existia pra login/registro (`app.is_service_context`) resolve: `SET` (não `SET LOCAL`, a conexão vive pelo processo inteiro) uma vez, logo depois de conectar.
+
 ## Auditoria
 
 `audit_logs` é polimórfico (`auditable_type`+`auditable_id`), pensado desde o início pra suportar qualquer entidade auditável, não só conta de usuário. Semântica de coluna e convenção de query em [`docs/database.md`](database.md#auditoria).
@@ -108,10 +110,12 @@ Rate limiting roda primeiro -- tráfego abusivo é barrado sem gastar uma transa
 ## Processamento assíncrono
 
 ```text
-Controller -> Queue (RedisQueue) -> PHP Worker (bin/worker.php) -> Job -> MailProvider/etc.
+Controller -> Queue (RedisQueue) -> PHP Worker (bin/worker.php) -> Job -> MailProvider/StorageProvider/etc.
 ```
 
 Falha reenfileira com `attempts` incrementado; passadas 3 tentativas vira dead-letter em vez de tentar pra sempre. Scheduler e worker são processos PHP CLI, mesma imagem Docker do backend com outro comando -- cada um escala e reinicia sozinho via Deployment próprio no k8s, sem precisar de supervisor porque o orquestrador já cuida disso.
+
+Job que o cliente precisa acompanhar (hoje: processar foto) grava progresso num `JobStatusStore` (Redis, chave com TTL) em vez de só rodar silencioso -- o controller devolve `202`+`job_id` na hora, e `GET /jobs/{id}/events` expõe isso como SSE (`StreamedResponse`, sem framework de streaming, só desliga o buffer do PHP-FPM e do nginx pra essa rota e escreve aos poucos). Genérico de propósito: mesmo mecanismo serve qualquer job futuro que precise dar feedback ao vivo, como um import em lote de fotos de veículo.
 
 ## Busca e geolocalização
 

@@ -90,6 +90,27 @@ final class DealershipRlsPolicyTest extends TestCase
         $this->assertSame([], $ids);
     }
 
+    /**
+     * Scheduler/worker rodam sem request HTTP, sem `current_user_id`/role pra
+     * setar -- a mesma policy de serviço que o login/registro usa em `users`
+     * é o que deixa o purge agendado e o job de foto enxergarem a linha.
+     */
+    #[Test]
+    public function contexto_de_servico_enxerga_e_atualiza_qualquer_linha(): void
+    {
+        $this->rls->beginTransaction();
+        $this->rls->exec("SET LOCAL app.is_service_context = 'true'");
+        $ids = $this->queryDealershipIds();
+        $statement = $this->rls->prepare('UPDATE dealerships SET name = ? WHERE id = ?');
+        $statement->execute(['Updated by service', $this->otherDealershipId]);
+        $affected = $statement->rowCount();
+        $this->rls->rollBack();
+
+        $this->assertContains($this->dealershipId, $ids);
+        $this->assertContains($this->otherDealershipId, $ids);
+        $this->assertSame(1, $affected);
+    }
+
     #[Test]
     public function seller_nao_consegue_atualizar_concessionaria_de_outro_seller(): void
     {

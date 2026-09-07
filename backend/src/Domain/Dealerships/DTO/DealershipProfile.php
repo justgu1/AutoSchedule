@@ -23,11 +23,13 @@ final readonly class DealershipProfile
         public ?float $longitude,
         public ?string $googlePlaceId,
         public ?string $phone,
+        public ?string $photoUrl,
         public string $status,
     ) {
     }
 
-    public static function fromDealership(Dealership $dealership): self
+    /** `$photoUrl` já resolvido por quem chama (`StorageProvider::url()`) -- o DTO não conhece storage. */
+    public static function fromDealership(Dealership $dealership, ?string $photoUrl): self
     {
         return new self(
             id: $dealership->id,
@@ -44,6 +46,7 @@ final readonly class DealershipProfile
             longitude: $dealership->longitude,
             googlePlaceId: $dealership->googlePlaceId,
             phone: $dealership->phone,
+            photoUrl: $photoUrl,
             status: $dealership->status->value,
         );
     }
@@ -66,6 +69,7 @@ final readonly class DealershipProfile
             'longitude' => $this->longitude,
             'google_place_id' => $this->googlePlaceId,
             'phone' => $this->phone,
+            'photo_url' => $this->photoUrl,
             'status' => $this->status,
         ];
     }

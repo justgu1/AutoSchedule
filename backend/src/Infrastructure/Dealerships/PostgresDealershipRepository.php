@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Infrastructure\Dealerships;
 
 use App\Domain\Dealerships\Dealership;
-use App\Domain\Dealerships\DealershipImage;
 use App\Domain\Dealerships\Ports\DealershipRepository;
 use App\Domain\Shared\TrashableStatus;
 
@@ -29,12 +28,12 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
         $statement = $this->pdo->prepare(<<<'SQL'
             INSERT INTO dealerships (
                 id, owner_user_id, name, zip_code, address, number, complement, neighborhood, city, state,
-                latitude, longitude, google_place_id, phone, status, trashed_by_owner_deactivation,
-                trashed_at, anonymized_at, created_at, updated_at
+                latitude, longitude, google_place_id, phone, photo_file_id, status,
+                trashed_by_owner_deactivation, trashed_at, anonymized_at, created_at, updated_at
             ) VALUES (
                 :id, :owner_user_id, :name, :zip_code, :address, :number, :complement, :neighborhood, :city, :state,
-                :latitude, :longitude, :google_place_id, :phone, :status, :trashed_by_owner_deactivation,
-                :trashed_at, :anonymized_at, :created_at, :updated_at
+                :latitude, :longitude, :google_place_id, :phone, :photo_file_id, :status,
+                :trashed_by_owner_deactivation, :trashed_at, :anonymized_at, :created_at, :updated_at
             )
             SQL);
 
@@ -48,6 +47,7 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
                 owner_user_id = :owner_user_id, name = :name, zip_code = :zip_code, address = :address,
                 number = :number, complement = :complement, neighborhood = :neighborhood, city = :city, state = :state,
                 latitude = :latitude, longitude = :longitude, google_place_id = :google_place_id, phone = :phone,
+                photo_file_id = :photo_file_id,
                 status = :status, trashed_by_owner_deactivation = :trashed_by_owner_deactivation,
                 trashed_at = :trashed_at, anonymized_at = :anonymized_at, updated_at = :updated_at
             WHERE id = :id
@@ -149,58 +149,6 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
         $statement->execute(['owner_user_id' => $ownerUserId]);
     }
 
-    public function insertImage(DealershipImage $image): void
-    {
-        $statement = $this->pdo->prepare(<<<'SQL'
-            INSERT INTO dealership_images (id, dealership_id, file_id, position, created_at, updated_at)
-            VALUES (:id, :dealership_id, :file_id, :position, :created_at, :updated_at)
-            SQL);
-
-        $statement->execute([
-            'id' => $image->id,
-            'dealership_id' => $image->dealershipId,
-            'file_id' => $image->fileId,
-            'position' => $image->position,
-            'created_at' => $image->createdAt->format(DATE_ATOM),
-            'updated_at' => $image->updatedAt->format(DATE_ATOM),
-        ]);
-    }
-
-    public function deleteImage(string $imageId): void
-    {
-        $statement = $this->pdo->prepare('DELETE FROM dealership_images WHERE id = :id');
-        $statement->execute(['id' => $imageId]);
-    }
-
-    public function findImageById(string $imageId): ?DealershipImage
-    {
-        $statement = $this->pdo->prepare('SELECT * FROM dealership_images WHERE id = :id');
-        $statement->execute(['id' => $imageId]);
-        $row = $statement->fetch();
-
-        return $row === false ? null : $this->imageFromRow($row);
-    }
-
-    public function findImagesByDealership(string $dealershipId): array
-    {
-        $statement = $this->pdo->prepare(
-            'SELECT * FROM dealership_images WHERE dealership_id = :dealership_id ORDER BY position',
-        );
-        $statement->execute(['dealership_id' => $dealershipId]);
-
-        return array_values(array_map($this->imageFromRow(...), $statement->fetchAll()));
-    }
-
-    public function nextImagePosition(string $dealershipId): int
-    {
-        $statement = $this->pdo->prepare(
-            'SELECT COALESCE(MAX(position) + 1, 0) FROM dealership_images WHERE dealership_id = :dealership_id',
-        );
-        $statement->execute(['dealership_id' => $dealershipId]);
-
-        return (int) $statement->fetchColumn();
-    }
-
     /** @param array<string, mixed> $row */
     private function fromRow(array $row): Dealership
     {
@@ -219,23 +167,11 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
             longitude: $row['longitude'] !== null ? (float) $row['longitude'] : null,
             googlePlaceId: $row['google_place_id'],
             phone: $row['phone'],
+            photoFileId: $row['photo_file_id'],
             status: TrashableStatus::from($row['status']),
             trashedByOwnerDeactivation: (bool) $row['trashed_by_owner_deactivation'],
             trashedAt: $this->toDateTime($row['trashed_at']),
             anonymizedAt: $this->toDateTime($row['anonymized_at']),
-            createdAt: new \DateTimeImmutable($row['created_at']),
-            updatedAt: new \DateTimeImmutable($row['updated_at']),
-        );
-    }
-
-    /** @param array<string, mixed> $row */
-    private function imageFromRow(array $row): DealershipImage
-    {
-        return new DealershipImage(
-            id: $row['id'],
-            dealershipId: $row['dealership_id'],
-            fileId: $row['file_id'],
-            position: (int) $row['position'],
             createdAt: new \DateTimeImmutable($row['created_at']),
             updatedAt: new \DateTimeImmutable($row['updated_at']),
         );
@@ -264,6 +200,7 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
             'longitude' => $dealership->longitude,
             'google_place_id' => $dealership->googlePlaceId,
             'phone' => $dealership->phone,
+            'photo_file_id' => $dealership->photoFileId,
             'status' => $dealership->status->value,
             'trashed_by_owner_deactivation' => $dealership->trashedByOwnerDeactivation ? 't' : 'f',
             'trashed_at' => $dealership->trashedAt?->format(DATE_ATOM),
