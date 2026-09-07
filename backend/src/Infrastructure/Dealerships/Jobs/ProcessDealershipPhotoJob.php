@@ -58,7 +58,7 @@ final readonly class ProcessDealershipPhotoJob implements Job
             $this->dealerships->update($dealership->withPhoto($file->id));
             $this->deleteStoredFile($oldPhotoFileId);
 
-            $this->audit->record(AuditEvent::DealershipPhotoUpdated, $uploadedBy, 'Dealership', $dealership->id, [], '', null);
+            $this->audit->record(AuditEvent::DealershipPhotoUpdated, $uploadedBy, 'Dealership', $dealership->id, [], null, null);
 
             $this->jobStatus->update($jobId, 'done', 'done', 100, [
                 'result' => ['photo_url' => $this->storage->url($file->path)],

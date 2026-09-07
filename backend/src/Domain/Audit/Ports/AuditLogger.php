@@ -13,6 +13,7 @@ interface AuditLogger
      * @param string $auditableType nome da entidade afetada (ex: 'User', 'Dealership') -- polimórfico, cresce sem migration nova a cada domínio
      * @param ?string $auditableId id da entidade afetada -- igual a $actorId quando o próprio ator é o afetado, diferente quando alguém mexe no registro de outra pessoa/entidade
      * @param array<string, mixed> $context detalhe extra (ex: email tentado num login falho, quais campos mudaram)
+     * @param ?string $ipAddress null quando não há request HTTP (job de fila, rotina agendada) -- coluna é `inet`, string vazia não é endereço válido
      */
-    public function record(AuditEvent $event, ?string $actorId, string $auditableType, ?string $auditableId, array $context, string $ipAddress, ?string $userAgent): void;
+    public function record(AuditEvent $event, ?string $actorId, string $auditableType, ?string $auditableId, array $context, ?string $ipAddress, ?string $userAgent): void;
 }

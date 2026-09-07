@@ -133,10 +133,15 @@ e2e-setup:
 		mc alias set local http://127.0.0.1:$$MINIO_PORT $$MINIO_USER $$MINIO_PASS && \
 		mc mb --ignore-existing local/autoschedule && \
 		mc anonymous set download local/autoschedule"
-	@docker compose run --rm e2e npm ci
+	@docker compose run --rm --no-deps e2e npm ci
 
+# `--no-deps`: sem isso, `docker compose run` reconcilia as dependências do
+# serviço `e2e` a cada chamada -- e recriar `backend` sozinho (sem recriar
+# `nginx` junto) deixa o `nginx` com a resolução de DNS antiga em cache,
+# apontando pro IP morto do container anterior (502 Bad Gateway em toda
+# rota da API, apesar do backend novo estar de pé e saudável).
 e2e: e2e-setup
-	@RATE_LIMIT_AUTH_MAX=1000 docker compose run --rm e2e npx playwright test
+	@RATE_LIMIT_AUTH_MAX=1000 docker compose run --rm --no-deps e2e npx playwright test
 	@echo "==> restaurando rate limit padrão do backend..."
 	@docker compose up -d backend
 

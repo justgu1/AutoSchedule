@@ -22,7 +22,25 @@ $queue = $container->get(RedisQueue::class);
 // o único jeito de um processo em background enxergar qualquer linha.
 // `SET` (não `SET LOCAL`) porque essa conexão vive pelo processo inteiro, sem
 // transação por job.
-$container->get(DatabaseConnection::class)->pdo()->exec("SET app.is_service_context = 'true'");
+//
+// Retry porque este processo pode subir antes da migration que cria a role
+// `autoschedule_app` (ou antes do Postgres aceitar conexões) -- sem loop,
+// crasha de vez e nunca mais processa fila nenhuma.
+$maxAttempts = 30;
+for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+    try {
+        $container->get(DatabaseConnection::class)->pdo()->exec("SET app.is_service_context = 'true'");
+
+        break;
+    } catch (\PDOException $exception) {
+        if ($attempt === $maxAttempts) {
+            throw $exception;
+        }
+
+        echo sprintf("Aguardando banco de dados (tentativa %d/%d): %s\n", $attempt, $maxAttempts, $exception->getMessage());
+        sleep(1);
+    }
+}
 
 echo "Worker started.\n";
 
