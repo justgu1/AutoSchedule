@@ -5,33 +5,12 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
-use App\Config;
-use App\Bootstrap\ContainerFactory;
-use App\Infrastructure\Database\DatabaseConnection;
+use App\Bootstrap\CliKernel;
 use App\Infrastructure\Scheduler\Scheduler;
 
-$app = new Config();
-$container = ContainerFactory::build($app);
-
-// Mesma razão do bin/worker.php: sem request HTTP, sem `current_user_id`/role
-// -- só a policy de serviço deixa o purge agendado enxergar qualquer linha.
-// Retry: ver comentário equivalente em bin/worker.php.
-$maxAttempts = 30;
-for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
-    try {
-        $container->get(DatabaseConnection::class)->pdo()->exec("SET app.is_service_context = 'true'");
-
-        break;
-    } catch (\PDOException $exception) {
-        if ($attempt === $maxAttempts) {
-            throw $exception;
-        }
-
-        echo sprintf("Aguardando banco de dados (tentativa %d/%d): %s\n", $attempt, $maxAttempts, $exception->getMessage());
-        sleep(1);
-    }
-}
+$kernel = CliKernel::boot();
+$kernel->enterServiceContext();
 
 echo "Scheduler started.\n";
 
-$container->get(Scheduler::class)->loop();
+$kernel->container->get(Scheduler::class)->loop();

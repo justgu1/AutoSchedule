@@ -1,4 +1,4 @@
-.PHONY: setup up down restart build logs ps test test-unit migrate rollback seed keys load-test static-analysis arch lint lint-fix rector rector-fix e2e e2e-setup
+.PHONY: setup up down restart build logs ps test test-unit comments migrate rollback seed keys load-test static-analysis arch lint lint-fix rector rector-fix e2e e2e-setup
 
 setup:
 	@if [ -f .env ]; then \
@@ -105,6 +105,10 @@ static-analysis:
 # Regra de dependência entre as camadas (ver backend/deptrac.yaml).
 arch:
 	@docker compose exec backend vendor/bin/deptrac analyse --config-file=deptrac.yaml --no-progress
+
+# Regras de comentário do docs/code-style.md.
+comments:
+	@docker compose exec backend php tools/check-comments.php
 
 lint:
 	@docker compose exec backend vendor/bin/php-cs-fixer fix --dry-run --diff

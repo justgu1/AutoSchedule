@@ -40,6 +40,12 @@ Node.js só existe durante o build -- a imagem final não carrega `node_modules`
 
 PHP 8.5, PHP-FPM, Composer. Nginx cuida da camada HTTP, PHP-FPM executa a aplicação.
 
+`public/index.php` tem três linhas: quem compõe é `Bootstrap\HttpKernel` (config, container, router,
+pipeline), e `Bootstrap\CliKernel` faz o mesmo pros processos de `bin/`. Rota é declarada de forma
+fluente (`$router->get(path, [Controller::class, 'metodo'])->roles(...)->rateLimit('auth')`) e casada
+uma vez por request, no `ResolveRouteMiddleware` -- os middlewares e o dispatch leem a rota do
+próprio `Request` em vez de casar de novo.
+
 ## Camadas
 
 ```text

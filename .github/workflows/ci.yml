@@ -38,6 +38,10 @@ jobs:
         working-directory: backend
         run: vendor/bin/deptrac analyse --config-file=deptrac.yaml --no-progress
 
+      - name: Comentários
+        working-directory: backend
+        run: php tools/check-comments.php
+
       - name: Build
         run: docker build -f infra/docker/backend/Dockerfile -t autoschedule-backend:ci .
 
