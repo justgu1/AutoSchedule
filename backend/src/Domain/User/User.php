@@ -59,42 +59,18 @@ final readonly class User
 
     public function withProfile(string $name, ?string $phone): self
     {
-        return new self(
-            id: $this->id,
-            name: $name,
-            email: $this->email,
-            phone: $phone,
-            passwordHash: $this->passwordHash,
-            role: $this->role,
-            passwordSetAt: $this->passwordSetAt,
-            emailVerifiedAt: $this->emailVerifiedAt,
-            createdAt: $this->createdAt,
-            updatedAt: new \DateTimeImmutable(),
-            deletedAt: $this->deletedAt,
-            status: $this->status,
-            anonymizedAt: $this->anonymizedAt,
-        );
+        return clone($this, ['name' => $name, 'phone' => $phone, 'updatedAt' => new \DateTimeImmutable()]);
     }
 
     public function withNewPassword(string $plainPassword): self
     {
         $now = new \DateTimeImmutable();
 
-        return new self(
-            id: $this->id,
-            name: $this->name,
-            email: $this->email,
-            phone: $this->phone,
-            passwordHash: password_hash($plainPassword, PASSWORD_ARGON2ID),
-            role: $this->role,
-            passwordSetAt: $now,
-            emailVerifiedAt: $this->emailVerifiedAt,
-            createdAt: $this->createdAt,
-            updatedAt: $now,
-            deletedAt: $this->deletedAt,
-            status: $this->status,
-            anonymizedAt: $this->anonymizedAt,
-        );
+        return clone($this, [
+            'passwordHash' => password_hash($plainPassword, PASSWORD_ARGON2ID),
+            'passwordSetAt' => $now,
+            'updatedAt' => $now,
+        ]);
     }
 
     /** A única escalada que dispensa admin: customer virando seller por vontade própria. */
@@ -105,21 +81,7 @@ final readonly class User
 
     public function withRole(UserRole $role): self
     {
-        return new self(
-            id: $this->id,
-            name: $this->name,
-            email: $this->email,
-            phone: $this->phone,
-            passwordHash: $this->passwordHash,
-            role: $role,
-            passwordSetAt: $this->passwordSetAt,
-            emailVerifiedAt: $this->emailVerifiedAt,
-            createdAt: $this->createdAt,
-            updatedAt: new \DateTimeImmutable(),
-            deletedAt: $this->deletedAt,
-            status: $this->status,
-            anonymizedAt: $this->anonymizedAt,
-        );
+        return clone($this, ['role' => $role, 'updatedAt' => new \DateTimeImmutable()]);
     }
 
     /** Anonimização é irreversível, então ela é o que fecha a janela de restore. */
@@ -141,21 +103,13 @@ final readonly class User
     /** Escruba PII (LGPD Art. 12) e preserva id/role/timestamps, senão a auditoria que referencia o usuário perde sentido. */
     public function anonymized(): self
     {
-        return new self(
-            id: $this->id,
-            name: 'Deleted user',
+        return clone($this, [
+            'name' => 'Deleted user',
             // Id inteiro, não prefixo: os primeiros hex de um UUIDv7 são timestamp e colidem entre exclusões próximas.
-            email: sprintf('deleted-%s@anonymized.local', $this->id),
-            phone: null,
-            passwordHash: $this->passwordHash,
-            role: $this->role,
-            passwordSetAt: $this->passwordSetAt,
-            emailVerifiedAt: $this->emailVerifiedAt,
-            createdAt: $this->createdAt,
-            updatedAt: $this->updatedAt,
-            deletedAt: $this->deletedAt,
-            status: TrashableStatus::Deleted,
-            anonymizedAt: new \DateTimeImmutable(),
-        );
+            'email' => sprintf('deleted-%s@anonymized.local', $this->id),
+            'phone' => null,
+            'status' => TrashableStatus::Deleted,
+            'anonymizedAt' => new \DateTimeImmutable(),
+        ]);
     }
 }

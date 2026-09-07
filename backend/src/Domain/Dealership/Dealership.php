@@ -97,91 +97,34 @@ final readonly class Dealership
         ?float $longitude,
         ?string $googlePlaceId,
     ): self {
-        return new self(
-            id: $this->id,
-            ownerUserId: $this->ownerUserId,
-            name: $name,
-            slug: $this->slug,
-            zipCode: $zipCode,
-            address: $address,
-            number: $number,
-            complement: $complement,
-            neighborhood: $neighborhood,
-            city: $city,
-            state: $state,
-            latitude: $latitude,
-            longitude: $longitude,
-            googlePlaceId: $googlePlaceId,
-            phone: $phone,
-            email: $email,
-            photoFileId: $this->photoFileId,
-            status: $this->status,
-            trashedByOwnerDeactivation: $this->trashedByOwnerDeactivation,
-            trashedAt: $this->trashedAt,
-            anonymizedAt: $this->anonymizedAt,
-            createdAt: $this->createdAt,
-            updatedAt: new \DateTimeImmutable(),
-        );
+        return clone($this, [
+            'name' => $name,
+            'zipCode' => $zipCode,
+            'address' => $address,
+            'number' => $number,
+            'complement' => $complement,
+            'neighborhood' => $neighborhood,
+            'city' => $city,
+            'state' => $state,
+            'phone' => $phone,
+            'email' => $email,
+            'latitude' => $latitude,
+            'longitude' => $longitude,
+            'googlePlaceId' => $googlePlaceId,
+            'updatedAt' => new \DateTimeImmutable(),
+        ]);
     }
 
     /** Admin reassociando a concessionária a outro seller. */
     public function withOwner(string $ownerUserId): self
     {
-        return new self(
-            id: $this->id,
-            ownerUserId: $ownerUserId,
-            name: $this->name,
-            slug: $this->slug,
-            zipCode: $this->zipCode,
-            address: $this->address,
-            number: $this->number,
-            complement: $this->complement,
-            neighborhood: $this->neighborhood,
-            city: $this->city,
-            state: $this->state,
-            latitude: $this->latitude,
-            longitude: $this->longitude,
-            googlePlaceId: $this->googlePlaceId,
-            phone: $this->phone,
-            email: $this->email,
-            photoFileId: $this->photoFileId,
-            status: $this->status,
-            trashedByOwnerDeactivation: $this->trashedByOwnerDeactivation,
-            trashedAt: $this->trashedAt,
-            anonymizedAt: $this->anonymizedAt,
-            createdAt: $this->createdAt,
-            updatedAt: new \DateTimeImmutable(),
-        );
+        return clone($this, ['ownerUserId' => $ownerUserId, 'updatedAt' => new \DateTimeImmutable()]);
     }
 
     /** Só uma foto por concessionária -- setar substitui a anterior (quem chama cuida de remover o arquivo velho do storage). */
     public function withPhoto(?string $photoFileId): self
     {
-        return new self(
-            id: $this->id,
-            ownerUserId: $this->ownerUserId,
-            name: $this->name,
-            slug: $this->slug,
-            zipCode: $this->zipCode,
-            address: $this->address,
-            number: $this->number,
-            complement: $this->complement,
-            neighborhood: $this->neighborhood,
-            city: $this->city,
-            state: $this->state,
-            latitude: $this->latitude,
-            longitude: $this->longitude,
-            googlePlaceId: $this->googlePlaceId,
-            phone: $this->phone,
-            email: $this->email,
-            photoFileId: $photoFileId,
-            status: $this->status,
-            trashedByOwnerDeactivation: $this->trashedByOwnerDeactivation,
-            trashedAt: $this->trashedAt,
-            anonymizedAt: $this->anonymizedAt,
-            createdAt: $this->createdAt,
-            updatedAt: new \DateTimeImmutable(),
-        );
+        return clone($this, ['photoFileId' => $photoFileId, 'updatedAt' => new \DateTimeImmutable()]);
     }
 
     /** Ver User::isEligibleForRestore(). */
@@ -206,31 +149,19 @@ final readonly class Dealership
      */
     public function anonymized(): self
     {
-        return new self(
-            id: $this->id,
-            ownerUserId: $this->ownerUserId,
-            name: 'Concessionária removida',
-            slug: self::buildSlug('concessionaria removida', $this->id),
-            zipCode: $this->zipCode,
-            address: '',
-            number: '',
-            complement: null,
-            neighborhood: $this->neighborhood,
-            city: $this->city,
-            state: $this->state,
-            latitude: $this->latitude,
-            longitude: $this->longitude,
-            googlePlaceId: null,
-            phone: null,
-            email: null,
-            photoFileId: null,
-            status: TrashableStatus::Deleted,
-            trashedByOwnerDeactivation: $this->trashedByOwnerDeactivation,
-            trashedAt: $this->trashedAt,
-            anonymizedAt: new \DateTimeImmutable(),
-            createdAt: $this->createdAt,
-            updatedAt: $this->updatedAt,
-        );
+        return clone($this, [
+            'name' => 'Concessionária removida',
+            'slug' => self::buildSlug('concessionaria removida', $this->id),
+            'address' => '',
+            'number' => '',
+            'complement' => null,
+            'googlePlaceId' => null,
+            'phone' => null,
+            'email' => null,
+            'photoFileId' => null,
+            'status' => TrashableStatus::Deleted,
+            'anonymizedAt' => new \DateTimeImmutable(),
+        ]);
     }
 
     /**
