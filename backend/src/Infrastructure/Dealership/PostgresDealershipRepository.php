@@ -6,7 +6,9 @@ namespace App\Infrastructure\Dealership;
 
 use App\Domain\Dealership\Dealership;
 use App\Domain\Dealership\Ports\DealershipRepository;
+use App\Domain\Shared\Trashable;
 use App\Domain\Shared\TrashableStatus;
+use App\Domain\Shared\TrashState;
 use App\Infrastructure\Database\DatabaseConnection;
 
 final readonly class PostgresDealershipRepository implements DealershipRepository
@@ -129,15 +131,19 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
         $statement->execute(['id' => $id]);
     }
 
-    public function findPurgeEligible(int $graceDays, \DateTimeImmutable $now): array
+    public function findTrashed(): array
     {
-        $statement = $this->connection->pdo()->prepare(<<<'SQL'
-            SELECT * FROM dealerships
-            WHERE status = 'trashed' AND anonymized_at IS NULL AND trashed_at <= :threshold
-            SQL);
-        $statement->execute(['threshold' => $now->modify("-{$graceDays} days")->format(DATE_ATOM)]);
+        $statement = $this->connection->pdo()->prepare("SELECT * FROM dealerships WHERE status = 'trashed' AND anonymized_at IS NULL");
+        $statement->execute();
 
         return array_values(array_map($this->fromRow(...), $statement->fetchAll()));
+    }
+
+    public function purge(Trashable $entity): void
+    {
+        if ($entity instanceof Dealership) {
+            $this->update($entity);
+        }
     }
 
     public function trashAllOwnedBy(string $ownerUserId): void
@@ -181,10 +187,12 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
             phone: $row['phone'],
             email: $row['email'],
             photoFileId: $row['photo_file_id'],
-            status: TrashableStatus::from($row['status']),
+            trash: new TrashState(
+                status: TrashableStatus::from($row['status']),
+                trashedAt: $this->toDateTime($row['trashed_at']),
+                anonymizedAt: $this->toDateTime($row['anonymized_at']),
+            ),
             trashedByOwnerDeactivation: (bool) $row['trashed_by_owner_deactivation'],
-            trashedAt: $this->toDateTime($row['trashed_at']),
-            anonymizedAt: $this->toDateTime($row['anonymized_at']),
             createdAt: new \DateTimeImmutable($row['created_at']),
             updatedAt: new \DateTimeImmutable($row['updated_at']),
         );
@@ -216,10 +224,10 @@ final readonly class PostgresDealershipRepository implements DealershipRepositor
             'phone' => $dealership->phone,
             'email' => $dealership->email,
             'photo_file_id' => $dealership->photoFileId,
-            'status' => $dealership->status->value,
+            'status' => $dealership->trash->status->value,
             'trashed_by_owner_deactivation' => $dealership->trashedByOwnerDeactivation ? 't' : 'f',
-            'trashed_at' => $dealership->trashedAt?->format(DATE_ATOM),
-            'anonymized_at' => $dealership->anonymizedAt?->format(DATE_ATOM),
+            'trashed_at' => $dealership->trash->trashedAt?->format(DATE_ATOM),
+            'anonymized_at' => $dealership->trash->anonymizedAt?->format(DATE_ATOM),
             'created_at' => $dealership->createdAt->format(DATE_ATOM),
             'updated_at' => $dealership->updatedAt->format(DATE_ATOM),
         ];

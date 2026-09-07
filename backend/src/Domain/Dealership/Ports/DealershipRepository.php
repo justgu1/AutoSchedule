@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Domain\Dealership\Ports;
 
 use App\Domain\Dealership\Dealership;
+use App\Domain\Shared\Ports\TrashableRepository;
 
-interface DealershipRepository
+interface DealershipRepository extends TrashableRepository
 {
     public function findById(string $id): ?Dealership;
 
@@ -31,9 +32,6 @@ interface DealershipRepository
     public function trash(string $id, bool $byOwnerDeactivation): void;
 
     public function restore(string $id): void;
-
-    /** @return list<Dealership> */
-    public function findPurgeEligible(int $graceDays, \DateTimeImmutable $now): array;
 
     /** Cascata: manda pra lixeira toda concessionária ativa do dono desativado. */
     public function trashAllOwnedBy(string $ownerUserId): void;

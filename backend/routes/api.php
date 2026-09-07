@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Domain\Shared\TrashState;
 use App\Domain\User\UserRole;
 use App\Infrastructure\Http\Controllers\ApiCatalogController;
 use App\Infrastructure\Http\Controllers\DealershipController;
@@ -62,10 +63,10 @@ return static function (Router $router): void {
             ->accepts('name', 'phone', 'role');
 
         $router->delete('/api/me', [UserController::class, 'destroy'])
-            ->describes('Moves your account to trash (recoverable for 30 days by logging in again, or restored/purged by an admin).');
+            ->describes(sprintf('Moves your account to trash (recoverable for %d days by logging in again, or restored/purged by an admin).', TrashState::GRACE_DAYS));
 
         $router->post('/api/me/purge', [UserController::class, 'purge'])
-            ->describes('Permanently anonymizes your trashed account now, without waiting 30 days.');
+            ->describes(sprintf('Permanently anonymizes your trashed account now, without waiting %d days.', TrashState::GRACE_DAYS));
 
         $router->get('/api/jobs/{id}', [JobController::class, 'show'])
             ->describes('Returns the current status of an async job (queued/processing/done/failed).');
@@ -93,10 +94,10 @@ return static function (Router $router): void {
             ->describes('Moves a user to trash. Fails if it is the last admin.');
 
         $router->post('/api/users/{id}/restore', [UserController::class, 'restore'])
-            ->describes('Restores a trashed user before the 30-day window expires.');
+            ->describes('Restores a trashed user before the recovery window expires.');
 
         $router->post('/api/users/{id}/purge', [UserController::class, 'purge'])
-            ->describes('Permanently anonymizes a trashed user now, without waiting 30 days.');
+            ->describes(sprintf('Permanently anonymizes a trashed user now, without waiting %d days.', TrashState::GRACE_DAYS));
     });
 
     $router->group($adminOrSeller, static function (Router $router): void {
@@ -115,10 +116,10 @@ return static function (Router $router): void {
             ->describes('Moves a dealership to trash.');
 
         $router->post('/api/dealerships/{id}/restore', [DealershipController::class, 'restore'])
-            ->describes('Restores a trashed dealership before the 30-day window expires.');
+            ->describes('Restores a trashed dealership before the recovery window expires.');
 
         $router->post('/api/dealerships/{id}/purge', [DealershipController::class, 'purge'])
-            ->describes('Permanently anonymizes a trashed dealership now, without waiting 30 days.');
+            ->describes(sprintf('Permanently anonymizes a trashed dealership now, without waiting %d days.', TrashState::GRACE_DAYS));
 
         $router->post('/api/dealerships/{id}/photo', [DealershipController::class, 'setPhoto'])
             ->describes('Sets the dealership photo (multipart, field name "image", max 20MB) -- replaces the previous one, if any.');

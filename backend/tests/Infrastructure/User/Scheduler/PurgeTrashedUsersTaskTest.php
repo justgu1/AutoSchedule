@@ -23,7 +23,6 @@ final class PurgeTrashedUsersTaskTest extends TestCase
     private PostgresUserRepository $repository;
     private FakeAuditLogger $audit;
 
-    /** @var PurgeTrashedEntitiesTask<User> */
     private PurgeTrashedEntitiesTask $task;
 
     protected function setUp(): void
@@ -34,14 +33,10 @@ final class PurgeTrashedUsersTaskTest extends TestCase
         $this->pdo->beginTransaction();
         $this->repository = new PostgresUserRepository($connection);
         $this->audit = new FakeAuditLogger();
-        $repository = $this->repository;
         $this->task = new PurgeTrashedEntitiesTask(
             name: 'purge-trashed-users',
-            graceDays: 30,
             dueIntervalSeconds: 86400,
-            findEligible: $repository->findPurgeEligible(...),
-            purge: static fn (User $user) => $repository->anonymizeAndSoftDelete($user->id),
-            identify: static fn (User $user): string => $user->id,
+            repository: $this->repository,
             audit: $this->audit,
             event: AuditEvent::AccountPurged,
             auditableType: 'User',

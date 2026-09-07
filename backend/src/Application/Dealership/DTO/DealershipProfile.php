@@ -51,7 +51,7 @@ final readonly class DealershipProfile
             phone: $dealership->phone,
             email: $dealership->email,
             photoUrl: $photoUrl,
-            status: $dealership->status->value,
+            status: $dealership->trash->status->value,
         );
     }
 

@@ -15,6 +15,7 @@ use App\Domain\File\Ports\FileRepository;
 use App\Domain\File\Ports\ImageOptimizer;
 use App\Domain\File\Ports\StorageProvider;
 use App\Domain\File\StoredFile;
+use App\Domain\Shared\Trashable;
 use App\Infrastructure\File\LocalTempFileStore;
 use App\Infrastructure\Jobs\JobStatusStore;
 use App\Infrastructure\Redis\RedisConnection;
@@ -237,9 +238,13 @@ final class InMemoryDealershipRepository implements DealershipRepository
     {
     }
 
-    public function findPurgeEligible(int $graceDays, \DateTimeImmutable $now): array
+    public function findTrashed(): array
     {
         return [];
+    }
+
+    public function purge(Trashable $entity): void
+    {
     }
 
     public function trashAllOwnedBy(string $ownerUserId): void

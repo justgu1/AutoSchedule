@@ -31,7 +31,9 @@ use App\Domain\Dealership\Dealership;
 use App\Domain\Dealership\Ports\DealershipRepository;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
+use App\Domain\Shared\Trashable;
 use App\Domain\Shared\TrashableStatus;
+use App\Domain\Shared\TrashState;
 use App\Domain\User\Ports\UserRepository;
 use App\Domain\User\User;
 use App\Domain\User\UserRole;
@@ -92,7 +94,7 @@ final class OAuthFlowsTest extends TestCase
 
         $restored = $this->users->findById($this->customer->id);
         assert($restored instanceof User);
-        $this->assertSame(TrashableStatus::Active, $restored->status);
+        $this->assertSame(TrashableStatus::Active, $restored->trash->status);
         $this->assertTrue($tokenPair->accountRestored);
         $this->assertSame([AuditEvent::AccountRestored, AuditEvent::LoginSucceeded], $this->audit->events);
     }
@@ -229,7 +231,7 @@ final class OAuthFlowsTest extends TestCase
 
         $restored = $this->users->findById($this->customer->id);
         assert($restored instanceof User);
-        $this->assertSame(TrashableStatus::Active, $restored->status);
+        $this->assertSame(TrashableStatus::Active, $restored->trash->status);
         $this->assertTrue($tokenPair->accountRestored);
         $this->assertSame([AuditEvent::AccountRestored, AuditEvent::LoginSucceeded], $this->audit->events);
     }
@@ -505,10 +507,6 @@ final class InMemoryUserRepository implements UserRepository
         $this->byId[$user->id] = $user;
     }
 
-    public function anonymizeAndSoftDelete(string $id): void
-    {
-        unset($this->byId[$id]);
-    }
 
     public function trash(string $id): void
     {
@@ -524,12 +522,14 @@ final class InMemoryUserRepository implements UserRepository
         }
     }
 
-    public function findPurgeEligible(int $graceDays, \DateTimeImmutable $now): array
+    public function findTrashed(): array
     {
-        return array_values(array_filter(
-            $this->byId,
-            static fn (User $user): bool => $user->isEligibleForPurge($graceDays, $now),
-        ));
+        return array_values(array_filter($this->byId, static fn (User $user): bool => $user->trash->isTrashed()));
+    }
+
+    public function purge(Trashable $entity): void
+    {
+        unset($this->byId[$entity->id]);
     }
 
     private function withStatus(User $user, TrashableStatus $status, ?\DateTimeImmutable $deletedAt): User
@@ -545,9 +545,7 @@ final class InMemoryUserRepository implements UserRepository
             emailVerifiedAt: $user->emailVerifiedAt,
             createdAt: $user->createdAt,
             updatedAt: new \DateTimeImmutable(),
-            deletedAt: $deletedAt,
-            status: $status,
-            anonymizedAt: $user->anonymizedAt,
+            trash: new TrashState($status, $deletedAt, $user->trash->anonymizedAt),
         );
     }
 
@@ -738,9 +736,13 @@ final class InMemoryDealershipRepository implements DealershipRepository
     {
     }
 
-    public function findPurgeEligible(int $graceDays, \DateTimeImmutable $now): array
+    public function findTrashed(): array
     {
         return [];
+    }
+
+    public function purge(Trashable $entity): void
+    {
     }
 
     public function trashAllOwnedBy(string $ownerUserId): void

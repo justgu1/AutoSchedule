@@ -6,6 +6,7 @@ namespace Tests\Domain\Dealership;
 
 use App\Domain\Dealership\Dealership;
 use App\Domain\Shared\TrashableStatus;
+use App\Domain\Shared\TrashState;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -19,10 +20,10 @@ final class DealershipTest extends TestCase
         $this->assertNotSame('', $dealership->id);
         $this->assertSame('owner-1', $dealership->ownerUserId);
         $this->assertSame('Auto Center', $dealership->name);
-        $this->assertSame(TrashableStatus::Active, $dealership->status);
+        $this->assertSame(TrashableStatus::Active, $dealership->trash->status);
         $this->assertFalse($dealership->trashedByOwnerDeactivation);
-        $this->assertNull($dealership->trashedAt);
-        $this->assertNull($dealership->anonymizedAt);
+        $this->assertNull($dealership->trash->trashedAt);
+        $this->assertNull($dealership->trash->anonymizedAt);
     }
 
     /** Slug é URL amigável (`/concessionarias/{slug}`), nunca o id -- formato: nome normalizado + 6 caracteres do próprio id, sempre único por natureza. */
@@ -70,7 +71,7 @@ final class DealershipTest extends TestCase
         $this->assertSame('Novo Nome', $updated->name);
         $this->assertSame($dealership->id, $updated->id);
         $this->assertSame($dealership->ownerUserId, $updated->ownerUserId);
-        $this->assertSame($dealership->status, $updated->status);
+        $this->assertSame($dealership->trash->status, $updated->trash->status);
         $this->assertSame($dealership->slug, $updated->slug);
     }
 
@@ -108,9 +109,9 @@ final class DealershipTest extends TestCase
         $trashed = $this->trashedFixture();
         $alreadyAnonymized = $this->trashedFixture(anonymizedAt: new \DateTimeImmutable());
 
-        $this->assertFalse($active->isEligibleForRestore());
-        $this->assertTrue($trashed->isEligibleForRestore());
-        $this->assertFalse($alreadyAnonymized->isEligibleForRestore());
+        $this->assertFalse($active->trash->allowsRestore());
+        $this->assertTrue($trashed->trash->allowsRestore());
+        $this->assertFalse($alreadyAnonymized->trash->allowsRestore());
     }
 
     #[Test]
@@ -122,10 +123,10 @@ final class DealershipTest extends TestCase
         $longTrashed = $this->trashedFixture(trashedAt: $now->modify('-31 days'));
         $alreadyAnonymized = $this->trashedFixture(trashedAt: $now->modify('-31 days'), anonymizedAt: $now);
 
-        $this->assertFalse($active->isEligibleForPurge(30, $now));
-        $this->assertFalse($recentlyTrashed->isEligibleForPurge(30, $now));
-        $this->assertTrue($longTrashed->isEligibleForPurge(30, $now));
-        $this->assertFalse($alreadyAnonymized->isEligibleForPurge(30, $now));
+        $this->assertFalse($active->trash->allowsPurge($now));
+        $this->assertFalse($recentlyTrashed->trash->allowsPurge($now));
+        $this->assertTrue($longTrashed->trash->allowsPurge($now));
+        $this->assertFalse($alreadyAnonymized->trash->allowsPurge($now));
     }
 
     #[Test]
@@ -148,8 +149,8 @@ final class DealershipTest extends TestCase
         $this->assertSame($dealership->zipCode, $anonymized->zipCode);
         $this->assertSame($dealership->city, $anonymized->city);
         $this->assertSame($dealership->state, $anonymized->state);
-        $this->assertSame(TrashableStatus::Deleted, $anonymized->status);
-        $this->assertNotNull($anonymized->anonymizedAt);
+        $this->assertSame(TrashableStatus::Deleted, $anonymized->trash->status);
+        $this->assertNotNull($anonymized->trash->anonymizedAt);
         $this->assertNull($anonymized->photoFileId);
     }
 
@@ -191,10 +192,8 @@ final class DealershipTest extends TestCase
             phone: $dealership->phone,
             email: $dealership->email,
             photoFileId: $dealership->photoFileId,
-            status: TrashableStatus::Trashed,
+            trash: new TrashState(TrashableStatus::Trashed, $trashedAt ?? new \DateTimeImmutable(), $anonymizedAt),
             trashedByOwnerDeactivation: false,
-            trashedAt: $trashedAt ?? new \DateTimeImmutable(),
-            anonymizedAt: $anonymizedAt,
             createdAt: $dealership->createdAt,
             updatedAt: $dealership->updatedAt,
         );

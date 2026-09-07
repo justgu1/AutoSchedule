@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Domain\User;
 
 use App\Domain\Shared\TrashableStatus;
+use App\Domain\Shared\TrashState;
 use App\Domain\User\User;
 use App\Domain\User\UserRole;
 use PHPUnit\Framework\Attributes\Test;
@@ -23,9 +24,9 @@ final class UserTest extends TestCase
         $this->assertSame(UserRole::Customer, $user->role);
         $this->assertNotNull($user->passwordSetAt);
         $this->assertNull($user->emailVerifiedAt);
-        $this->assertNull($user->deletedAt);
-        $this->assertSame(TrashableStatus::Active, $user->status);
-        $this->assertNull($user->anonymizedAt);
+        $this->assertNull($user->trash->trashedAt);
+        $this->assertSame(TrashableStatus::Active, $user->trash->status);
+        $this->assertNull($user->trash->anonymizedAt);
     }
 
     #[Test]
@@ -60,8 +61,8 @@ final class UserTest extends TestCase
         $this->assertNotSame('ada@example.com', $anonymized->email);
         $this->assertNull($anonymized->phone);
         $this->assertStringContainsString(substr($user->id, 0, 8), $anonymized->email);
-        $this->assertSame(TrashableStatus::Deleted, $anonymized->status);
-        $this->assertNotNull($anonymized->anonymizedAt);
+        $this->assertSame(TrashableStatus::Deleted, $anonymized->trash->status);
+        $this->assertNotNull($anonymized->trash->anonymizedAt);
     }
 
     #[Test]
@@ -131,9 +132,9 @@ final class UserTest extends TestCase
         $trashed = $this->trashedFixture();
         $alreadyAnonymized = $this->trashedFixture(anonymizedAt: new \DateTimeImmutable());
 
-        $this->assertFalse($active->isEligibleForRestore());
-        $this->assertTrue($trashed->isEligibleForRestore());
-        $this->assertFalse($alreadyAnonymized->isEligibleForRestore());
+        $this->assertFalse($active->trash->allowsRestore());
+        $this->assertTrue($trashed->trash->allowsRestore());
+        $this->assertFalse($alreadyAnonymized->trash->allowsRestore());
     }
 
     #[Test]
@@ -145,10 +146,10 @@ final class UserTest extends TestCase
         $longTrashed = $this->trashedFixture(deletedAt: $now->modify('-31 days'));
         $alreadyAnonymized = $this->trashedFixture(deletedAt: $now->modify('-31 days'), anonymizedAt: $now);
 
-        $this->assertFalse($active->isEligibleForPurge(30, $now));
-        $this->assertFalse($recentlyTrashed->isEligibleForPurge(30, $now));
-        $this->assertTrue($longTrashed->isEligibleForPurge(30, $now));
-        $this->assertFalse($alreadyAnonymized->isEligibleForPurge(30, $now));
+        $this->assertFalse($active->trash->allowsPurge($now));
+        $this->assertFalse($recentlyTrashed->trash->allowsPurge($now));
+        $this->assertTrue($longTrashed->trash->allowsPurge($now));
+        $this->assertFalse($alreadyAnonymized->trash->allowsPurge($now));
     }
 
     private function trashedFixture(?\DateTimeImmutable $deletedAt = null, ?\DateTimeImmutable $anonymizedAt = null): User
@@ -166,9 +167,7 @@ final class UserTest extends TestCase
             emailVerifiedAt: $user->emailVerifiedAt,
             createdAt: $user->createdAt,
             updatedAt: $user->updatedAt,
-            deletedAt: $deletedAt ?? new \DateTimeImmutable(),
-            status: TrashableStatus::Trashed,
-            anonymizedAt: $anonymizedAt,
+            trash: new TrashState(TrashableStatus::Trashed, $deletedAt ?? new \DateTimeImmutable(), $anonymizedAt),
         );
     }
 }

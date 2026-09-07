@@ -24,7 +24,7 @@ final readonly class RestoreDealership
     {
         $dealership = $this->finder->findOrFail($identifier);
 
-        if (!$dealership->isEligibleForRestore()) {
+        if (!$dealership->trash->allowsRestore()) {
             throw new DomainException('This dealership is not in the trash (or was already permanently deleted).', DomainErrorType::Conflict);
         }
 

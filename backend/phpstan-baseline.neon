@@ -583,12 +583,6 @@ parameters:
 			path: src/Infrastructure/User/PostgresUserRepository.php
 
 		-
-			message: '#^Method App\\Infrastructure\\User\\PostgresUserRepository\:\:findPurgeEligible\(\) should return list\<App\\Domain\\User\\User\> but returns array\<App\\Domain\\User\\User\>\.$#'
-			identifier: return.type
-			count: 1
-			path: src/Infrastructure/User/PostgresUserRepository.php
-
-		-
 			message: '#^Parameter \#1 \$callback of function array_map expects \(callable\(mixed\)\: mixed\)\|null, Closure\(array\<string, mixed\>\)\: App\\Domain\\User\\User given\.$#'
 			identifier: argument.type
 			count: 2

@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Domain\Dealership;
 
-use App\Domain\Shared\TrashableStatus;
+use App\Domain\Shared\Trashable;
+use App\Domain\Shared\TrashState;
 use App\Domain\Shared\Uuid;
 
-final readonly class Dealership
+final readonly class Dealership implements Trashable
 {
     public function __construct(
         public string $id,
@@ -27,10 +28,8 @@ final readonly class Dealership
         public ?string $phone,
         public ?string $email,
         public ?string $photoFileId,
-        public TrashableStatus $status,
+        public TrashState $trash,
         public bool $trashedByOwnerDeactivation,
-        public ?\DateTimeImmutable $trashedAt,
-        public ?\DateTimeImmutable $anonymizedAt,
         public \DateTimeImmutable $createdAt,
         public \DateTimeImmutable $updatedAt,
     ) {
@@ -73,10 +72,8 @@ final readonly class Dealership
             phone: $phone,
             email: $email,
             photoFileId: null,
-            status: TrashableStatus::Active,
+            trash: new TrashState(),
             trashedByOwnerDeactivation: false,
-            trashedAt: null,
-            anonymizedAt: null,
             createdAt: $now,
             updatedAt: $now,
         );
@@ -127,27 +124,11 @@ final readonly class Dealership
         return clone($this, ['photoFileId' => $photoFileId, 'updatedAt' => new \DateTimeImmutable()]);
     }
 
-    /** Ver User::isEligibleForRestore(). */
-    public function isEligibleForRestore(): bool
-    {
-        return $this->status === TrashableStatus::Trashed && !$this->anonymizedAt instanceof \DateTimeImmutable;
-    }
-
-    /** Ver User::isEligibleForPurge(). */
-    public function isEligibleForPurge(int $graceDays, \DateTimeImmutable $now): bool
-    {
-        if ($this->status !== TrashableStatus::Trashed || $this->anonymizedAt instanceof \DateTimeImmutable || !$this->trashedAt instanceof \DateTimeImmutable) {
-            return false;
-        }
-
-        return $this->trashedAt <= $now->modify("-{$graceDays} days");
-    }
-
     /**
      * Mesmo espírito de User::anonymized(): cai o que identifica direto, fica o que só serve agregado.
      * O slug troca junto porque nasce do nome, e URL pública antiga não pode seguir divulgando o negócio.
      */
-    public function anonymized(): self
+    public function anonymized(): static
     {
         return clone($this, [
             'name' => 'Concessionária removida',
@@ -159,8 +140,7 @@ final readonly class Dealership
             'phone' => null,
             'email' => null,
             'photoFileId' => null,
-            'status' => TrashableStatus::Deleted,
-            'anonymizedAt' => new \DateTimeImmutable(),
+            'trash' => $this->trash->anonymized(),
         ]);
     }
 

@@ -27,7 +27,7 @@ final readonly class RestoreAccount
     {
         $user = $this->finder->findOrFail($userId);
 
-        if (!$user->isEligibleForRestore()) {
+        if (!$user->trash->allowsRestore()) {
             throw new DomainException('This account is not in the trash (or was already permanently deleted).', DomainErrorType::Conflict);
         }
 

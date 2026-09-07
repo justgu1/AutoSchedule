@@ -10,7 +10,6 @@ use App\Domain\Audit\Ports\AuditLogger;
 use App\Domain\Dealership\Ports\DealershipRepository;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
-use App\Domain\Shared\TrashableStatus;
 
 /** Antecipa o que a purga agendada faria, a pedido de quem é dono. */
 final readonly class PurgeDealership
@@ -27,7 +26,7 @@ final readonly class PurgeDealership
     {
         $dealership = $this->finder->findOrFail($identifier);
 
-        if ($dealership->status !== TrashableStatus::Trashed) {
+        if (!$dealership->trash->isTrashed()) {
             throw new DomainException('This dealership is not in the trash.', DomainErrorType::Conflict);
         }
 

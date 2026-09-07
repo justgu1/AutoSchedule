@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Infrastructure\Dealership;
 
 use App\Domain\Dealership\Dealership;
+use App\Domain\Shared\Trashable;
 use App\Domain\Shared\TrashableStatus;
 use App\Infrastructure\Dealership\PostgresDealershipRepository;
 use PHPUnit\Framework\Attributes\Group;
@@ -49,7 +50,7 @@ final class PostgresDealershipRepositoryTest extends TestCase
         $this->assertSame($dealership->id, $found->id);
         $this->assertSame($owner, $found->ownerUserId);
         $this->assertSame('Auto Center', $found->name);
-        $this->assertSame(TrashableStatus::Active, $found->status);
+        $this->assertSame(TrashableStatus::Active, $found->trash->status);
     }
 
     #[Test]
@@ -157,9 +158,9 @@ final class PostgresDealershipRepositoryTest extends TestCase
 
         $found = $this->repository->findById($dealership->id);
         $this->assertNotNull($found);
-        $this->assertSame(TrashableStatus::Trashed, $found->status);
+        $this->assertSame(TrashableStatus::Trashed, $found->trash->status);
         $this->assertTrue($found->trashedByOwnerDeactivation);
-        $this->assertNotNull($found->trashedAt);
+        $this->assertNotNull($found->trash->trashedAt);
     }
 
     #[Test]
@@ -174,8 +175,8 @@ final class PostgresDealershipRepositoryTest extends TestCase
 
         $found = $this->repository->findById($dealership->id);
         $this->assertNotNull($found);
-        $this->assertSame(TrashableStatus::Active, $found->status);
-        $this->assertNull($found->trashedAt);
+        $this->assertSame(TrashableStatus::Active, $found->trash->status);
+        $this->assertNull($found->trash->trashedAt);
         $this->assertFalse($found->trashedByOwnerDeactivation);
     }
 
@@ -191,8 +192,11 @@ final class PostgresDealershipRepositoryTest extends TestCase
         $this->repository->trash($longTrashed->id, false);
         $this->pdo->prepare("UPDATE dealerships SET trashed_at = now() - interval '31 days' WHERE id = ?")->execute([$longTrashed->id]);
 
-        $eligible = $this->repository->findPurgeEligible(30, new \DateTimeImmutable());
+        $now = new \DateTimeImmutable();
+        $trashed = $this->repository->findTrashed();
+        $eligible = array_values(array_filter($trashed, static fn (Trashable $dealership): bool => $dealership->trash->allowsPurge($now)));
 
+        $this->assertCount(2, $trashed, 'findTrashed devolve tudo na lixeira; a janela é decidida pelo domínio');
         $this->assertCount(1, $eligible);
         $this->assertSame($longTrashed->id, $eligible[0]->id);
     }
@@ -211,7 +215,7 @@ final class PostgresDealershipRepositoryTest extends TestCase
 
         $foundActive = $this->repository->findById($active->id);
         $this->assertNotNull($foundActive);
-        $this->assertSame(TrashableStatus::Trashed, $foundActive->status);
+        $this->assertSame(TrashableStatus::Trashed, $foundActive->trash->status);
         $this->assertTrue($foundActive->trashedByOwnerDeactivation);
     }
 
@@ -232,8 +236,8 @@ final class PostgresDealershipRepositoryTest extends TestCase
         $foundManual = $this->repository->findById($manual->id);
         $this->assertNotNull($foundCascade);
         $this->assertNotNull($foundManual);
-        $this->assertSame(TrashableStatus::Active, $foundCascade->status);
-        $this->assertSame(TrashableStatus::Trashed, $foundManual->status);
+        $this->assertSame(TrashableStatus::Active, $foundCascade->trash->status);
+        $this->assertSame(TrashableStatus::Trashed, $foundManual->trash->status);
     }
 
     #[Test]

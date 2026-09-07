@@ -15,7 +15,6 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\FakeAuditLogger;
 use Tests\Support\TestDatabase;
 
-/** Teste de integração: conecta no Postgres real do docker-compose, igual PostgresDealershipRepositoryTest. */
 #[Group('integration')]
 final class PurgeTrashedDealershipsTaskTest extends TestCase
 {
@@ -23,7 +22,6 @@ final class PurgeTrashedDealershipsTaskTest extends TestCase
     private PostgresDealershipRepository $repository;
     private FakeAuditLogger $audit;
 
-    /** @var PurgeTrashedEntitiesTask<Dealership> */
     private PurgeTrashedEntitiesTask $task;
 
     protected function setUp(): void
@@ -34,14 +32,10 @@ final class PurgeTrashedDealershipsTaskTest extends TestCase
         $this->pdo->beginTransaction();
         $this->repository = new PostgresDealershipRepository($connection);
         $this->audit = new FakeAuditLogger();
-        $repository = $this->repository;
         $this->task = new PurgeTrashedEntitiesTask(
             name: 'purge-trashed-dealerships',
-            graceDays: 30,
             dueIntervalSeconds: 86400,
-            findEligible: $repository->findPurgeEligible(...),
-            purge: static fn (Dealership $dealership) => $repository->update($dealership->anonymized()),
-            identify: static fn (Dealership $dealership): string => $dealership->id,
+            repository: $this->repository,
             audit: $this->audit,
             event: AuditEvent::DealershipPurged,
             auditableType: 'Dealership',
@@ -69,12 +63,12 @@ final class PurgeTrashedDealershipsTaskTest extends TestCase
 
         $purged = $this->repository->findById($longTrashed->id);
         $this->assertNotNull($purged);
-        $this->assertSame(TrashableStatus::Deleted, $purged->status);
+        $this->assertSame(TrashableStatus::Deleted, $purged->trash->status);
         $this->assertNotSame('Long', $purged->name);
 
         $stillTrashed = $this->repository->findById($recentlyTrashed->id);
         $this->assertNotNull($stillTrashed);
-        $this->assertSame(TrashableStatus::Trashed, $stillTrashed->status);
+        $this->assertSame(TrashableStatus::Trashed, $stillTrashed->trash->status);
     }
 
     #[Test]

@@ -26,7 +26,7 @@ final readonly class AccountRestorer
 
     public function restoreIfTrashed(User $user, ActorContext $context): bool
     {
-        if (!$user->isEligibleForRestore()) {
+        if (!$user->trash->allowsRestore()) {
             return false;
         }
 

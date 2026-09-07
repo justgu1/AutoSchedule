@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\User;
 
+use App\Domain\Shared\Trashable;
 use App\Domain\Shared\TrashableStatus;
+use App\Domain\Shared\TrashState;
 use App\Domain\User\Ports\UserRepository;
 use App\Domain\User\User;
 use App\Domain\User\UserRole;
@@ -75,40 +77,33 @@ final readonly class PostgresUserRepository implements UserRepository
         $statement->execute(['id' => $id]);
     }
 
-    public function anonymizeAndSoftDelete(string $id): void
+    public function findTrashed(): array
     {
-        $user = $this->findById($id);
+        $statement = $this->connection->pdo()->prepare("SELECT * FROM users WHERE status = 'trashed' AND anonymized_at IS NULL");
+        $statement->execute();
 
-        if (!$user instanceof User) {
+        return array_values(array_map($this->fromRow(...), $statement->fetchAll()));
+    }
+
+    public function purge(Trashable $entity): void
+    {
+        if (!$entity instanceof User) {
             return;
         }
 
-        $anonymized = $user->anonymized();
-
         $statement = $this->connection->pdo()->prepare(<<<'SQL'
-            UPDATE users SET
-                name = :name, email = :email, phone = :phone,
-                status = 'deleted', anonymized_at = now(), deleted_at = now(), updated_at = now()
+            UPDATE users
+            SET name = :name, email = :email, phone = NULL, status = :status,
+                anonymized_at = :anonymized_at, deleted_at = COALESCE(deleted_at, now()), updated_at = now()
             WHERE id = :id
             SQL);
-
         $statement->execute([
-            'id' => $id,
-            'name' => $anonymized->name,
-            'email' => $anonymized->email,
-            'phone' => $anonymized->phone,
+            'id' => $entity->id,
+            'name' => $entity->name,
+            'email' => $entity->email,
+            'status' => $entity->trash->status->value,
+            'anonymized_at' => $entity->trash->anonymizedAt?->format(DATE_ATOM),
         ]);
-    }
-
-    public function findPurgeEligible(int $graceDays, \DateTimeImmutable $now): array
-    {
-        $statement = $this->connection->pdo()->prepare(<<<'SQL'
-            SELECT * FROM users
-            WHERE status = 'trashed' AND anonymized_at IS NULL AND deleted_at <= :threshold
-            SQL);
-        $statement->execute(['threshold' => $now->modify("-{$graceDays} days")->format(DATE_ATOM)]);
-
-        return array_map($this->fromRow(...), $statement->fetchAll());
     }
 
     public function findPage(int $limit, int $offset): array
@@ -159,9 +154,11 @@ final readonly class PostgresUserRepository implements UserRepository
             emailVerifiedAt: $this->toDateTime($row['email_verified_at']),
             createdAt: new \DateTimeImmutable($row['created_at']),
             updatedAt: new \DateTimeImmutable($row['updated_at']),
-            deletedAt: $this->toDateTime($row['deleted_at']),
-            status: TrashableStatus::from($row['status']),
-            anonymizedAt: $this->toDateTime($row['anonymized_at']),
+            trash: new TrashState(
+                status: TrashableStatus::from($row['status']),
+                trashedAt: $this->toDateTime($row['deleted_at']),
+                anonymizedAt: $this->toDateTime($row['anonymized_at']),
+            ),
         );
     }
 

@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Domain\User;
 
-use App\Domain\Shared\TrashableStatus;
+use App\Domain\Shared\Trashable;
+use App\Domain\Shared\TrashState;
 use App\Domain\Shared\Uuid;
 
-final readonly class User
+final readonly class User implements Trashable
 {
     public function __construct(
         public string $id,
@@ -20,9 +21,7 @@ final readonly class User
         public ?\DateTimeImmutable $emailVerifiedAt,
         public \DateTimeImmutable $createdAt,
         public \DateTimeImmutable $updatedAt,
-        public ?\DateTimeImmutable $deletedAt,
-        public TrashableStatus $status,
-        public ?\DateTimeImmutable $anonymizedAt,
+        public TrashState $trash,
     ) {
     }
 
@@ -46,9 +45,7 @@ final readonly class User
             emailVerifiedAt: null,
             createdAt: $now,
             updatedAt: $now,
-            deletedAt: null,
-            status: TrashableStatus::Active,
-            anonymizedAt: null,
+            trash: new TrashState(),
         );
     }
 
@@ -84,32 +81,15 @@ final readonly class User
         return clone($this, ['role' => $role, 'updatedAt' => new \DateTimeImmutable()]);
     }
 
-    /** Anonimização é irreversível, então ela é o que fecha a janela de restore. */
-    public function isEligibleForRestore(): bool
-    {
-        return $this->status === TrashableStatus::Trashed && !$this->anonymizedAt instanceof \DateTimeImmutable;
-    }
-
-    /** Passou da janela de recuperação sem ser restaurado. */
-    public function isEligibleForPurge(int $graceDays, \DateTimeImmutable $now): bool
-    {
-        if ($this->status !== TrashableStatus::Trashed || $this->anonymizedAt instanceof \DateTimeImmutable || !$this->deletedAt instanceof \DateTimeImmutable) {
-            return false;
-        }
-
-        return $this->deletedAt <= $now->modify("-{$graceDays} days");
-    }
-
     /** Escruba PII (LGPD Art. 12) e preserva id/role/timestamps, senão a auditoria que referencia o usuário perde sentido. */
-    public function anonymized(): self
+    public function anonymized(): static
     {
         return clone($this, [
             'name' => 'Deleted user',
             // Id inteiro, não prefixo: os primeiros hex de um UUIDv7 são timestamp e colidem entre exclusões próximas.
             'email' => sprintf('deleted-%s@anonymized.local', $this->id),
             'phone' => null,
-            'status' => TrashableStatus::Deleted,
-            'anonymizedAt' => new \DateTimeImmutable(),
+            'trash' => $this->trash->anonymized(),
         ]);
     }
 }

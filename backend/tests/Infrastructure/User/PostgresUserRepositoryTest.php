@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Infrastructure\User;
 
+use App\Domain\Shared\Trashable;
 use App\Domain\Shared\TrashableStatus;
+use App\Domain\Shared\TrashState;
 use App\Domain\User\User;
 use App\Domain\User\UserRole;
 use App\Infrastructure\User\PostgresUserRepository;
@@ -96,9 +98,7 @@ final class PostgresUserRepositoryTest extends TestCase
             emailVerifiedAt: new \DateTimeImmutable(),
             createdAt: $user->createdAt,
             updatedAt: new \DateTimeImmutable(),
-            deletedAt: null,
-            status: $user->status,
-            anonymizedAt: $user->anonymizedAt,
+            trash: new TrashState($user->trash->status, null, $user->trash->anonymizedAt),
         );
         $this->repository->update($updated);
 
@@ -110,24 +110,24 @@ final class PostgresUserRepositoryTest extends TestCase
     }
 
     #[Test]
-    public function anonymize_and_soft_delete_some_das_buscas(): void
+    public function purge_some_das_buscas(): void
     {
         $user = User::register('Ada Lovelace', 'ada@example.com', '+55 11 90000-0000', 'secret', UserRole::Customer);
         $this->repository->insert($user);
 
-        $this->repository->anonymizeAndSoftDelete($user->id);
+        $this->repository->purge($user->anonymized());
 
         $this->assertNull($this->repository->findById($user->id));
         $this->assertFalse($this->repository->existsByEmail('ada@example.com'));
     }
 
     #[Test]
-    public function anonymize_and_soft_delete_escruba_a_pii_na_linha_persistida(): void
+    public function purge_escruba_a_pii_na_linha_persistida(): void
     {
         $user = User::register('Ada Lovelace', 'ada@example.com', '+55 11 90000-0000', 'secret', UserRole::Customer);
         $this->repository->insert($user);
 
-        $this->repository->anonymizeAndSoftDelete($user->id);
+        $this->repository->purge($user->anonymized());
 
         $statement = $this->pdo->prepare('SELECT name, email, phone, deleted_at FROM users WHERE id = ?');
         $statement->execute([$user->id]);
@@ -140,13 +140,6 @@ final class PostgresUserRepositoryTest extends TestCase
         $this->assertNotNull($row['deleted_at']);
     }
 
-    #[Test]
-    public function anonymize_and_soft_delete_e_um_no_op_quando_usuario_nao_existe(): void
-    {
-        $this->repository->anonymizeAndSoftDelete('00000000-0000-4000-8000-000000000000');
-
-        $this->addToAssertionCount(1);
-    }
 
     #[Test]
     public function trash_move_pra_status_trashed_e_seta_deleted_at_sem_apagar_pii(): void
@@ -176,7 +169,7 @@ final class PostgresUserRepositoryTest extends TestCase
 
         $found = $this->repository->findByEmail('ada@example.com');
         $this->assertNotNull($found);
-        $this->assertSame(TrashableStatus::Trashed, $found->status);
+        $this->assertSame(TrashableStatus::Trashed, $found->trash->status);
         $this->assertTrue($this->repository->existsByEmail('ada@example.com'));
     }
 
@@ -191,8 +184,8 @@ final class PostgresUserRepositoryTest extends TestCase
 
         $restored = $this->repository->findById($user->id);
         assert($restored instanceof \App\Domain\User\User);
-        $this->assertSame(TrashableStatus::Active, $restored->status);
-        $this->assertNull($restored->deletedAt);
+        $this->assertSame(TrashableStatus::Active, $restored->trash->status);
+        $this->assertNull($restored->trash->trashedAt);
     }
 
     #[Test]
@@ -207,11 +200,13 @@ final class PostgresUserRepositoryTest extends TestCase
         $this->repository->insert($active);
         $this->repository->trash($recentlyTrashed->id);
         $this->repository->trash($longTrashed->id);
-        // trash() usa now() do banco -- ajusta deleted_at pra simular 31 dias atrás.
+        // trash() usa now() do banco, então ajusta a data pra simular a janela vencida.
         $this->pdo->prepare("UPDATE users SET deleted_at = now() - interval '31 days' WHERE id = ?")->execute([$longTrashed->id]);
 
-        $eligible = $this->repository->findPurgeEligible(30, $now);
+        $trashed = $this->repository->findTrashed();
+        $eligible = array_values(array_filter($trashed, static fn (Trashable $user): bool => $user->trash->allowsPurge($now)));
 
+        $this->assertCount(2, $trashed, 'findTrashed devolve tudo na lixeira; a janela é decidida pelo domínio');
         $this->assertCount(1, $eligible);
         $this->assertSame($longTrashed->id, $eligible[0]->id);
     }
@@ -223,7 +218,7 @@ final class PostgresUserRepositoryTest extends TestCase
         $deleted = User::register('Charles Babbage', 'charles@example.com', null, 'secret', UserRole::Customer);
         $this->repository->insert($active);
         $this->repository->insert($deleted);
-        $this->repository->anonymizeAndSoftDelete($deleted->id);
+        $this->repository->purge($deleted->anonymized());
 
         $ids = array_map(static fn (User $user): string => $user->id, $this->repository->findPage(1000, 0));
 

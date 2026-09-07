@@ -28,14 +28,12 @@ use App\Domain\Auth\Ports\PasswordResetTokenRepository;
 use App\Domain\Auth\Ports\RefreshTokenRepository;
 use App\Domain\Auth\Ports\TokenIssuer;
 use App\Domain\Auth\Ports\UserIdentityRepository;
-use App\Domain\Dealership\Dealership;
 use App\Domain\Dealership\Ports\DealershipRepository;
 use App\Domain\File\Ports\FileRepository;
 use App\Domain\File\Ports\ImageOptimizer;
 use App\Domain\File\Ports\StorageProvider;
 use App\Domain\Notification\Ports\MailProvider;
 use App\Domain\User\Ports\UserRepository;
-use App\Domain\User\User;
 use App\Infrastructure\Address\PostgresZipCodeCacheRepository;
 use App\Infrastructure\Address\ViaCepZipCodeProvider;
 use App\Infrastructure\Audit\PostgresAuditLogger;
@@ -219,39 +217,27 @@ final class ContainerFactory
     /** Cada domínio com lixeira reversível registra a própria purga sobre a mesma ScheduledTask. */
     private static function bindScheduler(Container $container): void
     {
-        $container->singleton(Scheduler::class, static function (Container $c): Scheduler {
-            $users = $c->get(UserRepository::class);
-            $dealerships = $c->get(DealershipRepository::class);
-            $audit = $c->get(AuditLogger::class);
-
-            return new Scheduler(
-                redis: $c->get(RedisConnection::class),
-                tasks: [
-                    new PurgeTrashedEntitiesTask(
-                        name: 'purge-trashed-users',
-                        graceDays: 30,
-                        dueIntervalSeconds: 86400,
-                        findEligible: $users->findPurgeEligible(...),
-                        purge: static fn (User $user) => $users->anonymizeAndSoftDelete($user->id),
-                        identify: static fn (User $user): string => $user->id,
-                        audit: $audit,
-                        event: AuditEvent::AccountPurged,
-                        auditableType: 'User',
-                    ),
-                    new PurgeTrashedEntitiesTask(
-                        name: 'purge-trashed-dealerships',
-                        graceDays: 30,
-                        dueIntervalSeconds: 86400,
-                        findEligible: $dealerships->findPurgeEligible(...),
-                        purge: static fn (Dealership $dealership) => $dealerships->update($dealership->anonymized()),
-                        identify: static fn (Dealership $dealership): string => $dealership->id,
-                        audit: $audit,
-                        event: AuditEvent::DealershipPurged,
-                        auditableType: 'Dealership',
-                    ),
-                ],
-            );
-        });
+        $container->singleton(Scheduler::class, static fn (Container $c): Scheduler => new Scheduler(
+            redis: $c->get(RedisConnection::class),
+            tasks: [
+                new PurgeTrashedEntitiesTask(
+                    name: 'purge-trashed-users',
+                    dueIntervalSeconds: 86400,
+                    repository: $c->get(UserRepository::class),
+                    audit: $c->get(AuditLogger::class),
+                    event: AuditEvent::AccountPurged,
+                    auditableType: 'User',
+                ),
+                new PurgeTrashedEntitiesTask(
+                    name: 'purge-trashed-dealerships',
+                    dueIntervalSeconds: 86400,
+                    repository: $c->get(DealershipRepository::class),
+                    audit: $c->get(AuditLogger::class),
+                    event: AuditEvent::DealershipPurged,
+                    auditableType: 'Dealership',
+                ),
+            ],
+        ));
     }
 
     private static function readKey(string $path): string
