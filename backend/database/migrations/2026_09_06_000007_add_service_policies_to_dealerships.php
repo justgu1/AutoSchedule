@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Infrastructure\Database\Migration;
+use App\Infrastructure\Persistence\Migration;
 
 /**
  * Sem request HTTP não há identidade pra setar, então as policies admin-or-owner escondem tudo do background.

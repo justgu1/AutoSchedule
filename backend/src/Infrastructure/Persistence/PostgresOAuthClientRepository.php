@@ -1,0 +1,46 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Infrastructure\Persistence;
+
+use App\Domain\Auth\ClientType;
+use App\Domain\Auth\GrantType;
+use App\Domain\Auth\OAuthClient;
+use App\Domain\Auth\Ports\OAuthClientRepository;
+
+final readonly class PostgresOAuthClientRepository implements OAuthClientRepository
+{
+    public function __construct(private DatabaseConnection $connection)
+    {
+    }
+
+    public function findByClientId(string $clientId): ?OAuthClient
+    {
+        $statement = $this->connection->pdo()->prepare('SELECT * FROM oauth_clients WHERE client_id = :client_id');
+        $statement->execute(['client_id' => $clientId]);
+        $row = $statement->fetch();
+
+        return $row === false ? null : $this->fromRow($row);
+    }
+
+    /** @param array<string, mixed> $row */
+    private function fromRow(array $row): OAuthClient
+    {
+        return new OAuthClient(
+            id: $row['id'],
+            clientId: $row['client_id'],
+            name: $row['name'],
+            type: ClientType::from($row['type']),
+            secretHash: $row['secret_hash'],
+            allowedGrantTypes: array_map(
+                GrantType::from(...),
+                PostgresArray::fromText($row['allowed_grant_types']),
+            ),
+            redirectUris: PostgresArray::fromText($row['redirect_uris']),
+            allowedScopes: PostgresArray::fromText($row['allowed_scopes']),
+            createdAt: new \DateTimeImmutable($row['created_at']),
+            updatedAt: new \DateTimeImmutable($row['updated_at']),
+        );
+    }
+}

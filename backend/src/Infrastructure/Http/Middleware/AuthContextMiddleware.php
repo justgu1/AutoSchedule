@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Infrastructure\Http\Middleware;
 
 use App\Domain\Auth\ValueObjects\AccessTokenClaims;
-use App\Infrastructure\Database\DatabaseConnection;
 use App\Infrastructure\Http\Middleware;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
+use App\Infrastructure\Persistence\DatabaseConnection;
 
 /**
  * As três marcas de contexto do RLS são compostas, não alternativas: um seller autenticado numa leitura

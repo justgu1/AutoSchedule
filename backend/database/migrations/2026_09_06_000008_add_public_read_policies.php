@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Infrastructure\Database\Migration;
+use App\Infrastructure\Persistence\Migration;
 
 /**
  * A policy só olha `status = 'active'`, sem checar dono, porque quem limita o alcance é a marca de

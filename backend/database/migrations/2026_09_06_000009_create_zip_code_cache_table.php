@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Infrastructure\Database\Migration;
+use App\Infrastructure\Persistence\Migration;
 
 /** CEP não troca de endereço, então nem TTL nem RLS fazem sentido: é referência pública. */
 return new class () implements Migration {

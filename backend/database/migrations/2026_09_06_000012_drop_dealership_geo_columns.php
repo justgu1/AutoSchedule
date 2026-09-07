@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Infrastructure\Database\Migration;
+use App\Infrastructure\Persistence\Migration;
 
 /** Nasceram para um geocoder que nunca foi escrito: nenhuma linha jamais teve valor nas três. */
 return new class () implements Migration {
