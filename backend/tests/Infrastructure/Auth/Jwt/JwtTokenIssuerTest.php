@@ -7,7 +7,7 @@ namespace Tests\Infrastructure\Auth\Jwt;
 use App\Domain\Auth\ValueObjects\AccessTokenClaims;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
-use App\Domain\Users\UserRole;
+use App\Domain\User\UserRole;
 use App\Infrastructure\Auth\Jwt\JwtTokenIssuer;
 use Firebase\JWT\JWT;
 use PHPUnit\Framework\Attributes\Test;

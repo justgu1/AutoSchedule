@@ -8,6 +8,7 @@ use App\Domain\Auth\RefreshToken;
 use App\Domain\Exceptions\DomainException;
 use App\Infrastructure\Auth\Postgres\PostgresRefreshTokenRepository;
 use App\Infrastructure\Database\PostgresConnection;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -15,6 +16,7 @@ use PHPUnit\Framework\TestCase;
  * Teste de integração: conecta no Postgres real do docker-compose. Isolado
  * por transação (rollback no tearDown), igual o PostgresUserRepositoryTest.
  */
+#[Group('integration')]
 final class PostgresRefreshTokenRepositoryTest extends TestCase
 {
     private \PDO $pdo;

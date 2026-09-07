@@ -7,6 +7,7 @@ namespace Tests\Infrastructure\Audit;
 use App\Domain\Audit\AuditEvent;
 use App\Infrastructure\Audit\PostgresAuditLogger;
 use App\Infrastructure\Database\PostgresConnection;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
@@ -15,6 +16,7 @@ use Psr\Log\AbstractLogger;
  * Teste de integração: grava no Postgres real -- precisa rodar dentro do
  * compose (mesmo padrão dos outros testes de Postgres).
  */
+#[Group('integration')]
 final class PostgresAuditLoggerTest extends TestCase
 {
     private PostgresConnection $connection;

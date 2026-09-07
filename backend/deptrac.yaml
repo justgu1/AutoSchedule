@@ -1,0 +1,49 @@
+# A regra de dependência das camadas, que antes só existia em prosa no
+# docs/architecture.md. Sem baseline de propósito: o código já passava quando
+# esta configuração entrou, então qualquer violação daqui pra frente é nova.
+parameters:
+    paths:
+        - ./src
+
+    layers:
+        - name: Domain
+          collectors:
+              - type: directory
+                value: src/Domain/.*
+
+        - name: Application
+          collectors:
+              - type: directory
+                value: src/Application/.*
+
+        - name: Infrastructure
+          collectors:
+              - type: directory
+                value: src/Infrastructure/.*
+
+        # Composition root: é o único que pode conhecer as três camadas ao mesmo
+        # tempo, porque a função dele é justamente ligar uma na outra.
+        - name: Bootstrap
+          collectors:
+              - type: directory
+                value: src/Bootstrap/.*
+              - type: classNameRegex
+                value: '#^App\\Config$#'
+
+    ruleset:
+        # O domínio não conhece ninguém: nem caso de uso, nem adapter, nem framework.
+        Domain: ~
+
+        Application:
+            - Domain
+
+        # Infrastructure implementa os ports das duas camadas de dentro e é
+        # chamada por elas só através deles.
+        Infrastructure:
+            - Domain
+            - Application
+
+        Bootstrap:
+            - Domain
+            - Application
+            - Infrastructure

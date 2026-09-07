@@ -1,4 +1,4 @@
-.PHONY: setup up down restart build logs ps test migrate rollback seed keys load-test static-analysis lint lint-fix rector rector-fix e2e e2e-setup
+.PHONY: setup up down restart build logs ps test test-unit migrate rollback seed keys load-test static-analysis arch lint lint-fix rector rector-fix e2e e2e-setup
 
 setup:
 	@if [ -f .env ]; then \
@@ -95,8 +95,16 @@ test:
 	@docker compose exec -e DB_DATABASE=autoschedule_test backend php bin/seed.php
 	@docker compose exec backend vendor/bin/phpunit
 
+# Só os testes puros: nenhum banco/Redis/MinIO envolvido, então não precisa do setup acima.
+test-unit:
+	@docker compose exec backend vendor/bin/phpunit --exclude-group integration
+
 static-analysis:
 	@docker compose exec backend vendor/bin/phpstan analyse --no-progress
+
+# Regra de dependência entre as camadas (ver backend/deptrac.yaml).
+arch:
+	@docker compose exec backend vendor/bin/deptrac analyse --config-file=deptrac.yaml --no-progress
 
 lint:
 	@docker compose exec backend vendor/bin/php-cs-fixer fix --dry-run --diff

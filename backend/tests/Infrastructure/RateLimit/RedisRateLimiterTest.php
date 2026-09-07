@@ -7,6 +7,7 @@ namespace Tests\Infrastructure\RateLimit;
 use App\Infrastructure\RateLimit\RateLimitPolicy;
 use App\Infrastructure\RateLimit\RedisRateLimiter;
 use App\Infrastructure\Redis\RedisConnection;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -15,6 +16,7 @@ use PHPUnit\Framework\TestCase;
  * uma key própria (uniqid) -- sem transação/rollback pra isolar (Redis não tem
  * isso), então nunca reaproveita key entre testes.
  */
+#[Group('integration')]
 final class RedisRateLimiterTest extends TestCase
 {
     private RedisRateLimiter $limiter;
