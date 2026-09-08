@@ -37,6 +37,11 @@ final readonly class Row
         return is_int($value) || is_numeric($value) ? (int) $value : throw $this->unexpected($column, 'int');
     }
 
+    public function nullableInt(string $column): ?int
+    {
+        return ($this->values[$column] ?? null) === null ? null : $this->int($column);
+    }
+
     public function bool(string $column): bool
     {
         $value = $this->values[$column] ?? null;

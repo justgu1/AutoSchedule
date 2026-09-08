@@ -32,6 +32,7 @@ use App\Domain\File\Ports\ImageOptimizer;
 use App\Domain\File\Ports\StorageProvider;
 use App\Domain\Notification\Ports\MailProvider;
 use App\Domain\User\Ports\UserRepository;
+use App\Domain\Vehicle\Ports\VehicleRepository;
 use App\Domain\ZipCode\Ports\ZipCodeCacheRepository;
 use App\Domain\ZipCode\Ports\ZipCodeProvider;
 use App\Infrastructure\Auth\Google\GoogleJwksIdTokenVerifier;
@@ -58,6 +59,7 @@ use App\Infrastructure\Persistence\PostgresPasswordResetTokenRepository;
 use App\Infrastructure\Persistence\PostgresRefreshTokenRepository;
 use App\Infrastructure\Persistence\PostgresUserIdentityRepository;
 use App\Infrastructure\Persistence\PostgresUserRepository;
+use App\Infrastructure\Persistence\PostgresVehicleRepository;
 use App\Infrastructure\Persistence\PostgresZipCodeCacheRepository;
 use App\Infrastructure\Queue\RedisQueue;
 use App\Infrastructure\RateLimit\RateLimiter;
@@ -90,6 +92,7 @@ final class ContainerFactory
     {
         $container->bind(UserRepository::class, PostgresUserRepository::class);
         $container->bind(DealershipRepository::class, PostgresDealershipRepository::class);
+        $container->bind(VehicleRepository::class, PostgresVehicleRepository::class);
         $container->bind(FileRepository::class, PostgresFileRepository::class);
         $container->bind(OAuthClientRepository::class, PostgresOAuthClientRepository::class);
         $container->bind(RefreshTokenRepository::class, PostgresRefreshTokenRepository::class);
