@@ -8,5 +8,6 @@ namespace App\Application\Ports;
 enum QueuedJob: string
 {
     case ProcessDealershipPhoto = 'dealership.process-photo';
+    case ProcessVehiclePhotos = 'vehicle.process-photos';
     case SendEmail = 'notification.send-email';
 }

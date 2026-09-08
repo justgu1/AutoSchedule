@@ -28,21 +28,16 @@ final readonly class DealershipPhotos
         return $file instanceof StoredFile ? $this->storage->url($file->path) : null;
     }
 
-    /**
-     * `UploadFile` dedupa por checksum, então duas concessionárias com bytes idênticos compartilham arquivo
-     * e este delete quebraria a outra. Risco aceito: foto real não colide byte a byte, e contar referência não se paga.
-     */
     public function delete(?string $fileId): void
     {
         if ($fileId === null) {
             return;
         }
 
-        $file = $this->files->findById($fileId);
+        $path = $this->files->deleteIfUnreferenced($fileId);
 
-        if ($file instanceof StoredFile) {
-            $this->storage->delete($file->path);
-            $this->files->delete($file->id);
+        if ($path !== null) {
+            $this->storage->delete($path);
         }
     }
 }

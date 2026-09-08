@@ -14,7 +14,7 @@ final class Request
      * @param array<string, string> $params
      * @param array<string, mixed> $attributes
      * @param array<string, string> $cookies
-     * @param array<string, UploadedFile> $files
+     * @param array<string, list<UploadedFile>> $files
      */
     public function __construct(
         private readonly string $method,
@@ -137,7 +137,13 @@ final class Request
 
     public function file(string $name): ?UploadedFile
     {
-        return $this->files[$name] ?? null;
+        return $this->files[$name][0] ?? null;
+    }
+
+    /** @return list<UploadedFile> */
+    public function files(string $name): array
+    {
+        return $this->files[$name] ?? [];
     }
 
     /** Header vence o cookie: quem manda o Bearer na mão está dizendo que não depende de credencial ambiente. */
@@ -217,7 +223,12 @@ final class Request
         return $headers;
     }
 
-    /** @return array<string, UploadedFile> */
+    /**
+     * Campo `nome[]` faz o PHP entregar array em cada chave em vez de escalar, então tudo vira lista
+     * e o campo simples é a lista de um.
+     *
+     * @return array<string, list<UploadedFile>>
+     */
     private static function resolveFiles(): array
     {
         $files = [];
@@ -227,14 +238,26 @@ final class Request
                 continue;
             }
 
-            $files[$name] = new UploadedFile(
-                tmpName: (string) ($file['tmp_name'] ?? ''),
-                originalName: (string) ($file['name'] ?? ''),
-                size: (int) ($file['size'] ?? 0),
-                error: (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE),
-            );
+            $tmpNames = is_array($file['tmp_name'] ?? null) ? array_values($file['tmp_name']) : [$file['tmp_name'] ?? ''];
+
+            foreach ($tmpNames as $index => $tmpName) {
+                $files[$name][] = new UploadedFile(
+                    tmpName: (string) $tmpName,
+                    originalName: (string) self::fileValue($file, 'name', $index),
+                    size: (int) self::fileValue($file, 'size', $index),
+                    error: (int) (self::fileValue($file, 'error', $index) ?? UPLOAD_ERR_NO_FILE),
+                );
+            }
         }
 
         return $files;
+    }
+
+    /** @param array<mixed> $file */
+    private static function fileValue(array $file, string $key, int $index): mixed
+    {
+        $value = $file[$key] ?? null;
+
+        return is_array($value) ? (array_values($value)[$index] ?? null) : $value;
     }
 }

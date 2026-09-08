@@ -10,7 +10,6 @@ use App\Application\File\UploadFile;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Dealership\Dealership;
 use App\Domain\File\OptimizedImage;
-use App\Domain\File\Ports\FileRepository;
 use App\Domain\File\Ports\ImageOptimizer;
 use App\Domain\File\Ports\StorageProvider;
 use App\Domain\File\StoredFile;
@@ -25,6 +24,7 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\DirectTransaction;
 use Tests\Support\FakeAuditLogger;
 use Tests\Support\InMemoryDealershipRepository;
+use Tests\Support\InMemoryFileRepository;
 
 /** O que importa aqui é a orquestração; o único ponto real é o `JobStatusStore`. */
 #[Group('integration')]
@@ -173,38 +173,6 @@ final class ProcessDealershipPhotoTest extends TestCase
             address: new Address('01000-000', 'Rua Antiga', '10', null, 'Bairro', 'Cidade', Uf::SP),
             phone: '11988888888',
         );
-    }
-}
-
-final class InMemoryFileRepository implements FileRepository
-{
-    /** @var array<string, StoredFile> */
-    private array $files = [];
-
-    public function findById(string $id): ?StoredFile
-    {
-        return $this->files[$id] ?? null;
-    }
-
-    public function findByPath(string $path): ?StoredFile
-    {
-        foreach ($this->files as $file) {
-            if ($file->path === $path) {
-                return $file;
-            }
-        }
-
-        return null;
-    }
-
-    public function insert(StoredFile $file): void
-    {
-        $this->files[$file->id] = $file;
-    }
-
-    public function delete(string $id): void
-    {
-        unset($this->files[$id]);
     }
 }
 

@@ -51,6 +51,22 @@ final readonly class PostgresFileRepository implements FileRepository
         $this->connection->execute('DELETE FROM files WHERE id = :id', ['id' => $id]);
     }
 
+    /** Uma sentença só: checar antes e apagar depois abriria janela pra outra referência nascer no meio. */
+    public function deleteIfUnreferenced(string $id): ?string
+    {
+        $statement = $this->connection->execute(<<<'SQL'
+            DELETE FROM files f
+            WHERE f.id = :id
+              AND NOT EXISTS (SELECT 1 FROM vehicle_images vi WHERE vi.file_id = f.id)
+              AND NOT EXISTS (SELECT 1 FROM dealerships d WHERE d.photo_file_id = f.id)
+            RETURNING path
+            SQL, ['id' => $id]);
+
+        $path = $statement->fetchColumn();
+
+        return is_string($path) ? $path : null;
+    }
+
     private function hydrateOne(\PDOStatement $statement): ?StoredFile
     {
         $row = $statement->fetch();

@@ -120,7 +120,7 @@ Table vehicles {
 Table vehicle_images {
   id uuid [pk]
   vehicle_id uuid [not null]
-  path varchar(500) [not null]
+  file_id uuid [not null]
   position smallint [not null]
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
@@ -194,6 +194,7 @@ Ref: dealerships.photo_file_id > files.id
 Ref: files.uploaded_by > users.id
 Ref: vehicles.dealership_id > dealerships.id
 Ref: vehicle_images.vehicle_id > vehicles.id
+Ref: vehicle_images.file_id > files.id
 Ref: dealership_availability_rules.dealership_id > dealerships.id
 Ref: vehicle_availability_rules.vehicle_id > vehicles.id
 Ref: availability_exceptions.dealership_id > dealerships.id
@@ -208,7 +209,11 @@ Ref: audit_logs.actor_id > users.id
 
 As imagens são armazenadas no MinIO. O PostgreSQL mantém somente a referência ao objeto.
 
-Concessionária tem só uma foto -- `dealerships.photo_file_id` referencia `files` (metadado genérico de upload, reaproveitado por qualquer domínio) direto, sem tabela de junção nem posição. Veículo terá galeria de verdade (várias fotos, ordenadas por `position`) quando esse domínio for implementado -- `vehicle_images` na modelagem abaixo ainda não existe de fato.
+Concessionária tem só uma foto -- `dealerships.photo_file_id` referencia `files` (metadado genérico de upload, reaproveitado por qualquer domínio) direto, sem tabela de junção nem posição. Veículo tem galeria: `vehicle_images` referencia o mesmo `files`, com `position` própria.
+
+Como `files.path` é o checksum do conteúdo, dois anúncios com a mesma foto compartilham a linha -- apagar uma imagem passa por `deleteIfUnreferenced`, que só remove do storage quando nenhuma galeria nem concessionária ainda aponta pra ela, numa sentença só.
+
+O UNIQUE `(vehicle_id, position)` é imediato, então reordenar acontece em duas passadas dentro da mesma transação: a primeira joga tudo pra faixa negativa (`position = -1 - position`), a segunda escreve a ordem final. Constraint `DEFERRABLE` não serve aqui: a violação estouraria no COMMIT, fora do `Statement::execute()` que traduz SQLSTATE, e viraria 500 em vez de 409.
 
 ```text
 position = 0 → primeira imagem

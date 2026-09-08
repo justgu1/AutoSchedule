@@ -7,13 +7,12 @@ namespace Tests\Application\File;
 use App\Application\File\UploadFile;
 use App\Domain\Exceptions\DomainException;
 use App\Domain\File\OptimizedImage;
-use App\Domain\File\Ports\FileRepository;
 use App\Domain\File\Ports\ImageOptimizer;
 use App\Domain\File\Ports\StorageProvider;
-use App\Domain\File\StoredFile;
 use App\Infrastructure\File\LocalTempFileStore;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\InMemoryFileRepository;
 
 final class UploadFileTest extends TestCase
 {
@@ -150,44 +149,6 @@ final class UploadFileTest extends TestCase
         }
 
         return $matches[1];
-    }
-}
-
-final class InMemoryFileRepository implements FileRepository
-{
-    /** @var array<string, StoredFile> */
-    private array $files = [];
-
-    public function findById(string $id): ?StoredFile
-    {
-        return $this->files[$id] ?? null;
-    }
-
-    public function findByPath(string $path): ?StoredFile
-    {
-        foreach ($this->files as $file) {
-            if ($file->path === $path) {
-                return $file;
-            }
-        }
-
-        return null;
-    }
-
-    public function insert(StoredFile $file): void
-    {
-        $this->files[$file->id] = $file;
-    }
-
-    public function delete(string $id): void
-    {
-        unset($this->files[$id]);
-    }
-
-    /** @return list<StoredFile> */
-    public function all(): array
-    {
-        return array_values($this->files);
     }
 }
 

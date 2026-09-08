@@ -171,7 +171,7 @@ Controller -> Caso de uso -> Queue (RedisQueue, enum QueuedJob)
 
 Falha reenfileira com `attempts` incrementado; passadas 3 tentativas vira dead-letter em vez de tentar pra sempre. Scheduler e worker são processos PHP CLI, mesma imagem Docker do backend com outro comando -- cada um escala e reinicia sozinho via Deployment próprio no k8s, sem precisar de supervisor porque o orquestrador já cuida disso.
 
-Job que o cliente precisa acompanhar (hoje: processar foto) grava progresso num `JobStatusStore` (Redis, chave com TTL) em vez de só rodar silencioso -- o controller devolve `202`+`job_id` na hora, e `GET /jobs/{id}/events` expõe isso como SSE (`StreamedResponse`, sem framework de streaming, só desliga o buffer do PHP-FPM e do nginx pra essa rota e escreve aos poucos). Genérico de propósito: mesmo mecanismo serve qualquer job futuro que precise dar feedback ao vivo, como um import em lote de fotos de veículo.
+Job que o cliente precisa acompanhar (hoje: processar foto) grava progresso num `JobStatusStore` (Redis, chave com TTL) em vez de só rodar silencioso -- o controller devolve `202`+`job_id` na hora, e `GET /jobs/{id}/events` expõe isso como SSE (`StreamedResponse`, sem framework de streaming, só desliga o buffer do PHP-FPM e do nginx pra essa rota e escreve aos poucos). Genérico de propósito, e o import em lote da galeria de veículo já prova isso: as N fotos de um request viajam num envelope só, com um `job_id` só. N jobs separados exigiriam N conexões SSE do mesmo cliente, e o navegador corta em 6 por host.
 
 ## Busca e geolocalização
 
