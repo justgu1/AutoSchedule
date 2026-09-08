@@ -130,7 +130,23 @@ horário não bloqueado por exceção
 não existe agendamento ativo no horário
 ```
 
-Os horários disponíveis são definidos por data. Ao selecionar uma data, somente os horários válidos para aquele dia devem ser apresentados.
+Os horários disponíveis são definidos por data. Ao selecionar uma data, somente os horários válidos para aquele dia devem ser apresentados. Calculado por `Domain/Availability/AvailabilityCalculator`, puro, sem consulta ao banco -- quem busca as janelas, exceções e agendamentos é a Application.
+
+Regras recorrentes (`seller`/`admin`, uma por concessionária ou por veículo, por dia da semana):
+
+```text
+GET/POST      /dealerships/{id}/availability-rules
+PATCH/DELETE  /availability-rules/{id}
+GET/POST      /vehicles/{id}/availability-rules
+PATCH/DELETE  /vehicle-availability-rules/{id}
+```
+
+Consulta pública, sem conta (é o que a tela de agendamento usa):
+
+```text
+GET /vehicles/{id}/availability/dates?month=YYYY-MM   -- default: mês corrente
+GET /vehicles/{id}/availability/slots?date=YYYY-MM-DD
+```
 
 ### Exemplo
 
@@ -158,11 +174,16 @@ Exemplos:
 - horário especial;
 - fechamento excepcional.
 
-A exceção específica da data possui prioridade sobre a regra recorrente.
+A exceção específica da data possui prioridade sobre a regra recorrente: `is_available=false` sem horário bloqueia o dia inteiro; com horário, subtrai só aquele intervalo; `is_available=true` substitui a janela do dia inteiro (exige horário próprio). Escopo é concessionária **ou** veículo, nunca os dois nem nenhum.
+
+```text
+GET/POST      /availability-exceptions?dealership_id=|vehicle_id=
+PATCH/DELETE  /availability-exceptions/{id}
+```
 
 ## Agendamento
 
-Fluxo:
+Fluxo do cliente, sem conta:
 
 ```text
 visualizar veículo
@@ -179,28 +200,47 @@ informar nome, e-mail e telefone
         ↓
 confirmar
         ↓
-criar agendamento
+criar agendamento (POST /appointments, público)
 ```
 
-A duração padrão é de 60 minutos.
+A duração é sempre 60 minutos -- não é campo que o cliente escolhe. A aplicação reconfere o horário no momento da criação (a checagem que gerou a lista pode ter ficado velha); `POST /appointments` acha o `customer` por e-mail ou cria um novo (mesmo mecanismo do login social -- sem tocar no perfil se a conta já existe). Nome/e-mail/telefone ficam guardados no próprio agendamento como uma cópia do que foi digitado, independente do que já existe em `users`: uma nova solicitação nunca sobrescreve o perfil da conta.
+
+## Ciclo de teste-drive
+
+Agendar não é só reservar um horário -- é rastrear a retirada e a devolução reais do veículo, porque um atraso na devolução afeta quem vem depois:
+
+```text
+10:00           agendamento confirmado começa
+10:15           funcionário marca "veículo retirado" (POST /appointments/{id}/pickup)
+11:00           prazo de devolução -- SEMPRE scheduled_at + 60min, nunca a hora da retirada
+                (chegar atrasado pra retirar não estica o prazo de devolução)
+11:00 ou antes  funcionário marca "veículo devolvido" (POST /appointments/{id}/release) -- ou,
+                se ele esquecer, uma rotina automática libera no prazo, no lugar dele
+11:15           released_at + 15min de preparo -> dispara e-mail de confirmação pro
+                PRÓXIMO agendamento daquele veículo, se houver um esperando
+```
+
+Se não existe agendamento anterior ainda em aberto (nenhum outro `pending`/`confirmed` com horário menor, ou o anterior foi `cancelled`/`no_show`), o e-mail de confirmação sai sem esperar handoff nenhum.
 
 ## Status
 
 ```text
 pending
-   ↓
+   ↓ (cliente confirma pelo e-mail, ou funcionário/admin confirma no painel)
 confirmed
-   ├── completed
-   └── no_show
+   ├── (funcionário marca retirada e depois devolução) ──► completed
+   └── (prazo de devolução passa sem retirada, automático) ──► no_show
 
 pending
-   ↓
+   ↓ (cliente cancela pelo e-mail, funcionário/admin cancela no painel, ou expira)
 cancelled
 ```
 
-`pending` representa uma reserva temporária e possui `expires_at`.
+`completed`/`no_show` nunca são clique de painel isolado: `completed` nasce da liberação do veículo (`release`), que só é possível depois da retirada (`pickup`); `no_show` nasce de uma rotina automática, quando o prazo de devolução passa sem que o veículo tenha sido retirado. Cancelamento só existe a partir de `pending` -- confirmado não tem caminho de volta.
 
-Após a expiração, o horário volta a ficar disponível.
+`pending` só ganha prazo de expiração (`expires_at`) quando o e-mail de confirmação de fato sai -- antes disso não faz sentido expirar uma reserva que o cliente ainda nem foi convidado a confirmar. Expirado, o agendamento vira `cancelled` e o horário volta a ficar disponível.
+
+É o **cliente**, clicando no e-mail de confirmação (token opaco, sem login), quem normalmente confirma ou cancela -- o painel mantém as mesmas ações como *override* de funcionário (telefonema, walk-in), mesmo endpoint, dois jeitos de autorizar (sessão de admin/dono, ou o token).
 
 ## Concorrência
 
@@ -218,9 +258,9 @@ O cliente informa:
 - e-mail;
 - telefone.
 
-Cada agendamento possui os dados do cliente informados no momento da solicitação.
+Cada agendamento possui os dados do cliente informados no momento da solicitação -- uma cópia própria, que não sobrescreve o perfil da conta.
 
-Um novo `customer` é criado caso ainda não exista.
+Um novo `customer` é criado caso ainda não exista, achado por e-mail.
 
 ## Autenticação
 
@@ -366,11 +406,6 @@ vehicle.images_reordered
 vehicle.trashed
 vehicle.restored
 vehicle.purged
-```
-
-Planejados conforme os domínios abaixo forem implementados:
-
-```text
 availability.created
 availability.updated
 availability.deleted
@@ -380,6 +415,8 @@ appointment.cancelled
 appointment.completed
 ```
 
+`availability.*` cobre as três tabelas de disponibilidade (regra recorrente de concessionária, de veículo, exceção) -- `auditable_id` distingue qual. `appointment.*` não audita `pickup`/`release`/`no_show`: as próprias colunas de timestamp (`picked_up_at`, `released_at`) já são o registro, e `completed` audita através do `release`.
+
 Os registros de auditoria são somente de leitura para a aplicação.
 
 ## Rate limiting
@@ -387,7 +424,7 @@ Os registros de auditoria são somente de leitura para a aplicação.
 Toda rota passa por uma política de rate limit antes de qualquer outra verificação (sliding window, por usuário autenticado ou por IP):
 
 - `general` (padrão 1000/min): cobre a API como um todo, com headroom generoso sobre o pico esperado;
-- `auth` (padrão 5/min): `POST /oauth/token`, `POST /api/register`, `POST /api/password-reset` e `PUT /me/password` — proteção contra brute-force de login/registro/reset.
+- `auth` (padrão 5/min): `POST /oauth/token`, `POST /api/register`, `POST /api/password-reset`, `PUT /me/password`, `POST /api/appointments` e `POST /api/appointments/{id}/confirm|cancel` — proteção contra brute-force de login/registro/reset/agendamento.
 
 Response com `429` inclui `Retry-After`. Falha do Redis não derruba a API — o rate limit fica temporariamente inativo (fail-open) em vez de bloquear todo o tráfego.
 
@@ -399,21 +436,17 @@ Endpoints de listagem aceitam `page`/`per_page` (`per_page` limitado por um máx
 
 O envio de e-mails deve ser assíncrono.
 
-Eventos iniciais:
+Implementado, reaproveitando o mesmo mecanismo (`QueuedJob::SendEmail`) do reset de senha:
 
 ```text
-appointment.created
-appointment.confirmed
-appointment.cancelled
+criação do agendamento    -> vendedor dono da concessionária (aviso informativo)
+e-mail de confirmação     -> cliente (o botão de confirmar/cancelar), timing decidido pela
+                             rotina agendada (ver "Ciclo de teste-drive")
+confirmado/cancelado/
+concluído                 -> cliente
 ```
 
-O agendamento pode notificar:
-
-- cliente;
-- vendedores responsáveis pela concessionária;
-- administrador.
-
-A falha no envio do e-mail não deve impedir a criação do agendamento.
+A falha no envio do e-mail não impede a criação do agendamento nem a transição de status -- o e-mail é um efeito colateral enfileirado depois, não parte da transação.
 
 ## Scheduler
 
@@ -421,8 +454,10 @@ O scheduler PHP executa tarefas periódicas (`ScheduledTask`), cada uma com seu 
 
 Tarefas previstas:
 
-- expirar agendamentos pendentes;
-- purgar da lixeira (usuário e concessionária) passados 30 dias sem recuperação;
+- enviar o e-mail de confirmação do agendamento, quando o veículo estiver desbloqueado;
+- expirar agendamentos pendentes sem confirmação a tempo;
+- liberar (e concluir, ou marcar `no_show`) agendamentos confirmados cujo prazo de devolução passou;
+- purgar da lixeira (usuário, concessionária e veículo) passados 30 dias sem recuperação;
 - limpar dados temporários quando necessário.
 
 ## Worker

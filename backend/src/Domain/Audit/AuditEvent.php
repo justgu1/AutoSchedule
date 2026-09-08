@@ -34,6 +34,13 @@ enum AuditEvent: string
     case VehicleTrashed = 'vehicle.trashed';
     case VehicleRestored = 'vehicle.restored';
     case VehiclePurged = 'vehicle.purged';
+    case AvailabilityCreated = 'availability.created';
+    case AvailabilityUpdated = 'availability.updated';
+    case AvailabilityDeleted = 'availability.deleted';
+    case AppointmentCreated = 'appointment.created';
+    case AppointmentConfirmed = 'appointment.confirmed';
+    case AppointmentCancelled = 'appointment.cancelled';
+    case AppointmentCompleted = 'appointment.completed';
 
     /** O afetado sai do próprio evento. Sem `default`: domínio novo tem que aparecer aqui, não virar 'User' calado. */
     public function auditableType(): AuditableType
@@ -42,6 +49,8 @@ enum AuditEvent: string
             'auth', 'user' => AuditableType::User,
             'dealership' => AuditableType::Dealership,
             'vehicle' => AuditableType::Vehicle,
+            'availability' => AuditableType::Availability,
+            'appointment' => AuditableType::Appointment,
             default => throw new \LogicException(sprintf('Event "%s" has no auditable type.', $this->value)),
         };
     }

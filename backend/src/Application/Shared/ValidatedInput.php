@@ -41,6 +41,17 @@ final readonly class ValidatedInput
         return $this->stringOrNull($field) ?? $fallback;
     }
 
+    public function int(string $field): int
+    {
+        $value = $this->intOrNull($field);
+
+        if ($value === null) {
+            throw new \LogicException(sprintf('Field "%s" was not validated as a number.', $field));
+        }
+
+        return $value;
+    }
+
     public function intOrNull(string $field): ?int
     {
         $value = $this->values[$field] ?? null;
@@ -74,6 +85,13 @@ final readonly class ValidatedInput
         }
 
         return (string) $value;
+    }
+
+    public function boolOr(string $field, bool $fallback): bool
+    {
+        $value = $this->values[$field] ?? null;
+
+        return is_bool($value) ? $value : $fallback;
     }
 
     /** @return list<string> */

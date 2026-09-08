@@ -93,8 +93,8 @@ Dealership    implementado
 Audit         implementado (transversal, não é um domínio de negócio)
 Notification  implementado (e-mail assíncrono)
 Vehicle       implementado
-Availability  planejado
-Appointment   planejado
+Availability  implementado
+Appointment   implementado
 ```
 
 Pasta de contexto no singular (`Domain/Dealership/`, não `Dealerships/`) -- nomeia o contexto, não uma coleção.
