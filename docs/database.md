@@ -26,9 +26,9 @@ Enum dealership_status {
 }
 
 Enum vehicle_status {
-  available
-  sold
-  inactive
+  active
+  trashed
+  deleted
 }
 
 Enum appointment_status {
@@ -107,12 +107,14 @@ Table vehicles {
   version varchar(80)
   year smallint
   price numeric(12,2) [not null]
-  thumbnail_path varchar(500)
+  description text
   status vehicle_status [not null]
+  trashed_by_dealership_trash boolean [not null]
+  trashed_at timestamptz
+  anonymized_at timestamptz
   search_vector tsvector
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
-  deleted_at timestamptz
 }
 
 Table vehicle_images {
@@ -226,11 +228,15 @@ A senha em texto puro nunca deve ser persistida ou registrada em logs.
 
 `status` (`active`/`trashed`/`deleted`) é a fonte de verdade do ciclo de vida -- `deleted_at`/`trashed_at` marca quando entrou na lixeira (não é mais "deletado = deleted_at preenchido" sozinho). `anonymized_at` marca quando a anonimização definitiva rodou, idempotência da rotina de purge.
 
-O mesmo modelo de três estados vale pra `users` e `dealerships` -- na aplicação os dois reaproveitam o mesmo enum PHP (`App\Domain\Shared\TrashableStatus`), só o tipo `ENUM` do Postgres é duplicado por tabela (`user_status`/`dealership_status`) porque cada `CREATE TYPE` é local à tabela que o usa.
+O mesmo modelo de três estados vale pra `users`, `dealerships` e `vehicles` -- na aplicação os três reaproveitam o mesmo enum PHP (`App\Domain\Shared\TrashableStatus`), só o tipo `ENUM` do Postgres é duplicado por tabela (`user_status`/`dealership_status`/`vehicle_status`) porque cada `CREATE TYPE` é local à tabela que o usa.
 
-`dealerships.trashed_by_owner_deactivation` diferencia lixeira manual (o seller apagou a própria concessionária) de lixeira em cascata (o seller desativou a conta) -- só a segunda é restaurada automaticamente quando o seller volta a logar.
+`vehicles` não tem nenhum estado além desses três. "Veículo com visita marcada" e "veículo vendido" não viram coluna: o primeiro é `EXISTS` em `appointments` e o segundo o sistema não tem como saber. Estado guardado que depende de outra tabela dessincroniza no primeiro cancelamento esquecido, e o sintoma (veículo que ninguém consegue agendar) é silencioso.
 
-Índice em `status` (`users_status_idx`/`dealerships_status_idx`) -- toda query de listagem/login filtra por ele.
+Veículo também não tem dado pessoal, então a anonimização do purge é só o estado terminal -- marca `deleted`/`anonymized_at` e preserva marca e modelo, que o histórico de agendamento ainda precisa exibir.
+
+`dealerships.trashed_by_owner_deactivation` e `vehicles.trashed_by_dealership_trash` diferenciam lixeira manual (o seller apagou aquele registro) de lixeira em cascata (o seller desativou a conta, ou a concessionária dona foi pra lixeira) -- só a segunda é restaurada automaticamente. A cascata de veículo é de dois níveis, porque a desativação de conta arrasta concessionária e estoque sem passar pelo caso de uso de concessionária.
+
+Índice em `status` (`users_status_idx`/`dealerships_status_idx`/`vehicles_status_idx`) -- toda query de listagem/login filtra por ele.
 
 Convenção de visibilidade nas queries:
 
@@ -239,6 +245,8 @@ users:       findByEmail/findById/existsByEmail/findPage/count       -> status <
 users:       countByRole (trava do último admin)                     -> status = 'active'    (só ativo protege)
 dealerships: findByOwner/findPage/count/countByOwner                 -> status <> 'deleted'  (mostra active + trashed)
 dealerships: findById                                                -> sem filtro           (admin/restore/purge acham mesmo depois de anonimizado)
+vehicles:    findByOwner/findByDealership/findPage/count             -> status <> 'deleted'  (mostra active + trashed)
+vehicles:    findById                                                -> sem filtro           (admin/restore/purge acham mesmo depois de anonimizado)
 ```
 
 ## Auditoria

@@ -58,15 +58,19 @@ A URL pública (`/concessionarias/{slug}` no front) usa um `slug` gerado a parti
 
 ## Veículos
 
-Todo veículo pertence a uma única concessionária.
+Todo veículo pertence a uma única concessionária. Quem é o dono é sempre transitivo -- vem do `owner_user_id` da concessionária, nunca de uma cópia no próprio veículo, pra não divergir quando o admin reassocia a concessionária a outro seller.
 
 Estados:
 
-- `available`
-- `sold`
-- `inactive`
+- `active`
+- `trashed`
+- `deleted`
 
-Veículos `sold` ou `inactive` não podem receber novos agendamentos.
+É a mesma lixeira reversível da conta e da concessionária, com a mesma janela de 30 dias. Como veículo não tem dado pessoal, a anonimização do purge é só o estado terminal: marca `deleted` e preserva marca e modelo, que o histórico de agendamento ainda precisa exibir.
+
+Não existe estado "vendido": o sistema não tem como saber que a venda aconteceu, e um estado que ninguém alimenta mente pra quem olha. "Agendado" também não é estado guardado -- é o veículo ter visita ativa em `appointments`, calculado na leitura. Guardar isso obrigaria todo cancelamento e toda expiração a lembrar de desfazer, e esquecer um deixaria o veículo inagendável em silêncio. Veículo com visita marcada não recebe outra, mas continua aparecendo na vitrine: esconder estoque faria a concessionária parecer vazia.
+
+Concessionária que vai pra lixeira arrasta o estoque junto, e restaurá-la devolve só o que caiu por cascata -- veículo que o seller tinha apagado sozinho continua na lixeira. Desativar a conta do seller arrasta os dois níveis de uma vez.
 
 ## Galeria
 

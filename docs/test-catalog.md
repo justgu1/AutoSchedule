@@ -33,9 +33,20 @@ Convenção: `Arquivo::método` para PHPUnit (backend); `arquivo.spec.ts > nome 
 | UF é uma das 27 unidades federativas, validada na borda -- sigla inexistente é 422, nunca 500 | `ValidatorTest::rejeita_sigla_de_estado_que_nao_existe` |
 | Os sete campos de endereço andam juntos como um valor só (`Address`), e a anonimização é regra do próprio VO | `DealershipTest::anonymized_escruba_identificador_direto_mas_preserva_localidade_agregada`; `PostgresDealershipRepositoryTest::insere_e_encontra_por_id` (ida e volta do VO pelo banco) |
 
-### Veículos, Galeria (veículo), Disponibilidade, Exemplo, Exceções, Agendamento, Status, Concorrência, Cliente
+## Veículos
 
-Domínio ainda não implementado (`Worklist.md`, Dia 2/3/4) -- nenhum teste existe porque nenhum código existe. Não é lacuna de cobertura, é trabalho futuro.
+| Regra | Testes |
+|---|---|
+| Veículo pertence a uma única concessionária, e o dono é transitivo (`dealerships.owner_user_id`), sem cópia no próprio veículo | `PostgresVehicleRepositoryTest::insere_e_encontra_por_id`, `::find_by_owner_traz_so_os_veiculos_das_concessionarias_daquele_dono`, `::find_by_dealership_traz_so_os_daquela_concessionaria` |
+| Status é só a lixeira de 3 estados da conta e da concessionária (`active`/`trashed`/`deleted`), reversível 30 dias -- "vendido" e "agendado" não são estado guardado | `VehicleTest::register_monta_um_veiculo_novo_ativo_e_sem_anonimizacao`, `::allows_restore_permite_so_trashed_ainda_nao_anonimizado`, `::allows_purge_exige_trashed_ha_mais_de_grace_days`; `PostgresVehicleRepositoryTest::trash_move_pra_status_trashed_e_seta_trashed_at`, `::restore_volta_status_active_e_limpa_trashed_at`, `::find_trashed_so_traz_trashed_ainda_nao_anonimizado` |
+| Purge só encerra o ciclo de vida -- veículo não tem PII, então marca e modelo sobrevivem pro histórico de agendamento | `VehicleTest::anonymized_encerra_o_ciclo_de_vida_sem_mexer_nos_dados_do_anuncio`; `PostgresVehicleRepositoryTest::listagem_ignora_veiculo_deletado` |
+| Lixeira em cascata (concessionária ou conta do dono) só restaura automaticamente quem caiu por causa dela | `PostgresVehicleRepositoryTest::trash_all_in_dealership_so_afeta_os_ativos_e_marca_por_cascata`, `::restore_auto_trashed_in_dealership_so_restaura_quem_caiu_por_cascata`, `::cascata_por_dono_alcanca_todas_as_concessionarias_dele` |
+| RLS: seller só enxerga/altera veículo das próprias concessionárias e não consegue inserir na alheia (o dono vem do payload, então o INSERT também checa); admin enxerga qualquer um; sem contexto, nenhuma linha; contexto de serviço enxerga e atualiza; leitura pública enxerga só veículo `active` de concessionária `active` | `VehicleRlsPolicyTest` (8 casos) |
+| Preço em centavos inteiros, nunca float -- ida e volta pelo banco preserva o centavo | `MoneyTest` (5 casos); `PostgresVehicleRepositoryTest::preco_faz_a_ida_e_volta_pelo_banco_sem_perder_centavo` |
+
+### Galeria (veículo), Disponibilidade, Exemplo, Exceções, Agendamento, Status, Concorrência, Cliente
+
+Domínio ainda não implementado -- nenhum teste existe porque nenhum código existe. Não é lacuna de cobertura, é trabalho futuro (ver `Worklist.md`).
 
 ## Autenticação
 

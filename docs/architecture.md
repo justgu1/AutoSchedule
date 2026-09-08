@@ -92,7 +92,7 @@ User          implementado
 Dealership    implementado
 Audit         implementado (transversal, não é um domínio de negócio)
 Notification  implementado (e-mail assíncrono)
-Vehicle       planejado
+Vehicle       implementado
 Availability  planejado
 Appointment   planejado
 ```

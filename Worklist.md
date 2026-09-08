@@ -119,7 +119,7 @@ Backlog do projeto: epic > issue > task. Cada `[x]` já está em `main`; `[ ]` �
 
 ## Epic: Veículo
 
-- [ ] `Vehicle` (marca/modelo/versão/ano/preço/status), pertence a uma concessionária
+- [x] `Vehicle` (marca/modelo/versão/ano/preço/descrição/status), pertence a uma concessionária -- status é só a lixeira (`active`/`trashed`/`deleted`), idêntica à da conta e da concessionária; sem estado "vendido" nem "agendado" guardado; dono transitivo pela concessionária (RLS por `EXISTS`, sem `owner_user_id` duplicado)
 - [ ] Galeria de fotos (mesmo padrão de `dealership_images`)
 - [ ] Busca (PostgreSQL Full Text Search + `pg_trgm`)
 - [ ] CRUD (seller gerencia os das próprias concessionárias, admin qualquer um)
