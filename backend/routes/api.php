@@ -150,5 +150,15 @@ return static function (Router $router): void {
 
         $router->post('/api/vehicles/{id}/purge', [VehicleController::class, 'purge'])
             ->describes(sprintf('Permanently deletes a trashed vehicle now, without waiting %d days.', TrashState::GRACE_DAYS));
+
+        $router->post('/api/vehicles/{id}/photos', [VehicleController::class, 'addPhotos'])
+            ->describes('Adds images to the vehicle gallery (multipart, field name "images[]", up to 10 files of 20MB each) -- one job id tracks the whole batch.');
+
+        $router->patch('/api/vehicles/{id}/photos', [VehicleController::class, 'reorderPhotos'])
+            ->describes('Reorders the gallery. Send every image id of the vehicle, in the wanted order; the first one becomes the cover.')
+            ->accepts('order');
+
+        $router->delete('/api/vehicles/{id}/photos/{image_id}', [VehicleController::class, 'removePhoto'])
+            ->describes('Removes one image from the vehicle gallery.');
     });
 };

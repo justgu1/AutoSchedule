@@ -15,4 +15,12 @@ interface FileRepository
     public function insert(StoredFile $file): void;
 
     public function delete(string $id): void;
+
+    /**
+     * O `path` é o checksum, então entidades com bytes idênticos compartilham a linha -- apagar sem
+     * checar quem ainda aponta pra ela quebraria a outra.
+     *
+     * @return ?string o `path` a remover do storage, ou `null` se alguém ainda referencia o arquivo
+     */
+    public function deleteIfUnreferenced(string $id): ?string;
 }

@@ -9,6 +9,7 @@ use App\Application\Ports\Queue;
 use App\Application\Ports\QueuedJob;
 use App\Application\Ports\TempFileStore;
 use App\Application\Shared\ActorContext;
+use App\Application\Shared\UploadLimits;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
 use App\Domain\Shared\Uuid;
@@ -19,9 +20,6 @@ use App\Domain\Shared\Uuid;
  */
 final readonly class EnqueueDealershipPhoto
 {
-    /** Recusa antes de copiar: o que vai ser rejeitado no worker não vale a viagem. */
-    private const int MAX_PHOTO_BYTES = 20 * 1024 * 1024;
-
     public function __construct(
         private DealershipFinder $finder,
         private TempFileStore $tempFiles,
@@ -35,7 +33,8 @@ final readonly class EnqueueDealershipPhoto
     {
         $dealership = $this->finder->findOrFail($identifier);
 
-        if ($sizeBytes > self::MAX_PHOTO_BYTES) {
+        // Recusa antes de copiar: o que vai ser rejeitado no worker não vale a viagem.
+        if ($sizeBytes > UploadLimits::MAX_IMAGE_BYTES) {
             throw new DomainException('Invalid data.', DomainErrorType::Validation, ['image' => 'The image must be at most 20MB.']);
         }
 

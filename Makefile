@@ -136,7 +136,7 @@ load-test:
 
 e2e-setup:
 	@docker compose build nginx
-	@RATE_LIMIT_AUTH_MAX=1000 docker compose up -d nginx mailpit minio backend worker
+	@RATE_LIMIT_AUTH_MAX=1000 docker compose up -d nginx mailpit minio backend
 	@echo "==> instalando dependências do backend (imagem é --no-dev, bind-mount local some com o vendor/)..."
 	@docker compose exec backend composer install --no-interaction --prefer-dist
 	@echo "==> aplicando migrations e seeders (banco pode estar vazio -- ambiente novo/CI)..."
@@ -151,6 +151,8 @@ e2e-setup:
 		mc alias set local http://127.0.0.1:$$MINIO_PORT $$MINIO_USER $$MINIO_PASS && \
 		mc mb --ignore-existing local/autoschedule && \
 		mc anonymous set download local/autoschedule"
+	@echo "==> subindo o worker (só agora: ele compartilha o mesmo bind-mount, e sem vendor/ morre no boot)..."
+	@RATE_LIMIT_AUTH_MAX=1000 docker compose up -d worker
 	@docker compose run --rm --no-deps e2e npm ci
 
 # `--no-deps`: sem isso, `docker compose run` reconcilia as dependências do

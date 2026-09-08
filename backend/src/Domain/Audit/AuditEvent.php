@@ -28,6 +28,9 @@ enum AuditEvent: string
     case VehicleCreated = 'vehicle.created';
     case VehicleUpdated = 'vehicle.updated';
     case VehicleDealershipReassigned = 'vehicle.dealership_reassigned';
+    case VehicleImagesAdded = 'vehicle.images_added';
+    case VehicleImageRemoved = 'vehicle.image_removed';
+    case VehicleImagesReordered = 'vehicle.images_reordered';
     case VehicleTrashed = 'vehicle.trashed';
     case VehicleRestored = 'vehicle.restored';
     case VehiclePurged = 'vehicle.purged';

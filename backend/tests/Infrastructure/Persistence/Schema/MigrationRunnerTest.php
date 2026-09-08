@@ -26,6 +26,7 @@ final class MigrationRunnerTest extends TestCase
 
         // Ordem importa: CASCADE derruba a constraint de FK, não a tabela dependente, que precisa do próprio DROP.
         // Estender a lista quando uma migration nova criar tabela.
+        $this->pdo->exec('DROP TABLE IF EXISTS vehicle_images CASCADE');
         $this->pdo->exec('DROP TABLE IF EXISTS vehicles CASCADE');
         $this->pdo->exec('DROP TYPE IF EXISTS vehicle_status');
         $this->pdo->exec('DROP TABLE IF EXISTS dealership_images CASCADE');

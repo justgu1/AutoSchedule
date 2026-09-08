@@ -80,11 +80,13 @@ Preço é enviado e devolvido como string decimal, porque número em JSON vira p
 
 ## Galeria
 
-Um veículo pode possuir várias imagens.
+Um veículo pode possuir várias imagens, no máximo 20, enviadas em lotes de até 10 por vez, 20MB cada.
 
-As imagens são armazenadas no MinIO e referenciadas por `path`.
+As imagens são armazenadas no MinIO e referenciadas por `files`, o mesmo metadado de upload que a foto da concessionária usa. Como o arquivo é endereçado pelo checksum do conteúdo, dois anúncios com a mesma foto compartilham a linha, e remover uma imagem só apaga o objeto quando ninguém mais aponta pra ele.
 
-A ordem é definida por `position`, sendo `0` a primeira imagem apresentada.
+A ordem é definida por `position`, sendo `0` a primeira imagem apresentada -- a capa é a posição 0, não uma coluna de destaque, que seria uma segunda verdade a sincronizar. Reordenar manda a lista completa de ids na ordem desejada: ordem parcial é recusada, porque N atualizações independentes convergem pra um estado que ninguém pediu sem dar sinal.
+
+Otimizar e gravar sai do request, como na foto da concessionária -- o lote inteiro tem um `job_id` só, acompanhado pelo mesmo SSE. Uma transação por foto: uma imagem ruim no meio do lote não desfaz as que já entraram, e o erro vira status `failed` em vez de exceção.
 
 ## Disponibilidade
 
@@ -332,6 +334,9 @@ dealership.photo_removed
 vehicle.created
 vehicle.updated
 vehicle.dealership_reassigned
+vehicle.images_added
+vehicle.image_removed
+vehicle.images_reordered
 vehicle.trashed
 vehicle.restored
 vehicle.purged

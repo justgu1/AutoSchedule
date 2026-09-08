@@ -49,7 +49,20 @@ Convenção: `Arquivo::método` para PHPUnit (backend); `arquivo.spec.ts > nome 
 | Todo evento de auditoria tem tipo auditável -- prefixo novo sem braço no `match` seria 500 na primeira gravação | `AuditEventTest::todo_evento_tem_um_tipo_auditavel_correspondente` |
 | Ano e preço são validados como número e faixa na borda, não como tamanho de string | `ValidatorTest::rejeita_valor_que_nao_e_numero`, `::rejeita_valor_fora_da_faixa_do_between`, `::aceita_numero_como_string_ou_como_numero` |
 
-### Galeria (veículo), Disponibilidade, Exemplo, Exceções, Agendamento, Status, Concorrência, Cliente
+## Galeria (veículo)
+
+| Regra | Testes |
+|---|---|
+| A galeria referencia `files` (mesmo metadado da foto da concessionária) e vem ordenada por `position`, com a capa em `0` | `VehicleGalleryTest::galeria_vem_ordenada_por_posicao_com_a_url_de_cada_imagem`, `::capas_de_varios_veiculos_saem_indexadas_por_veiculo`; `PostgresVehicleImageRepositoryTest::find_by_vehicle_devolve_ordenado_por_posicao`, `::find_covers_for_traz_a_posicao_zero_de_varios_veiculos_numa_consulta_so` |
+| Arquivo compartilhado por dedupe de checksum só sai do storage quando ninguém mais o referencia | `VehicleGalleryTest::remover_imagem_apaga_o_arquivo_quando_ninguem_mais_o_referencia`, `::remover_imagem_preserva_o_arquivo_quando_outro_veiculo_ainda_o_usa` |
+| Lote assíncrono: um `job_id` pro request inteiro, uma transação por foto, falha vira status `failed` sem exceção escapar, temporários descartados sempre | `ProcessVehiclePhotosTest` (4 casos) |
+| Posição é sequencial a partir do fim da galeria, e duplicada no mesmo veículo vira `409` | `ProcessVehiclePhotosTest::posicoes_sao_atribuidas_em_sequencia_a_partir_do_fim_da_galeria`; `PostgresVehicleImageRepositoryTest::posicao_duplicada_no_mesmo_veiculo_vira_conflito_de_dominio`, `::next_position_comeca_em_zero_e_segue_o_fim_da_galeria` |
+| Reordenar exige a lista completa de ids e reescreve as posições em duas passadas, sem violar o UNIQUE no meio | `PostgresVehicleImageRepositoryTest::reorder_troca_as_posicoes_sem_violar_o_unique`; `VehiclePhotoRoutesTest::reordenar_reescreve_as_posicoes_na_ordem_pedida`, `::reordenar_recusa_ordem_que_nao_lista_a_galeria_inteira` |
+| Imagem de outro veículo é `404`; purga manual limpa a galeria (a rotina agendada não alcança storage) | `VehiclePhotoRoutesTest::remover_imagem_de_outro_veiculo_e_404`, `::purge_limpa_a_galeria_junto`, `::purge_recusa_veiculo_que_nao_esta_na_lixeira` |
+| RLS da galeria delega pro do veículo, inclusive pro contexto de serviço, que é quem grava a foto | `VehicleImageRlsPolicyTest` (6 casos) |
+| `images[]` vira uma lista de arquivos; campo simples continua sendo a lista de um | `RequestFilesTest` (4 casos) |
+
+### Disponibilidade, Exemplo, Exceções, Agendamento, Status, Concorrência, Cliente
 
 Domínio ainda não implementado -- nenhum teste existe porque nenhum código existe. Não é lacuna de cobertura, é trabalho futuro (ver `Worklist.md`).
 

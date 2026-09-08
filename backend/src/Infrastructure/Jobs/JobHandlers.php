@@ -14,6 +14,7 @@ final class JobHandlers
     {
         return match ($job) {
             QueuedJob::ProcessDealershipPhoto => ProcessDealershipPhotoJob::class,
+            QueuedJob::ProcessVehiclePhotos => ProcessVehiclePhotosJob::class,
             QueuedJob::SendEmail => SendEmailJob::class,
         };
     }

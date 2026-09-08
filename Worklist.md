@@ -120,7 +120,8 @@ Backlog do projeto: epic > issue > task. Cada `[x]` já está em `main`; `[ ]` �
 ## Epic: Veículo
 
 - [x] `Vehicle` (marca/modelo/versão/ano/preço/descrição/status), pertence a uma concessionária -- status é só a lixeira (`active`/`trashed`/`deleted`), idêntica à da conta e da concessionária; sem estado "vendido" nem "agendado" guardado; dono transitivo pela concessionária (RLS por `EXISTS`, sem `owner_user_id` duplicado)
-- [ ] Galeria de fotos (mesmo padrão de `dealership_images`)
+- [x] Galeria de fotos -- referencia `files` como a foto da concessionária, upload em lote pela fila com um `job_id` só, reordenação em duas passadas, arquivo compartilhado só sai do storage quando ninguém mais aponta pra ele
+- [ ] GC de `files` órfãos: a purga agendada limpa linha, não storage, então arquivo sem referência sobra pago no MinIO
 - [ ] Busca (PostgreSQL Full Text Search + `pg_trgm`)
 - [x] CRUD (seller gerencia os das próprias concessionárias, admin qualquer um) -- lixeira/restore/purge iguais aos outros domínios, cascata de dois níveis (conta -> concessionária -> veículo), auditoria `vehicle.*`
 
