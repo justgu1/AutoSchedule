@@ -110,7 +110,9 @@ Listar e buscar veículo são a mesma requisição: `GET /vehicles` com filtros 
 
 Marca e modelo passarem pelo índice de texto é a razão de a busca ser configurada no banco: **filtrar por "Chevrolet" encontra também o anúncio que só escreveu a marca na descrição**. E filtrar não é só recortar -- o campo próprio pesa mais que o texto livre, então quem é da marca aparece antes de quem só a cita.
 
-A busca também tolera erro de digitação e palavra parcial (`corola` acha `Corolla`), o que a FTS sozinha não faz -- é o `pg_trgm` que cobre isso.
+A busca também tolera erro de digitação e palavra parcial (`corola` acha `Corolla`), o que a FTS sozinha não faz -- é o `pg_trgm` que cobre isso. Prefixo curto (1+ caractere) de qualquer palavra, em qualquer campo (inclusive `description`), também é encontrado, e substring no meio de uma palavra (3+ caracteres) também -- as três técnicas (FTS exata, prefixo, similaridade/substring) se somam, nunca se substituem.
+
+`sort` ordena explicitamente o resultado (`price_desc`, `price_asc`, `year_desc`, `created_desc`, `created_asc`), substituindo a ordenação por relevância quando presente. Sugestão de digitação progressiva (autocomplete) não tem endpoint próprio -- é o mesmo `GET /vehicles?q=&per_page=5`, só com uma página pequena.
 
 `GET /vehicles/filters` devolve as marcas, modelos e anos que existem no estoque relevante, pra tela não oferecer combinação que não devolve nada -- sem `scope`, é o catálogo público inteiro; com `scope=mine`, só o estoque de quem chama (admin vê tudo, seller só o próprio).
 
@@ -161,6 +163,8 @@ Se a concessionária estiver disponível das 09:00 às 18:00 e o veículo das 10
 ```
 
 O intervalo utiliza a convenção `[start, end)`.
+
+Se o **veículo** não tem nenhuma regra recorrente cadastrada (e nenhuma exceção pra aquela data), ele não restringe nada -- vale só a janela da concessionária. Se a **concessionária** não tem nenhuma regra cadastrada (e nenhuma exceção pra aquela data), ela usa o default segunda a sexta, 09:00 às 18:00. Uma exceção pontual, mesmo sem regra recorrente nenhuma, já conta como "configurado" -- continua bloqueando/abrindo normalmente, nenhum dos dois defaults se aplica.
 
 ## Exceções
 

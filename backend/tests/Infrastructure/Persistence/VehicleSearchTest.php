@@ -5,8 +5,12 @@ declare(strict_types=1);
 namespace Tests\Infrastructure\Persistence;
 
 use App\Domain\Shared\Money;
+use App\Domain\Vehicle\BodyType;
+use App\Domain\Vehicle\FuelType;
+use App\Domain\Vehicle\Transmission;
 use App\Domain\Vehicle\Vehicle;
 use App\Domain\Vehicle\VehicleFilters;
+use App\Domain\Vehicle\VehicleSort;
 use App\Infrastructure\Persistence\PostgresVehicleRepository;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
@@ -100,6 +104,33 @@ final class VehicleSearchTest extends TestCase
         $this->assertContains($vehicle->id, $this->idsOf(new VehicleFilters(term: 'volkswagen | :')));
     }
 
+    /** O bug relatado: prefixo curto de uma palavra só presente em `description` não achava nada antes desta correção. */
+    #[Test]
+    public function busca_por_prefixo_na_descricao_encontra_progressivamente(): void
+    {
+        $vehicle = $this->register('Fiat', 'Argo', description: 'Anúncio de teste, sem uso');
+
+        foreach (['t', 'te', 'tes', 'test', 'teste'] as $prefix) {
+            $this->assertContains($vehicle->id, $this->idsOf(new VehicleFilters(term: $prefix)), "prefixo '{$prefix}'");
+        }
+    }
+
+    #[Test]
+    public function busca_por_substring_no_meio_da_palavra_na_descricao(): void
+    {
+        $vehicle = $this->register('Fiat', 'Argo', description: 'Testemunha ocular do estado de conservação');
+
+        $this->assertContains($vehicle->id, $this->idsOf(new VehicleFilters(term: 'estem')));
+    }
+
+    #[Test]
+    public function termo_de_um_caractere_nao_quebra_a_busca(): void
+    {
+        $this->register('Fiat', 'Argo');
+
+        $this->assertGreaterThanOrEqual(0, count($this->idsOf(new VehicleFilters(term: 'a'))));
+    }
+
     #[Test]
     public function busca_vazia_devolve_a_listagem_inteira(): void
     {
@@ -126,6 +157,34 @@ final class VehicleSearchTest extends TestCase
         $this->assertSame([$wanted->id], $ids);
     }
 
+    /** Os 3 specs (câmbio/carroceria/combustível) e o teto de km combinam por AND, igual marca/ano/preço. */
+    #[Test]
+    public function filtro_de_specs_combina_cambio_carroceria_combustivel_e_km(): void
+    {
+        $wanted = $this->register(
+            'Toyota',
+            'Corolla Cross',
+            transmission: Transmission::Automatic,
+            bodyType: BodyType::Suv,
+            fuelType: FuelType::Hybrid,
+            mileageKm: 20000,
+        );
+        // Cada um erra o filtro por um critério só, provando que todos os quatro são de fato exigidos.
+        $this->register('Toyota', 'Corolla Cross', transmission: Transmission::Manual, bodyType: BodyType::Suv, fuelType: FuelType::Hybrid, mileageKm: 20000);
+        $this->register('Toyota', 'Corolla Cross', transmission: Transmission::Automatic, bodyType: BodyType::Sedan, fuelType: FuelType::Hybrid, mileageKm: 20000);
+        $this->register('Toyota', 'Corolla Cross', transmission: Transmission::Automatic, bodyType: BodyType::Suv, fuelType: FuelType::Flex, mileageKm: 20000);
+        $this->register('Toyota', 'Corolla Cross', transmission: Transmission::Automatic, bodyType: BodyType::Suv, fuelType: FuelType::Hybrid, mileageKm: 90000);
+
+        $ids = $this->idsOf(new VehicleFilters(
+            transmission: Transmission::Automatic,
+            bodyType: BodyType::Suv,
+            fuelType: FuelType::Hybrid,
+            mileageKmMax: 30000,
+        ));
+
+        $this->assertSame([$wanted->id], $ids);
+    }
+
     #[Test]
     public function faixa_de_ano_recorta_o_resultado_pelas_duas_pontas(): void
     {
@@ -143,7 +202,24 @@ final class VehicleSearchTest extends TestCase
         $vehicle = $this->register('Fiat', 'Argo');
         $this->assertSame([], $this->idsOf(new VehicleFilters(term: 'blindado')));
 
-        $this->repository->update($vehicle->withDetails('Fiat', 'Argo', null, null, $vehicle->price, 'Carro blindado'));
+        $this->repository->update($vehicle->withDetails(
+            brand: 'Fiat',
+            model: 'Argo',
+            version: null,
+            manufactureYear: null,
+            modelYear: null,
+            price: $vehicle->price,
+            description: 'Carro blindado',
+            mileageKm: null,
+            transmission: null,
+            bodyType: null,
+            fuelType: null,
+            color: null,
+            plateEndDigit: null,
+            acceptsTrade: false,
+            ipvaPaid: false,
+            licensed: false,
+        ));
 
         $this->assertSame([$vehicle->id], $this->idsOf(new VehicleFilters(term: 'blindado')));
     }
@@ -241,6 +317,35 @@ final class VehicleSearchTest extends TestCase
         $this->assertSame(['Chevrolet'], $filters['brands']);
     }
 
+    #[Test]
+    public function ordenacao_explicita_por_preco_ignora_a_relevancia(): void
+    {
+        $cheap = $this->register('Chevrolet', 'Onix', price: new Money(5000000));
+        $expensive = $this->register('Chevrolet', 'Onix', price: new Money(9000000));
+
+        $this->assertSame([$expensive->id, $cheap->id], $this->idsOf(new VehicleFilters(sort: VehicleSort::PriceDesc)));
+        $this->assertSame([$cheap->id, $expensive->id], $this->idsOf(new VehicleFilters(sort: VehicleSort::PriceAsc)));
+    }
+
+    #[Test]
+    public function ordenacao_explicita_por_ano_traz_os_mais_novos_primeiro(): void
+    {
+        $older = $this->register('Chevrolet', 'Onix', year: 2015);
+        $newer = $this->register('Chevrolet', 'Onix', year: 2024);
+
+        $this->assertSame([$newer->id, $older->id], $this->idsOf(new VehicleFilters(sort: VehicleSort::YearDesc)));
+    }
+
+    #[Test]
+    public function ordenacao_explicita_por_criacao_recente_e_antiga(): void
+    {
+        $first = $this->register('Chevrolet', 'Onix');
+        $second = $this->register('Chevrolet', 'Onix');
+
+        $this->assertSame([$second->id, $first->id], $this->idsOf(new VehicleFilters(sort: VehicleSort::CreatedDesc)));
+        $this->assertSame([$first->id, $second->id], $this->idsOf(new VehicleFilters(sort: VehicleSort::CreatedAsc)));
+    }
+
     /** @return list<string> */
     private function idsOf(VehicleFilters $filters, int $limit = 10, int $offset = 0): array
     {
@@ -257,15 +362,24 @@ final class VehicleSearchTest extends TestCase
         ?Money $price = null,
         ?string $description = null,
         ?string $dealershipId = null,
+        ?Transmission $transmission = null,
+        ?BodyType $bodyType = null,
+        ?FuelType $fuelType = null,
+        ?int $mileageKm = null,
     ): Vehicle {
         $vehicle = Vehicle::register(
             dealershipId: $dealershipId ?? $this->dealershipId,
             brand: $brand,
             model: $model,
             version: null,
-            year: $year,
+            manufactureYear: $year,
+            modelYear: $year,
             price: $price ?? new Money(8990000),
             description: $description,
+            mileageKm: $mileageKm,
+            transmission: $transmission,
+            bodyType: $bodyType,
+            fuelType: $fuelType,
         );
         $this->repository->insert($vehicle);
 

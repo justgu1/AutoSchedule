@@ -7,23 +7,29 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 
 use App\Bootstrap\CliKernel;
 
-/**
- * Sessão manual ou E2E contra o banco de dev deixa refresh token real que quebra teste do usuário seedado.
- * `CREATE DATABASE` não roda de dentro do próprio banco, daí conectar na `postgres`, que sempre existe.
- */
-const TEST_DATABASE = 'autoschedule_test';
+/** Cada banco irmão isola teste/E2E do de dev; `CREATE DATABASE` conecta na `postgres` porque sempre existe. */
+const SIBLING_DATABASES = ['autoschedule_test', 'autoschedule_e2e'];
+
+$database = $argv[1] ?? 'autoschedule_test';
+
+// Allowlist fixa, nunca input externo livre: `CREATE DATABASE` não aceita bind, e interpolar um
+// argv sem checar seria injeção de verdade.
+if (!in_array($database, SIBLING_DATABASES, true)) {
+    fwrite(STDERR, sprintf("Banco '%s' não é um banco irmão conhecido (%s).\n", $database, implode(', ', SIBLING_DATABASES)));
+
+    exit(1);
+}
 
 $pdo = CliKernel::boot()->maintenanceConnection('postgres')->pdo();
 
 $statement = $pdo->prepare('SELECT 1 FROM pg_database WHERE datname = ?');
-$statement->execute([TEST_DATABASE]);
+$statement->execute([$database]);
 
 if ((bool) $statement->fetchColumn()) {
-    echo TEST_DATABASE . " already exists.\n";
+    echo $database . " already exists.\n";
 
     exit(0);
 }
 
-// Nome fixo, nunca input externo: CREATE DATABASE não aceita bind, e interpolar aqui não é injeção.
-$pdo->exec('CREATE DATABASE ' . TEST_DATABASE);
-echo 'Created ' . TEST_DATABASE . ".\n";
+$pdo->exec('CREATE DATABASE ' . $database);
+echo 'Created ' . $database . ".\n";

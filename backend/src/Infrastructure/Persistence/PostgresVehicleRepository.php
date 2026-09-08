@@ -8,18 +8,26 @@ use App\Domain\Shared\Money;
 use App\Domain\Shared\Trashable;
 use App\Domain\Shared\TrashableStatus;
 use App\Domain\Shared\TrashState;
+use App\Domain\Vehicle\BodyType;
+use App\Domain\Vehicle\FuelType;
 use App\Domain\Vehicle\Ports\VehicleRepository;
+use App\Domain\Vehicle\Transmission;
 use App\Domain\Vehicle\Vehicle;
 use App\Domain\Vehicle\VehicleFilters;
+use App\Domain\Vehicle\VehicleSort;
 
 final readonly class PostgresVehicleRepository implements VehicleRepository
 {
-    private const string COLUMNS = 'id, dealership_id, brand, model, version, year, price, description, status, trashed_by_dealership_trash, trashed_at, anonymized_at, created_at, updated_at';
+    private const string COLUMNS = 'id, dealership_id, brand, model, version, manufacture_year, model_year, price, description, mileage_km, transmission, body_type, fuel_type, color, plate_end_digit, accepts_trade, ipva_paid, licensed, status, trashed_by_dealership_trash, trashed_at, anonymized_at, created_at, updated_at';
 
     // `search_vector` fica de fora de propósito: coluna gerada não aceita escrita, e o hábito daqui é listar tudo.
-    private const string PREFIXED_COLUMNS = 'v.id, v.dealership_id, v.brand, v.model, v.version, v.year, v.price, v.description, v.status, v.trashed_by_dealership_trash, v.trashed_at, v.anonymized_at, v.created_at, v.updated_at';
+    private const string PREFIXED_COLUMNS = 'v.id, v.dealership_id, v.brand, v.model, v.version, v.manufacture_year, v.model_year, v.price, v.description, v.mileage_km, v.transmission, v.body_type, v.fuel_type, v.color, v.plate_end_digit, v.accepts_trade, v.ipva_paid, v.licensed, v.status, v.trashed_by_dealership_trash, v.trashed_at, v.anonymized_at, v.created_at, v.updated_at';
 
     private const string SEARCHABLE_NAME = "v.brand || ' ' || v.model || ' ' || coalesce(v.version, '')";
+
+    // Cobre também `description` -- índice trigram próprio (`vehicles_full_text_trgm_idx`), separado do de
+    // SEARCHABLE_NAME pra não diluir a similaridade usada no ranking/tolerância a erro de digitação.
+    private const string SEARCHABLE_FULL_TEXT = "v.brand || ' ' || v.model || ' ' || coalesce(v.version, '') || ' ' || coalesce(v.description, '')";
 
     public function __construct(private DatabaseConnection $connection)
     {
@@ -36,10 +44,14 @@ final readonly class PostgresVehicleRepository implements VehicleRepository
     {
         $this->connection->execute(<<<'SQL'
             INSERT INTO vehicles (
-                id, dealership_id, brand, model, version, year, price, description, status,
+                id, dealership_id, brand, model, version, manufacture_year, model_year, price, description,
+                mileage_km, transmission, body_type, fuel_type, color, plate_end_digit,
+                accepts_trade, ipva_paid, licensed, status,
                 trashed_by_dealership_trash, trashed_at, anonymized_at, created_at, updated_at
             ) VALUES (
-                :id, :dealership_id, :brand, :model, :version, :year, :price, :description, :status,
+                :id, :dealership_id, :brand, :model, :version, :manufacture_year, :model_year, :price, :description,
+                :mileage_km, :transmission, :body_type, :fuel_type, :color, :plate_end_digit,
+                :accepts_trade, :ipva_paid, :licensed, :status,
                 :trashed_by_dealership_trash, :trashed_at, :anonymized_at, :created_at, :updated_at
             )
             SQL, $this->toParams($vehicle));
@@ -53,7 +65,11 @@ final readonly class PostgresVehicleRepository implements VehicleRepository
         $this->connection->execute(<<<'SQL'
             UPDATE vehicles SET
                 dealership_id = :dealership_id, brand = :brand, model = :model, version = :version,
-                year = :year, price = :price, description = :description, status = :status,
+                manufacture_year = :manufacture_year, model_year = :model_year,
+                price = :price, description = :description, status = :status,
+                mileage_km = :mileage_km, transmission = :transmission, body_type = :body_type,
+                fuel_type = :fuel_type, color = :color, plate_end_digit = :plate_end_digit,
+                accepts_trade = :accepts_trade, ipva_paid = :ipva_paid, licensed = :licensed,
                 trashed_by_dealership_trash = :trashed_by_dealership_trash,
                 trashed_at = :trashed_at, anonymized_at = :anonymized_at, updated_at = :updated_at
             WHERE id = :id
@@ -70,9 +86,9 @@ final readonly class PostgresVehicleRepository implements VehicleRepository
             SELECT %s
             FROM vehicles v
             WHERE %s
-            ORDER BY %sv.created_at DESC, v.id DESC
+            ORDER BY %s
             LIMIT :limit OFFSET :offset
-            SQL, self::PREFIXED_COLUMNS, $where, $this->relevance($filters)), $params));
+            SQL, self::PREFIXED_COLUMNS, $where, $this->orderBy($filters)), $params));
     }
 
     public function countSearch(VehicleFilters $filters, ?string $ownerUserId): int
@@ -96,9 +112,9 @@ final readonly class PostgresVehicleRepository implements VehicleRepository
             SELECT %s
             FROM vehicles v
             WHERE %s
-            ORDER BY %sv.created_at DESC, v.id DESC
+            ORDER BY %s
             LIMIT :limit OFFSET :offset
-            SQL, self::PREFIXED_COLUMNS, $where, $this->relevance($filters)), $params));
+            SQL, self::PREFIXED_COLUMNS, $where, $this->orderBy($filters)), $params));
     }
 
     public function countSearchPublic(VehicleFilters $filters): int
@@ -127,20 +143,23 @@ final readonly class PostgresVehicleRepository implements VehicleRepository
 
     /**
      * @param array<string, string|int|null> $params
-     * @return array{brands: list<string>, models: list<string>, years: list<int>}
+     * @return array{brands: list<string>, models: list<string>, years: list<int>, transmissions: list<string>, body_types: list<string>, fuel_types: list<string>}
      */
     private function facets(string $where, array $params): array
     {
         $row = $this->connection->execute(sprintf(<<<'SQL'
             SELECT array_to_string(array_agg(DISTINCT v.brand ORDER BY v.brand), ',') AS brands,
                    array_to_string(array_agg(DISTINCT v.model ORDER BY v.model), ',') AS models,
-                   array_to_string(array_agg(DISTINCT v.year ORDER BY v.year DESC) FILTER (WHERE v.year IS NOT NULL), ',') AS years
+                   array_to_string(array_agg(DISTINCT v.model_year ORDER BY v.model_year DESC) FILTER (WHERE v.model_year IS NOT NULL), ',') AS years,
+                   array_to_string(array_agg(DISTINCT v.transmission) FILTER (WHERE v.transmission IS NOT NULL), ',') AS transmissions,
+                   array_to_string(array_agg(DISTINCT v.body_type) FILTER (WHERE v.body_type IS NOT NULL), ',') AS body_types,
+                   array_to_string(array_agg(DISTINCT v.fuel_type) FILTER (WHERE v.fuel_type IS NOT NULL), ',') AS fuel_types
             FROM vehicles v
             WHERE %s
             SQL, $where), $params)->fetch();
 
         if ($row === false) {
-            return ['brands' => [], 'models' => [], 'years' => []];
+            return ['brands' => [], 'models' => [], 'years' => [], 'transmissions' => [], 'body_types' => [], 'fuel_types' => []];
         }
 
         $values = Row::from($row);
@@ -149,6 +168,9 @@ final readonly class PostgresVehicleRepository implements VehicleRepository
             'brands' => $this->split($values->nullableString('brands')),
             'models' => $this->split($values->nullableString('models')),
             'years' => array_map(intval(...), $this->split($values->nullableString('years'))),
+            'transmissions' => $this->split($values->nullableString('transmissions')),
+            'body_types' => $this->split($values->nullableString('body_types')),
+            'fuel_types' => $this->split($values->nullableString('fuel_types')),
         ];
     }
 
@@ -244,13 +266,21 @@ final readonly class PostgresVehicleRepository implements VehicleRepository
             $conditions[] = "EXISTS (SELECT 1 FROM dealerships d WHERE d.id = v.dealership_id AND d.status = 'active')";
         }
 
-        // `websearch_to_tsquery` e não `to_tsquery`: a segunda lança erro de sintaxe com `&`, `|` ou `!`
-        // vindos de caixa de busca, o que viraria 500. E `%` como operador, porque só ele usa o índice trigram.
+        // `websearch_to_tsquery` no termo cru evita erro de sintaxe (`&`/`|`/`!` viraria 500). `%` tolera
+        // digitação errada; `to_tsquery(...:*)` é aditivo, acha prefixo de 1+ char (lexema inteiro não acha).
         if ($filters->term !== null) {
-            $conditions[] = sprintf(
-                "(v.search_vector @@ websearch_to_tsquery('simple', :term) OR (%s) %% :term)",
-                self::SEARCHABLE_NAME,
-            );
+            $clauses = [
+                "v.search_vector @@ websearch_to_tsquery('simple', :term)",
+                sprintf('(%s) %% :term', self::SEARCHABLE_NAME),
+                "v.search_vector @@ to_tsquery('simple', regexp_replace(websearch_to_tsquery('simple', :term)::text, '(\\S+)$', '\\1:*'))",
+            ];
+
+            // Termo curto demais pra `pg_trgm` extrair um trigrama útil -- o prefixo acima já cobre esse caso.
+            if (mb_strlen(trim($filters->term)) >= 3) {
+                $clauses[] = sprintf("(%s) ILIKE '%%' || :term || '%%'", self::SEARCHABLE_FULL_TEXT);
+            }
+
+            $conditions[] = '(' . implode(' OR ', $clauses) . ')';
             $params['term'] = $filters->term;
         }
 
@@ -262,11 +292,15 @@ final readonly class PostgresVehicleRepository implements VehicleRepository
         }
 
         $ranges = [
-            'year_min' => ['v.year >= :year_min', $filters->yearMin],
-            'year_max' => ['v.year <= :year_max', $filters->yearMax],
+            'year_min' => ['v.model_year >= :year_min', $filters->yearMin],
+            'year_max' => ['v.model_year <= :year_max', $filters->yearMax],
             'price_min' => ['v.price >= :price_min::numeric', $filters->priceMin?->toDecimal()],
             'price_max' => ['v.price <= :price_max::numeric', $filters->priceMax?->toDecimal()],
             'dealership_id' => ['v.dealership_id = :dealership_id::uuid', $filters->dealershipId],
+            'transmission' => ['v.transmission = :transmission', $filters->transmission?->value],
+            'body_type' => ['v.body_type = :body_type', $filters->bodyType?->value],
+            'fuel_type' => ['v.fuel_type = :fuel_type', $filters->fuelType?->value],
+            'mileage_km_max' => ['v.mileage_km <= :mileage_km_max', $filters->mileageKmMax],
         ];
 
         foreach ($ranges as $name => [$condition, $value]) {
@@ -289,7 +323,8 @@ final readonly class PostgresVehicleRepository implements VehicleRepository
 
         if ($filters->term !== null) {
             $scores[] = sprintf(
-                "ts_rank(v.search_vector, websearch_to_tsquery('simple', :term)) + similarity(%s, :term)",
+                "ts_rank(v.search_vector, websearch_to_tsquery('simple', :term)) + similarity(%s, :term)"
+                . " + ts_rank(v.search_vector, to_tsquery('simple', regexp_replace(websearch_to_tsquery('simple', :term)::text, '(\\S+)$', '\\1:*')))",
                 self::SEARCHABLE_NAME,
             );
         }
@@ -302,6 +337,19 @@ final readonly class PostgresVehicleRepository implements VehicleRepository
         }
 
         return $scores === [] ? '' : implode(' + ', $scores) . ' DESC, ';
+    }
+
+    /** `sort` explícito substitui a relevância inteira -- os dois juntos não fariam sentido pro usuário escolher. */
+    private function orderBy(VehicleFilters $filters): string
+    {
+        return match ($filters->sort) {
+            VehicleSort::PriceDesc => 'v.price DESC, v.id DESC',
+            VehicleSort::PriceAsc => 'v.price ASC, v.id ASC',
+            VehicleSort::YearDesc => 'v.model_year DESC NULLS LAST, v.id DESC',
+            VehicleSort::CreatedDesc => 'v.created_at DESC, v.id DESC',
+            VehicleSort::CreatedAsc => 'v.created_at ASC, v.id ASC',
+            null => $this->relevance($filters) . 'v.created_at DESC, v.id DESC',
+        };
     }
 
     /** @return list<string> */
@@ -331,10 +379,20 @@ final readonly class PostgresVehicleRepository implements VehicleRepository
             brand: $row->string('brand'),
             model: $row->string('model'),
             version: $row->nullableString('version'),
-            year: $row->nullableInt('year'),
+            manufactureYear: $row->nullableInt('manufacture_year'),
+            modelYear: $row->nullableInt('model_year'),
             // `numeric` sai do PDO como string e é assim que fica: converter pra float perderia centavo.
             price: Money::fromDecimal($row->string('price')),
             description: $row->nullableString('description'),
+            mileageKm: $row->nullableInt('mileage_km'),
+            transmission: $row->nullableEnum(Transmission::class, 'transmission'),
+            bodyType: $row->nullableEnum(BodyType::class, 'body_type'),
+            fuelType: $row->nullableEnum(FuelType::class, 'fuel_type'),
+            color: $row->nullableString('color'),
+            plateEndDigit: $row->nullableInt('plate_end_digit'),
+            acceptsTrade: $row->bool('accepts_trade'),
+            ipvaPaid: $row->bool('ipva_paid'),
+            licensed: $row->bool('licensed'),
             trash: new TrashState(
                 status: $row->enum(TrashableStatus::class, 'status'),
                 trashedAt: $row->nullableDateTime('trashed_at'),
@@ -355,9 +413,19 @@ final readonly class PostgresVehicleRepository implements VehicleRepository
             'brand' => $vehicle->brand,
             'model' => $vehicle->model,
             'version' => $vehicle->version,
-            'year' => $vehicle->year,
+            'manufacture_year' => $vehicle->manufactureYear,
+            'model_year' => $vehicle->modelYear,
             'price' => $vehicle->price->toDecimal(),
             'description' => $vehicle->description,
+            'mileage_km' => $vehicle->mileageKm,
+            'transmission' => $vehicle->transmission?->value,
+            'body_type' => $vehicle->bodyType?->value,
+            'fuel_type' => $vehicle->fuelType?->value,
+            'color' => $vehicle->color,
+            'plate_end_digit' => $vehicle->plateEndDigit,
+            'accepts_trade' => $vehicle->acceptsTrade,
+            'ipva_paid' => $vehicle->ipvaPaid,
+            'licensed' => $vehicle->licensed,
             'status' => $vehicle->trash->status->value,
             'trashed_by_dealership_trash' => $vehicle->trashedByDealershipTrash,
             'trashed_at' => $vehicle->trash->trashedAt?->format(DATE_ATOM),

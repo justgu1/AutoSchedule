@@ -134,12 +134,18 @@ seed:
 load-test:
 	@docker compose run --rm k6 run /scripts/api-load-test.js
 
+E2E_DB := autoschedule_e2e
+
 e2e-setup:
 	@docker compose build nginx
 	@RATE_LIMIT_AUTH_MAX=1000 docker compose up -d nginx mailpit minio backend
 	@echo "==> instalando dependências do backend (imagem é --no-dev, bind-mount local some com o vendor/)..."
 	@docker compose exec backend composer install --no-interaction --prefer-dist
-	@echo "==> aplicando migrations e seeders (banco pode estar vazio -- ambiente novo/CI)..."
+	@echo "==> criando o banco isolado do E2E, nunca o de dev (ver docs/testing.md)..."
+	@docker compose exec backend php bin/setup_test_database.php $(E2E_DB)
+	@echo "==> apontando backend/nginx pro banco isolado do E2E..."
+	@RATE_LIMIT_AUTH_MAX=1000 DB_DATABASE=$(E2E_DB) docker compose up -d nginx mailpit minio backend
+	@echo "==> aplicando migrations e seeders no banco do E2E (pode estar vazio -- ambiente novo/CI)..."
 	@docker compose exec backend php bin/migrate.php
 	@docker compose exec backend php bin/seed.php
 	@echo "==> criando o bucket do MinIO (upload de foto de concessionária precisa dele)..."
@@ -151,8 +157,8 @@ e2e-setup:
 		mc alias set local http://127.0.0.1:$$MINIO_PORT $$MINIO_USER $$MINIO_PASS && \
 		mc mb --ignore-existing local/autoschedule && \
 		mc anonymous set download local/autoschedule"
-	@echo "==> subindo o worker (só agora: ele compartilha o mesmo bind-mount, e sem vendor/ morre no boot)..."
-	@RATE_LIMIT_AUTH_MAX=1000 docker compose up -d worker
+	@echo "==> subindo worker/scheduler no banco do E2E (só agora: compartilham o bind-mount, sem vendor/ morrem no boot)..."
+	@RATE_LIMIT_AUTH_MAX=1000 DB_DATABASE=$(E2E_DB) docker compose up -d worker scheduler
 	@docker compose run --rm --no-deps e2e npm ci
 
 # `--no-deps`: sem isso, `docker compose run` reconcilia as dependências do
@@ -160,10 +166,15 @@ e2e-setup:
 # `nginx` junto) deixa o `nginx` com a resolução de DNS antiga em cache,
 # apontando pro IP morto do container anterior (502 Bad Gateway em toda
 # rota da API, apesar do backend novo estar de pé e saudável).
+#
+# `backend`/`worker`/`scheduler` ficam presos no banco `autoschedule_e2e` (e com rate limit
+# relaxado) até a linha final restaurar pro banco de dev -- roda mesmo se o Playwright falhar,
+# senão uma sessão manual local depois do teste mexeria no banco errado sem perceber.
 e2e: e2e-setup
-	@RATE_LIMIT_AUTH_MAX=1000 docker compose run --rm --no-deps e2e npx playwright test
-	@echo "==> restaurando rate limit padrão do backend..."
-	@docker compose up -d backend
+	@RATE_LIMIT_AUTH_MAX=1000 docker compose run --rm --no-deps e2e npx playwright test; status=$$?; \
+	echo "==> restaurando backend/worker/scheduler pro banco de dev e rate limit padrão..."; \
+	docker compose up -d nginx backend worker scheduler; \
+	exit $$status
 
 keys:
 	@mkdir -p backend/storage/keys

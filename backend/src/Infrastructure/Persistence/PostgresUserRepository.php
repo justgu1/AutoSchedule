@@ -109,17 +109,30 @@ final readonly class PostgresUserRepository implements UserRepository
         ]);
     }
 
-    public function findPage(int $limit, int $offset): array
+    public function findPage(int $limit, int $offset, ?string $role = null): array
     {
+        $roleClause = $role === null ? '' : ' AND role = :role';
+        $params = ['limit' => $limit, 'offset' => $offset];
+
+        if ($role !== null) {
+            $params['role'] = $role;
+        }
+
         return $this->hydrateAll($this->connection->execute(
-            'SELECT ' . self::COLUMNS . " FROM users WHERE status <> 'deleted' ORDER BY created_at LIMIT :limit OFFSET :offset",
-            ['limit' => $limit, 'offset' => $offset],
+            'SELECT ' . self::COLUMNS . " FROM users WHERE status <> 'deleted'{$roleClause} ORDER BY created_at LIMIT :limit OFFSET :offset",
+            $params,
         ));
     }
 
-    public function count(): int
+    public function count(?string $role = null): int
     {
-        return (int) $this->connection->execute("SELECT COUNT(*) FROM users WHERE status <> 'deleted'")->fetchColumn();
+        $roleClause = $role === null ? '' : ' AND role = :role';
+        $params = $role === null ? [] : ['role' => $role];
+
+        return (int) $this->connection->execute(
+            "SELECT COUNT(*) FROM users WHERE status <> 'deleted'{$roleClause}",
+            $params,
+        )->fetchColumn();
     }
 
     public function countByRole(UserRole $role): int

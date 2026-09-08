@@ -1,25 +1,21 @@
 import Alert from '@mui/material/Alert';
-import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
+import Grid from '@mui/material/Grid';
 import Pagination from '@mui/material/Pagination';
-import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
+import { AvailabilityDialog } from '../components/AvailabilityDialog';
+import { Breadcrumb } from '../components/Breadcrumb';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { VehicleFilterBar } from '../components/VehicleFilterBar';
+import { FilterSidebar } from '../components/FilterSidebar';
 import { VehicleFormDialog } from '../components/VehicleFormDialog';
 import { VehicleGalleryDialog } from '../components/VehicleGalleryDialog';
+import { VehicleManagementCard } from '../components/VehicleManagementCard';
 import { Toast } from '../components/Toast';
 import { ApiError } from '../lib/apiClient';
 import { getMe } from '../lib/auth';
@@ -34,16 +30,9 @@ import {
     type Vehicle,
     type VehicleFilterParams,
     type VehicleInput,
-    type VehicleStatus,
 } from '../lib/vehicles';
 
-const PER_PAGE = 10;
-
-const STATUS_LABEL: Record<VehicleStatus, string> = {
-    active: 'Ativo',
-    trashed: 'Na lixeira',
-    deleted: 'Removido',
-};
+const PER_PAGE = 12;
 
 type ConfirmAction = { type: 'trash' | 'purge'; vehicle: Vehicle };
 
@@ -55,6 +44,7 @@ export function VehiclesPage() {
     const [formOpen, setFormOpen] = useState(false);
     const [editing, setEditing] = useState<Vehicle | null>(null);
     const [galleryVehicle, setGalleryVehicle] = useState<Vehicle | null>(null);
+    const [availabilityVehicle, setAvailabilityVehicle] = useState<Vehicle | null>(null);
     const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -147,17 +137,8 @@ export function VehiclesPage() {
     }
 
     return (
-        <Paper sx={{ p: 3 }}>
-            <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6" component="h1">
-                    Veículos
-                </Typography>
-                <Button variant="contained" onClick={openCreate}>
-                    Novo veículo
-                </Button>
-            </Stack>
-
-            <VehicleFilterBar
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} sx={{ alignItems: 'flex-start' }}>
+            <FilterSidebar
                 value={filters}
                 facets={facets.data}
                 onChange={(value) => {
@@ -166,104 +147,54 @@ export function VehiclesPage() {
                 }}
             />
 
-            {vehicles.isError && <Alert severity="error">Não foi possível carregar os veículos.</Alert>}
-
-            {vehicles.data?.data.length === 0 && (
-                <Alert severity="info">
-                    Nenhum veículo encontrado -- ajuste os filtros ou cadastre o primeiro acima.
-                </Alert>
-            )}
-
-            {vehicles.data && vehicles.data.data.length > 0 && (
-                <Table size="small">
-                    <TableHead>
-                        <TableRow>
-                            <TableCell />
-                            <TableCell>Veículo</TableCell>
-                            <TableCell>Ano</TableCell>
-                            <TableCell>Preço</TableCell>
-                            <TableCell>Status</TableCell>
-                            <TableCell align="right">Ações</TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {vehicles.data.data.map((vehicle) => (
-                            <TableRow key={vehicle.id}>
-                                <TableCell sx={{ width: 48 }}>
-                                    <Avatar src={vehicle.photo_url ?? undefined} variant="rounded">
-                                        {vehicle.brand.charAt(0)}
-                                    </Avatar>
-                                </TableCell>
-                                <TableCell>
-                                    {vehicle.brand} {vehicle.model}
-                                    {vehicle.version ? ` ${vehicle.version}` : ''}
-                                </TableCell>
-                                <TableCell>{vehicle.year ?? '-'}</TableCell>
-                                <TableCell>
-                                    {Number(vehicle.price).toLocaleString('pt-BR', {
-                                        style: 'currency',
-                                        currency: 'BRL',
-                                    })}
-                                </TableCell>
-                                <TableCell>
-                                    <Chip
-                                        size="small"
-                                        label={STATUS_LABEL[vehicle.status]}
-                                        color={vehicle.status === 'active' ? 'success' : 'default'}
-                                    />
-                                </TableCell>
-                                <TableCell align="right">
-                                    <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
-                                        <Button size="small" onClick={() => openEdit(vehicle)}>
-                                            Editar
-                                        </Button>
-                                        <Button size="small" onClick={() => setGalleryVehicle(vehicle)}>
-                                            Galeria
-                                        </Button>
-                                        {vehicle.status === 'active' && (
-                                            <Button
-                                                size="small"
-                                                color="error"
-                                                onClick={() => setConfirmAction({ type: 'trash', vehicle })}
-                                            >
-                                                Mover pra lixeira
-                                            </Button>
-                                        )}
-                                        {vehicle.status === 'trashed' && (
-                                            <>
-                                                <Button
-                                                    size="small"
-                                                    disabled={restoreMutation.isPending}
-                                                    onClick={() => restoreMutation.mutate(vehicle.id)}
-                                                >
-                                                    Restaurar
-                                                </Button>
-                                                <Button
-                                                    size="small"
-                                                    color="error"
-                                                    onClick={() => setConfirmAction({ type: 'purge', vehicle })}
-                                                >
-                                                    Excluir agora
-                                                </Button>
-                                            </>
-                                        )}
-                                    </Stack>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            )}
-
-            {vehicles.data && vehicles.data.meta.last_page > 1 && (
-                <Stack sx={{ alignItems: 'center', mt: 2 }}>
-                    <Pagination
-                        page={page}
-                        count={vehicles.data.meta.last_page}
-                        onChange={(_, value) => setPage(value)}
-                    />
+            <Stack spacing={2} sx={{ flex: 1, minWidth: 0, width: '100%' }}>
+                <Breadcrumb items={[{ label: 'Veículos' }]} />
+                <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="h6" component="h1">
+                        Veículos
+                    </Typography>
+                    <Button variant="contained" onClick={openCreate}>
+                        Novo veículo
+                    </Button>
                 </Stack>
-            )}
+
+                {vehicles.isError && <Alert severity="error">Não foi possível carregar os veículos.</Alert>}
+
+                {vehicles.data?.data.length === 0 && (
+                    <Alert severity="info">
+                        Nenhum veículo encontrado -- ajuste os filtros ou cadastre o primeiro acima.
+                    </Alert>
+                )}
+
+                {vehicles.data && vehicles.data.data.length > 0 && (
+                    <Grid container spacing={2}>
+                        {vehicles.data.data.map((vehicle) => (
+                            <Grid key={vehicle.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
+                                <VehicleManagementCard
+                                    vehicle={vehicle}
+                                    onEdit={() => openEdit(vehicle)}
+                                    onGallery={() => setGalleryVehicle(vehicle)}
+                                    onAvailability={() => setAvailabilityVehicle(vehicle)}
+                                    onTrash={() => setConfirmAction({ type: 'trash', vehicle })}
+                                    onRestore={() => restoreMutation.mutate(vehicle.id)}
+                                    onPurge={() => setConfirmAction({ type: 'purge', vehicle })}
+                                    restoring={restoreMutation.isPending}
+                                />
+                            </Grid>
+                        ))}
+                    </Grid>
+                )}
+
+                {vehicles.data && vehicles.data.meta.last_page > 1 && (
+                    <Stack sx={{ alignItems: 'center' }}>
+                        <Pagination
+                            page={page}
+                            count={vehicles.data.meta.last_page}
+                            onChange={(_, value) => setPage(value)}
+                        />
+                    </Stack>
+                )}
+            </Stack>
 
             <VehicleFormDialog
                 key={editing?.id ?? 'new'}
@@ -279,6 +210,11 @@ export function VehiclesPage() {
                 open={galleryVehicle !== null}
                 vehicle={galleryVehicle}
                 onClose={() => setGalleryVehicle(null)}
+            />
+            <AvailabilityDialog
+                open={availabilityVehicle !== null}
+                scope={availabilityVehicle ? { type: 'vehicle', id: availabilityVehicle.id } : null}
+                onClose={() => setAvailabilityVehicle(null)}
             />
             <ConfirmDialog
                 open={confirmAction !== null}
@@ -305,6 +241,6 @@ export function VehiclesPage() {
                 onCancel={() => setConfirmAction(null)}
             />
             <Toast open={toastMessage !== null} message={toastMessage ?? ''} onClose={() => setToastMessage(null)} />
-        </Paper>
+        </Stack>
     );
 }

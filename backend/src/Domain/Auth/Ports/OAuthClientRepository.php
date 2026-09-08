@@ -8,6 +8,15 @@ use App\Domain\Auth\OAuthClient;
 
 interface OAuthClientRepository
 {
-    /** Client é seedado, não registrado em runtime ainda -- só leitura de propósito, sem insert/update/delete. */
+    /** Nunca devolve um client revogado -- revogar precisa negar login imediatamente, não só ao expirar o token. */
     public function findByClientId(string $clientId): ?OAuthClient;
+
+    public function findByIdForOwner(string $id, string $ownerUserId): ?OAuthClient;
+
+    /** @return list<OAuthClient> */
+    public function findAllForOwner(string $ownerUserId): array;
+
+    public function insert(OAuthClient $client): void;
+
+    public function update(OAuthClient $client): void;
 }

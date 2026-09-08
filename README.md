@@ -30,7 +30,7 @@ O AutoSchedule é uma aplicação para agendamento de visitas a veículos. Fluxo
 
 Os horários disponíveis são definidos por data — ao selecionar um dia, só os horários livres naquele dia são apresentados.
 
-Antes desse fluxo existir, o projeto precisou de uma base de conta/autenticação, concessionária e veículo (login com role, MinIO pra foto, fila/scheduler pra e-mail assíncrono e purga da lixeira, CRUD de concessionária e de veículo com galeria e busca, página pública da concessionária em `/concessionarias/{slug}` já sem exigir conta) — é o que já está implementado hoje; disponibilidade e agendamento em si são a próxima etapa (`Worklist.md`).
+O fluxo inteiro está implementado hoje. Antes dele existir, o projeto precisou de uma base de conta/autenticação, concessionária e veículo (login com role, MinIO pra foto, fila/scheduler pra e-mail assíncrono e purga da lixeira, CRUD de concessionária e de veículo com galeria e busca, página pública da concessionária em `/concessionarias/{slug}` já sem exigir conta). Disponibilidade combina regra recorrente de concessionária e de veículo mais exceções pontuais; o agendamento, além de reservar o horário, rastreia a retirada e a devolução reais do veículo -- o cliente confirma clicando num e-mail (sem conta, sem senha), e uma rotina agendada decide quando notificar o próximo da fila com base no handoff do anterior (ver `docs/business-rules.md#ciclo-de-teste-drive`).
 
 ## Stack
 

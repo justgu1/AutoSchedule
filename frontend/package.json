@@ -13,10 +13,14 @@
     "dependencies": {
         "@emotion/react": "latest",
         "@emotion/styled": "latest",
+        "@mui/icons-material": "latest",
         "@mui/material": "latest",
+        "@mui/x-date-pickers": "latest",
         "@tanstack/react-query": "latest",
+        "dayjs": "latest",
         "react": "latest",
         "react-dom": "latest",
+        "react-number-format": "latest",
         "react-router-dom": "^7.18.3"
     },
     "devDependencies": {

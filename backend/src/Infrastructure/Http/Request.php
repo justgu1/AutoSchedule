@@ -78,10 +78,16 @@ final class Request
     }
 
     /**
-     * @throws \JsonException quando o corpo não é um JSON válido
+     * Corpo vazio (ação sem payload, ex. override de painel) vira `null`, não erro de parse.
+     *
+     * @throws \JsonException quando o corpo não está vazio mas não é um JSON válido
      */
     public function json(): mixed
     {
+        if (trim($this->body) === '') {
+            return null;
+        }
+
         return json_decode($this->body, associative: true, flags: JSON_THROW_ON_ERROR);
     }
 

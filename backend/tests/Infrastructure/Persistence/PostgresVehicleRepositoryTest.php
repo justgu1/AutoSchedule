@@ -48,7 +48,7 @@ final class PostgresVehicleRepositoryTest extends TestCase
         $this->assertSame($vehicle->id, $found->id);
         $this->assertSame($dealership, $found->dealershipId);
         $this->assertSame('Chevrolet', $found->brand);
-        $this->assertSame(2023, $found->year);
+        $this->assertSame(2023, $found->modelYear);
         $this->assertSame(TrashableStatus::Active, $found->trash->status);
     }
 
@@ -73,7 +73,24 @@ final class PostgresVehicleRepositoryTest extends TestCase
         $vehicle = $this->registerFixture($dealership);
         $this->repository->insert($vehicle);
 
-        $this->repository->update($vehicle->withDetails('Fiat', 'Argo', null, 2024, new Money(7550000), 'Único dono'));
+        $this->repository->update($vehicle->withDetails(
+            brand: 'Fiat',
+            model: 'Argo',
+            version: null,
+            manufactureYear: 2023,
+            modelYear: 2024,
+            price: new Money(7550000),
+            description: 'Único dono',
+            mileageKm: null,
+            transmission: null,
+            bodyType: null,
+            fuelType: null,
+            color: null,
+            plateEndDigit: null,
+            acceptsTrade: false,
+            ipvaPaid: false,
+            licensed: false,
+        ));
 
         $found = $this->repository->findById($vehicle->id);
         $this->assertNotNull($found);
@@ -264,7 +281,8 @@ final class PostgresVehicleRepositoryTest extends TestCase
             brand: $brand,
             model: 'Onix',
             version: 'LTZ 1.0 Turbo',
-            year: 2023,
+            manufactureYear: 2023,
+            modelYear: 2023,
             price: $price ?? new Money(8990000),
         );
 
@@ -274,9 +292,19 @@ final class PostgresVehicleRepositoryTest extends TestCase
             brand: $vehicle->brand,
             model: $vehicle->model,
             version: $vehicle->version,
-            year: $vehicle->year,
+            manufactureYear: $vehicle->manufactureYear,
+            modelYear: $vehicle->modelYear,
             price: $vehicle->price,
             description: $vehicle->description,
+            mileageKm: $vehicle->mileageKm,
+            transmission: $vehicle->transmission,
+            bodyType: $vehicle->bodyType,
+            fuelType: $vehicle->fuelType,
+            color: $vehicle->color,
+            plateEndDigit: $vehicle->plateEndDigit,
+            acceptsTrade: $vehicle->acceptsTrade,
+            ipvaPaid: $vehicle->ipvaPaid,
+            licensed: $vehicle->licensed,
             trash: $vehicle->trash,
             trashedByDealershipTrash: $vehicle->trashedByDealershipTrash,
             createdAt: $createdAt,

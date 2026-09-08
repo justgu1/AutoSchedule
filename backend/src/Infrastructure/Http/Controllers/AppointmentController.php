@@ -11,6 +11,7 @@ use App\Application\Appointment\DTO\AppointmentSummary;
 use App\Application\Appointment\ListAppointments;
 use App\Application\Appointment\PickupAppointment;
 use App\Application\Appointment\ReleaseAppointment;
+use App\Application\Appointment\ViewAppointment;
 use App\Domain\Appointment\Appointment;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
@@ -24,6 +25,7 @@ final readonly class AppointmentController
 {
     public function __construct(
         private CreateAppointment $createAppointment,
+        private ViewAppointment $viewAppointment,
         private ListAppointments $listAppointments,
         private ConfirmAppointment $confirmAppointment,
         private CancelAppointment $cancelAppointment,
@@ -53,6 +55,13 @@ final readonly class AppointmentController
         );
 
         return Response::success(AppointmentSummary::fromAppointment($appointment)->toArray(), 201);
+    }
+
+    public function show(Request $request): Response
+    {
+        $appointment = ($this->viewAppointment)($request->param('id'), $request->query('token'), RequestActor::fromRequest($request));
+
+        return Response::success(AppointmentSummary::fromAppointment($appointment)->toArray());
     }
 
     public function index(Request $request): Response

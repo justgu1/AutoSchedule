@@ -77,8 +77,20 @@ Convenção: `Arquivo::método` para PHPUnit (backend); `arquivo.spec.ts > nome 
 | Busca respeita o escopo do seller e as facetas trazem só o que existe em estoque | `VehicleSearchTest::busca_nao_atravessa_a_concessionaria_de_outro_seller`, `::facetas_trazem_so_o_que_existe_em_estoque` |
 | Facetas públicas ignoram veículo trashed; o catálogo é o mesmo filtro empilhado, só sem escopo de dono | `VehicleSearchTest::facetas_publicas_ignoram_veiculo_trashed` |
 | Query string editável na barra de endereço vira filtro ausente, não 500 | `VehicleFilterQueryTest` (4 casos) |
+| Prefixo progressivo (1+ caractere) acha termo só presente em `description`, mesmo sem a palavra inteira digitada | `VehicleSearchTest::busca_por_prefixo_na_descricao_encontra_progressivamente`, `::busca_por_substring_no_meio_da_palavra_na_descricao`, `::termo_de_um_caractere_nao_quebra_a_busca` |
+| Câmbio/carroceria/combustível/km-máximo combinam por AND entre si e com os filtros já existentes | `VehicleSearchTest::filtro_de_specs_combina_cambio_carroceria_combustivel_e_km` |
+| Ordenação explícita (preço, ano, criação) substitui a relevância quando informada; sem ela, relevância continua sendo o default | `VehicleSearchTest::ordenacao_explicita_por_preco_ignora_a_relevancia`, `::ordenacao_explicita_por_ano_traz_os_mais_novos_primeiro`, `::ordenacao_explicita_por_criacao_recente_e_antiga` |
 | Site público: index lista o catálogo filtrável e o card abre a página do veículo, sem exigir conta; header troca "Entrar/Criar conta" por "Entrar no painel" conforme a sessão | E2E: `public-site.spec.ts > index lista o catálogo público...`, `> header oferece entrar e criar conta...` |
 | Painel do vendedor: CRUD, galeria e lixeira do próprio estoque; filtro de marca encontra o veículo pelo painel; customer não acessa a rota | E2E: `vehicles.spec.ts` (3 casos) |
+
+## Especificações e itens de veículo
+
+| Regra | Testes |
+|---|---|
+| Câmbio/carroceria/combustível/cor/km/final de placa/troca/IPVA/licenciado são campos planos do próprio `Vehicle`, sem VO extra | `VehicleTest::with_details_troca_os_dados_mas_preserva_concessionaria_e_ciclo_de_vida`; `PostgresVehicleRepositoryTest` (ida e volta pelo banco, via `registerFixture`) |
+| Itens de veículo (amenities) são catálogo global fora do agregado `Vehicle`, resolvido por porta própria | `VehicleAmenitiesTest` (5 casos: catálogo inteiro, substituição em vez de soma, id inválido rejeita sem persistir nada) |
+| Vínculo de item delega inteiramente pro RLS do próprio veículo; catálogo é público-leitura, admin-só-escrita | `VehicleAmenityRlsPolicyTest` (9 casos) |
+| `amenity_ids` inválido (fora do catálogo) é 422, nunca erro de FK | `VehicleAmenitiesTest::replace_com_id_inexistente_no_catalogo_rejeita_com_422` |
 
 ## Disponibilidade
 
@@ -87,6 +99,9 @@ Convenção: `Arquivo::método` para PHPUnit (backend); `arquivo.spec.ts > nome 
 | `WeeklyWindow` valida `weekday` 0-6 e `start_time < end_time` -- único lugar que valida, reaproveitado pelas duas tabelas de regra recorrente | `WeeklyWindowTest` (3 casos) |
 | `AvailabilityException` exige exatamente um escopo (concessionária ou veículo), intervalo válido, e horário obrigatório quando `is_available=true` | `AvailabilityExceptionTest` (5 casos) |
 | O motor de cálculo intersecta concessionária ∩ veículo, aplica a exceção com prioridade sobre a regra recorrente, remove slot ocupado, respeita `[start, end)` -- o exemplo de `business-rules.md` é o teste de referência | `AvailabilityCalculatorTest` (9 casos: exemplo da documentação, sem interseção, exceção total/parcial/substituição, agendamento ocupando slot, múltiplas janelas no mesmo dia, borda do intervalo, weekday errado não conta) |
+| Veículo sem regra recorrente e sem exceção pontual não restringe nada -- usa só a janela da concessionária | `AvailabilityCalculatorTest::veiculo_sem_regra_e_sem_excecao_nao_restringe_usa_so_a_janela_da_concessionaria` |
+| Concessionária sem regra recorrente e sem exceção usa o default seg-sex 9h-18h, em vez de zero horário | `AvailabilityCalculatorTest::concessionaria_sem_regra_e_sem_excecao_usa_default_seg_sex_9_18` |
+| Veículo sem regra recorrente mas com exceção pontual pra aquela data respeita a exceção (não vira "sem restrição" só por faltar regra) | `AvailabilityCalculatorTest::veiculo_sem_regra_recorrente_mas_com_excecao_pontual_respeita_a_excecao` |
 | RLS das três tabelas de disponibilidade delega inteiramente pro RLS da concessionária/veículo, sem repetir predicado -- inclusive a leitura pública que o motor de cálculo precisa | `PostgresDealershipAvailabilityRuleRepositoryTest`, `PostgresVehicleAvailabilityRuleRepositoryTest`, `PostgresAvailabilityExceptionRepositoryTest` |
 
 ## Agendamento
@@ -97,11 +112,12 @@ Convenção: `Arquivo::método` para PHPUnit (backend); `arquivo.spec.ts > nome 
 | Prazo de devolução é sempre `scheduled_at + 60min`, nunca a hora real da retirada | `AppointmentTest::return_deadline_e_sempre_scheduled_at_mais_60_minutos` |
 | O token de confirmação nasce só quando o e-mail de fato sai (`markConfirmationSent`), nunca na criação -- texto puro gerado antes de existir e-mail seria descartado sem ninguém poder usá-lo | `AppointmentTest::request_monta_um_agendamento_pending_sem_token_de_confirmacao_ainda`, `::mark_confirmation_sent_gera_o_token_e_grava_o_prazo_a_partir_do_envio` |
 | RLS: seller só enxerga/altera agendamento das próprias concessionárias; admin, qualquer um; sem contexto, nenhuma linha; contexto de serviço insere/enxerga/atualiza qualquer um (criação pública, rotina agendada, clique por token); leitura pública enxerga só `pending`/`confirmed`, nunca `completed`/`cancelled`/`no_show` | `AppointmentRlsPolicyTest` (7 casos) |
-| Concorrência: duas reservas do mesmo veículo/horário, uma vira `409` -- reconferido na aplicação antes do INSERT, e o índice único do banco é o backstop final | Fumaça manual (`curl` simultâneo); índice único documentado em `docs/database.md#agendamentos` |
-| Confirmar/cancelar aceita sessão de admin/dono OU o token do e-mail, mesmo endpoint -- token errado ou ausente sem sessão vira `404`, igual agendamento inexistente | Fumaça manual (`ConfirmAppointment`/`CancelAppointment` via `AppointmentAccess`) |
-| Cliente é achado por e-mail ou criado (`role=customer`), sem sobrescrever o perfil de quem já existe -- o snapshot do agendamento é uma cópia própria | Fumaça manual (fluxo completo via `curl`, ver histórico de PR) |
-| E-mail de confirmação espera o veículo ficar livre (handoff do agendamento anterior + 15min de preparo), ou sai na hora se nada bloqueia -- reaproveita o mesmo `QueuedJob::SendEmail` do reset de senha | Fumaça manual (Mailpit real, ciclo completo: criação → e-mail de aviso ao vendedor → e-mail de confirmação ao cliente → clique confirma) |
-| Rotina automática libera o veículo (`completed`) ou marca `no_show` quando o prazo de devolução passa, ancorada no prazo, não em "agora" | Fumaça manual (agendamento real expirando em tempo de execução) |
+| Concorrência: duas reservas do mesmo veículo/horário, uma vira `409` -- reconferido na aplicação antes do INSERT, e o índice único do banco é o backstop final | E2E: `appointments.spec.ts > reserva concorrente do mesmo horário vira 409`; índice único documentado em `docs/database.md#agendamentos` |
+| Confirmar/cancelar aceita sessão de admin/dono OU o token do e-mail, mesmo endpoint -- token errado ou ausente sem sessão vira `404`, igual agendamento inexistente | E2E: `appointments.spec.ts > ciclo completo...` (confirma por token); fumaça manual pro caso de token errado |
+| Cliente é achado por e-mail ou criado (`role=customer`), sem sobrescrever o perfil de quem já existe -- o snapshot do agendamento é uma cópia própria | E2E: `appointments.spec.ts` (todo agendamento criado pelo fluxo público passa por isso) |
+| E-mail de confirmação espera o veículo ficar livre (handoff do agendamento anterior + 15min de preparo), ou sai na hora se nada bloqueia -- reaproveita o mesmo `QueuedJob::SendEmail` do reset de senha | E2E: `appointments.spec.ts > ciclo completo: e-mail de confirmação, token, retirada e devolução` (Mailpit real) |
+| Rotina automática libera o veículo (`completed`) ou marca `no_show` quando o prazo de devolução passa, ancorada no prazo, não em "agora" | Fumaça manual (agendamento real expirando em tempo de execução) -- ciclo feliz (retirada + devolução manual) coberto pelo mesmo E2E acima |
+| Slot que já passou hoje não aparece como disponível (`notBefore`) -- comparado por instante, não por `format()` | `AvailabilityCalculatorTest::not_before_remove_slot_que_ja_passou`, `::sem_not_before_slot_do_passado_continua_valido` |
 
 ## Autenticação
 
@@ -119,6 +135,17 @@ Convenção: `Arquivo::método` para PHPUnit (backend); `arquivo.spec.ts > nome 
 | Logout revoga a família do refresh token e limpa os cookies | `OAuthFlowsTest::logout_revoga_o_refresh_token_e_o_reuso_subsequente_falha`, `::logout_com_token_inexistente_nao_lanca_excecao`; E2E: `auth.spec.ts > logout limpa a sessão e redireciona pro login` |
 | Reset de senha: `POST /password-reset` sempre 200 (não vaza se a conta existe); `PUT /me/password` aceita `reset_token` (sem Bearer) ou `current_password` (autenticado) | `PasswordResetTokenTest`, `PostgresPasswordResetTokenRepositoryTest` (4 casos); E2E: `password-reset.spec.ts > esqueci a senha -> e-mail real via Mailpit -> redefinir -> login com a senha nova` (Mailpit real, não mock) |
 | Access token JWT RS256, `alg` fixo (não aceita troca pra HS256) | `JwtTokenIssuerTest::rejeita_algoritmo_diferente_de_rs256_mesmo_assinado_com_a_chave_publica`, `::rejeita_assinatura_de_uma_chave_diferente`, `::rejeita_issuer_ou_audience_inesperados`, `::rejeita_token_expirado` |
+
+## Credenciais de API (OAuth2 self-service, m2m)
+
+| Regra | Testes |
+|---|---|
+| Client m2m nasce com `client_id` prefixado, secret aleatório mostrado uma vez só (hash persistido, nunca o texto puro) | `OAuthClientTest::create_for_owner_monta_um_client_confidencial_m2m_sem_escopo_proprio`, `::rotate_secret_troca_o_hash_e_invalida_o_secret_anterior`, `::revoked_marca_o_client_como_revogado` |
+| `client_credentials` de client com dono autentica como o próprio dono (`subject`/`role` do JWT viram os do dono, não do client) -- RLS/`RoleMiddleware` funcionam sem mudança nenhuma | `OAuthFlowsTest::client_credentials_de_client_com_dono_autentica_como_o_dono` |
+| Client revogado ou dono trashed nega o login, mesmo com secret correto | `OAuthFlowsTest::client_credentials_de_client_revogado_e_negado`, `::client_credentials_de_dono_trashed_e_negado` |
+| CRUD (`CreateApiClient`/`ListApiClients`/`RotateApiClientSecret`/`RevokeApiClient`) escopado ao próprio dono, nunca alcança client alheio | `CreateApiClientTest`, `ListApiClientsTest`, `RotateApiClientSecretTest`, `RevokeApiClientTest` |
+| RLS: client sem dono (sistema) é sempre visível independente de contexto; dono só enxerga o próprio; admin, qualquer um | `OAuthClientRlsPolicyTest` (inclui a regressão do cookie obsoleto -- ver `docs/testing.md`) |
+| Corpo vazio em endpoint que não manda payload (override de painel) não derruba com exceção de JSON malformado | `RequestTest` (corpo vazio vira `null`, corpo de fato malformado ainda lança) |
 
 ## Autorização
 
@@ -180,7 +207,8 @@ Não é seção de `business-rules.md` (é requisito não-funcional, não regra 
 
 | Regra | Testes |
 |---|---|
-| Páginas públicas sem violação de WCAG 2.1 AA (contraste, ARIA, labels) | E2E: `accessibility.spec.ts` (axe-core, tags `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`, roda em `/`, `/login`, `/register`, `/forgot-password`) |
+| Páginas públicas estáticas sem violação de WCAG 2.1 AA (contraste, ARIA, labels) | E2E: `accessibility.spec.ts` (axe-core, tags `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`, roda em `/`, `/login`, `/register`, `/forgot-password`) |
+| Páginas dinâmicas (perfil de veículo, de concessionária) e o painel autenticado inteiro (veículos/concessionárias/agendamentos/perfil) também passam no mesmo scan | E2E: `accessibility.spec.ts > página pública do veículo...`, `> página pública da concessionária...`, `> painel autenticado...` (fixture própria criada dentro do teste, banco de dev/demo nunca é usado) |
 | Operável 100% por teclado, ordem de foco lógica | E2E: `keyboard-navigation.spec.ts > login é operável só com teclado, sem mouse`, `> registro é operável só com teclado até o campo de role` |
 | Sem quebra de layout em viewport mobile | Toda a suíte E2E roda em 2 projetos Playwright (`chromium` desktop + `mobile`, `iPhone 13`) -- qualquer spec que falhe só no mobile pega isso |
 | Indicador visual de foco (2.4.7, AA) | **Não coberto por teste automatizado** -- é visual, sem asserção confiável sem screenshot-diff; revisão manual |
@@ -204,11 +232,21 @@ Pontos sem teste automatizado direto, documentados aqui em vez de silenciosament
   screenshot-diff. Revisão manual.
 - **Uso sem JavaScript.** Não aplicável hoje: a SPA é 100% client-rendered, sem SSR. O `<noscript>`
   avisa, mas não há conteúdo funcional sem JS.
-- **`AppointmentController`/`CreateAppointment` e a cadeia de e-mail não têm suíte de integração
-  própria** (só o domínio puro e o RLS têm): concorrência, confirmação por token, o algoritmo de
-  quando o e-mail de confirmação dispara, e as três rotinas agendadas (expira, libera, no-show)
-  foram verificados via `curl`/Mailpit reais, documentado no histórico da PR -- não por teste
-  automatizado. Mesma situação que `VehicleController`, um degrau abaixo.
+- **`AppointmentController`/`CreateAppointment` não têm suíte de integração PHPUnit própria**
+  (só o domínio puro e o RLS têm) -- concorrência, confirmação por token e o algoritmo de quando
+  o e-mail de confirmação dispara são cobertos pelo E2E (`appointments.spec.ts`, Mailpit real),
+  não por teste de backend isolado. As rotinas de expiração e a de auto-`no_show` (só disparam
+  quando ninguém retira o veículo) seguem só com fumaça manual -- mesma situação que
+  `VehicleController`, um degrau abaixo.
+- **`ApiClientController` na mesma situação dos outros controllers:** o CRUD em si (rotas, formato
+  de resposta, `client_secret` só aparecendo na criação/rotação) foi verificado manualmente via
+  curl (round-trip completo: gerar credencial, autenticar com ela, revogar, confirmar que uma nova
+  tentativa falha), mas não tem teste de endpoint automatizado -- a regra de negócio por trás
+  (dono, revogação, m2m autenticando como o dono) está coberta em `OAuthFlowsTest`/`OAuthClientTest`.
+- **Fallback de foto real do seeder de demo (Wikimedia Commons) não é testado.** É rede externa e
+  best-effort por natureza (`fetchRealCarImages()` devolve lista vazia em qualquer falha, e quem
+  chama já cai pro placeholder de GD) -- verificado manualmente rodando o seeder contra a rede real
+  (30 de 32 modelos trouxeram foto real na última rodada), não por teste automatizado.
 
 Duas coisas que **deixaram** de ser lacuna nesta rodada e ficam registradas para não voltarem
 como surpresa:
@@ -218,6 +256,18 @@ como surpresa:
   chamada no caminho real, não só em teste.
 - Violação de `UNIQUE` subia crua e virava 500. Agora tem teste
   (`PostgresUserRepositoryTest::email_duplicado_vira_conflito_de_dominio_e_nao_erro_interno`).
+- `amenity_ids` inválido não tinha nenhum teste (só wiring incidental em `CreateVehicleTest`/
+  `UpdateVehicleTest`) -- agora `VehicleAmenitiesTest` cobre substituição válida, id inexistente
+  (422, sem persistir nada) e RLS delegada tem suíte própria (`VehicleAmenityRlsPolicyTest`).
+- O slug de concessionária quebrava palavra com acento em dois (`iconv('UTF-8','ASCII//TRANSLIT',...)`
+  vira `"~a"` pra `"ã"`, não `"a"`) -- achado rodando o seeder de demo com nomes reais
+  (`"minas-ve-iculos-savassi"`). Extraído pro `Slugger` compartilhado, com teste próprio
+  (`SluggerTest`) e regressão em `DealershipTest`.
+- Filtro combinado de specs (câmbio/carroceria/combustível/km) só tinha fumaça manual -- agora
+  `VehicleSearchTest::filtro_de_specs_combina_cambio_carroceria_combustivel_e_km`.
+- E2E rodava contra o mesmo banco de dev (`autoschedule`), poluindo o catálogo de demonstração com
+  dado sintético de teste a cada rodada -- `make e2e` agora usa um banco irmão isolado
+  (`autoschedule_e2e`), documentado em `docs/testing.md`.
 
 ### Fora de escopo, de propósito
 

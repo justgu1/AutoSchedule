@@ -159,6 +159,82 @@ final class AvailabilityCalculatorTest extends TestCase
         $this->assertSame([], $slots);
     }
 
+    #[Test]
+    public function not_before_remove_slot_que_ja_passou(): void
+    {
+        $slots = $this->calculator->slotsFor(
+            date: $this->date(self::TUESDAY),
+            dealershipWindows: [$this->window(2, '09:00', '18:00')],
+            vehicleWindows: [$this->window(2, '10:00', '15:00')],
+            exceptions: [],
+            occupiedStarts: [],
+            durationMinutes: 60,
+            notBefore: $this->dateTime(self::TUESDAY, '12:00'),
+        );
+
+        $this->assertSame(['12:00', '13:00', '14:00'], $this->times($slots));
+    }
+
+    #[Test]
+    public function sem_not_before_slot_do_passado_continua_valido(): void
+    {
+        $slots = $this->calculator->slotsFor(
+            date: $this->date(self::TUESDAY),
+            dealershipWindows: [$this->window(2, '09:00', '18:00')],
+            vehicleWindows: [$this->window(2, '10:00', '15:00')],
+            exceptions: [],
+            occupiedStarts: [],
+            durationMinutes: 60,
+        );
+
+        $this->assertSame(['10:00', '11:00', '12:00', '13:00', '14:00'], $this->times($slots));
+    }
+
+    #[Test]
+    public function veiculo_sem_regra_e_sem_excecao_nao_restringe_usa_so_a_janela_da_concessionaria(): void
+    {
+        $slots = $this->calculator->slotsFor(
+            date: $this->date(self::TUESDAY),
+            dealershipWindows: [$this->window(2, '09:00', '12:00')],
+            vehicleWindows: [],
+            exceptions: [],
+            occupiedStarts: [],
+            durationMinutes: 60,
+        );
+
+        $this->assertSame(['09:00', '10:00', '11:00'], $this->times($slots));
+    }
+
+    #[Test]
+    public function concessionaria_sem_regra_e_sem_excecao_usa_default_seg_sex_9_18(): void
+    {
+        $slots = $this->calculator->slotsFor(
+            date: $this->date(self::TUESDAY),
+            dealershipWindows: [],
+            vehicleWindows: [$this->window(2, '08:00', '10:00')],
+            exceptions: [],
+            occupiedStarts: [],
+            durationMinutes: 60,
+        );
+
+        $this->assertSame(['09:00'], $this->times($slots));
+    }
+
+    #[Test]
+    public function veiculo_sem_regra_recorrente_mas_com_excecao_pontual_respeita_a_excecao(): void
+    {
+        $slots = $this->calculator->slotsFor(
+            date: $this->date(self::TUESDAY),
+            dealershipWindows: [$this->window(2, '09:00', '18:00')],
+            vehicleWindows: [],
+            exceptions: [$this->exception(startTime: null, endTime: null, isAvailable: false, vehicleId: 'v1')],
+            occupiedStarts: [],
+            durationMinutes: 60,
+        );
+
+        $this->assertSame([], $slots);
+    }
+
     private function window(int $weekday, string $start, string $end): WeeklyWindow
     {
         return new WeeklyWindow($weekday, $this->time($start), $this->time($end));

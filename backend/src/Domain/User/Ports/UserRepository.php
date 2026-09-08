@@ -28,10 +28,10 @@ interface UserRepository extends TrashableRepository
     public function restore(string $id): void;
 
     /** @return list<User> */
-    public function findPage(int $limit, int $offset): array;
+    public function findPage(int $limit, int $offset, ?string $role = null): array;
 
     /** Total de usuários não deletados -- base pro `meta.last_page` da paginação. */
-    public function count(): int;
+    public function count(?string $role = null): int;
 
     /** Usado pra bloquear DELETE do último admin restante (409 Conflict) -- só conta admin ativo, um trashed não protege ninguém. */
     public function countByRole(UserRole $role): int;

@@ -87,6 +87,18 @@ final readonly class ValidatedInput
         return (string) $value;
     }
 
+    /**
+     * @template T of \BackedEnum
+     * @param class-string<T> $enum
+     * @return ?T
+     */
+    public function enumOrNull(string $field, string $enum): ?\BackedEnum
+    {
+        $value = $this->stringOrNull($field);
+
+        return $value === null ? null : $enum::from($value);
+    }
+
     public function boolOr(string $field, bool $fallback): bool
     {
         $value = $this->values[$field] ?? null;

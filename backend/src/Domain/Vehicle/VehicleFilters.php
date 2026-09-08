@@ -21,6 +21,11 @@ final readonly class VehicleFilters
         public ?Money $priceMin = null,
         public ?Money $priceMax = null,
         public ?string $dealershipId = null,
+        public ?VehicleSort $sort = null,
+        public ?Transmission $transmission = null,
+        public ?BodyType $bodyType = null,
+        public ?FuelType $fuelType = null,
+        public ?int $mileageKmMax = null,
     ) {
     }
 }

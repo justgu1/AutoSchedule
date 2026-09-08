@@ -257,6 +257,20 @@ final class PostgresUserRepositoryTest extends TestCase
     }
 
     #[Test]
+    public function find_page_filtra_por_role_quando_informado(): void
+    {
+        $seller = User::register('Seller Demo', new Email('seller-page@example.com'), null, 'secret', UserRole::Seller);
+        $customer = User::register('Customer Demo', new Email('customer-page@example.com'), null, 'secret', UserRole::Customer);
+        $this->repository->insert($seller);
+        $this->repository->insert($customer);
+
+        $ids = array_map(static fn (User $user): string => $user->id, $this->repository->findPage(1000, 0, UserRole::Seller->value));
+
+        $this->assertContains($seller->id, $ids);
+        $this->assertNotContains($customer->id, $ids);
+    }
+
+    #[Test]
     public function count_conta_todo_usuario_nao_deletado(): void
     {
         $before = $this->repository->count();
@@ -264,6 +278,16 @@ final class PostgresUserRepositoryTest extends TestCase
         $this->repository->insert(User::register('Ada', new Email('ada-count@example.com'), null, 'secret', UserRole::Customer));
 
         $this->assertSame($before + 1, $this->repository->count());
+    }
+
+    #[Test]
+    public function count_filtra_por_role_quando_informado(): void
+    {
+        $before = $this->repository->count(UserRole::Seller->value);
+
+        $this->repository->insert(User::register('Ada', new Email('ada-count-seller@example.com'), null, 'secret', UserRole::Seller));
+
+        $this->assertSame($before + 1, $this->repository->count(UserRole::Seller->value));
     }
 
     #[Test]

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { searchOnHome } from './support/ui';
 
 function uniqueEmail(prefix: string): string {
     return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@example.com`;
@@ -70,10 +71,10 @@ async function registerSellerWithVehicle(
     await dialog.getByLabel('Concessionária').fill(dealershipName);
     await page.getByRole('option', { name: dealershipName }).click();
     await dialog.getByLabel('Marca').fill(brand);
-    await dialog.getByLabel('Modelo').fill(model);
+    await dialog.getByLabel(/^Modelo/).fill(model);
     await dialog.getByLabel('Preço').fill('89900.00');
     await dialog.getByRole('button', { name: 'Criar' }).click();
-    await expect(page.getByRole('cell', { name: `${brand} ${model}` })).toBeVisible();
+    await expect(page.getByRole('group', { name: `${brand} ${model}` })).toBeVisible();
 
     await page.getByRole('button', { name: 'Sair' }).click();
     await expect(page).toHaveURL(/\/login$/);
@@ -85,8 +86,8 @@ test('index lista o catálogo público e o card abre a página do veículo, sem 
     await registerSellerWithVehicle(page, `Index Center ${Date.now()}`, brand, 'Argo');
 
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: 'Encontre seu próximo veículo' })).toBeVisible();
-    await page.getByLabel('Buscar').fill(brand);
+    await expect(page.getByRole('heading', { name: /veículos/ })).toBeVisible();
+    await searchOnHome(page, brand);
     await expect(page.getByRole('heading', { name: `${brand} Argo` })).toBeVisible();
 
     await page.getByRole('heading', { name: `${brand} Argo` }).click();

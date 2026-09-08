@@ -31,7 +31,7 @@ interface VehicleRepository extends TrashableRepository
      * Marcas, modelos e anos que existem em estoque, pros filtros da tela não oferecerem
      * combinação que não devolve nada.
      *
-     * @return array{brands: list<string>, models: list<string>, years: list<int>}
+     * @return array{brands: list<string>, models: list<string>, years: list<int>, transmissions: list<string>, body_types: list<string>, fuel_types: list<string>}
      */
     public function availableFilters(?string $ownerUserId): array;
 
@@ -45,7 +45,7 @@ interface VehicleRepository extends TrashableRepository
 
     public function countSearchPublic(VehicleFilters $filters): int;
 
-    /** @return array{brands: list<string>, models: list<string>, years: list<int>} */
+    /** @return array{brands: list<string>, models: list<string>, years: list<int>, transmissions: list<string>, body_types: list<string>, fuel_types: list<string>} */
     public function availableFiltersPublic(): array;
 
     public function trash(string $id): void;

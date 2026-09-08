@@ -201,11 +201,13 @@ test('seller usa o próprio telefone e e-mail no formulário da concessionária'
 test('admin cria concessionária pra um seller e reassocia o dono pra outro', async ({ page }) => {
     await mockZipCodeLookup(page, { street: 'Rua Admin', neighborhood: 'Centro', city: 'Rio de Janeiro', state: 'RJ' });
 
-    const { id: ownerAId } = await registerSellerAndGetId(page, 'Dono Original');
+    const ownerAName = `Dono Original ${Date.now()}`;
+    const { email: ownerAEmail } = await registerSellerAndGetId(page, ownerAName);
     await page.getByRole('button', { name: 'Sair' }).click();
     await expect(page).toHaveURL(/\/login$/);
 
-    const { id: ownerBId } = await registerSellerAndGetId(page, 'Dono Novo');
+    const ownerBName = `Dono Novo ${Date.now()}`;
+    const { email: ownerBEmail } = await registerSellerAndGetId(page, ownerBName);
     await page.getByRole('button', { name: 'Sair' }).click();
     await expect(page).toHaveURL(/\/login$/);
 
@@ -217,7 +219,9 @@ test('admin cria concessionária pra um seller e reassocia o dono pra outro', as
     await page.getByRole('link', { name: 'Concessionárias' }).click();
     await page.getByRole('button', { name: 'Nova concessionária' }).click();
     const dealershipName = `Admin Reassoc ${Date.now()}`;
-    await page.getByLabel(/Dono/).fill(ownerAId);
+    // Dropdown de dono é um Autocomplete que busca pelo nome/e-mail exibido -- nunca UUID digitado.
+    await page.getByLabel(/Dono/).fill(ownerAEmail);
+    await page.getByRole('option', { name: new RegExp(`${ownerAName}.*${ownerAEmail}`) }).click();
     await page.getByLabel('Nome').fill(dealershipName);
     await page.getByLabel('CEP').fill('01000-000');
     // CEP completo -> debounce dispara sozinho (mocado) e preenche Endereço/Bairro/Cidade/UF.
@@ -232,8 +236,9 @@ test('admin cria concessionária pra um seller e reassocia o dono pra outro', as
         .getByRole('row', { name: new RegExp(dealershipName) })
         .getByRole('button', { name: 'Editar' })
         .click();
-    await expect(page.getByLabel(/Dono/)).toHaveValue(ownerAId);
-    await page.getByLabel(/Dono/).fill(ownerBId);
+    await expect(page.getByLabel(/Dono/)).toHaveValue(`${ownerAName} (${ownerAEmail})`);
+    await page.getByLabel(/Dono/).fill(ownerBEmail);
+    await page.getByRole('option', { name: new RegExp(`${ownerBName}.*${ownerBEmail}`) }).click();
     await page.getByRole('button', { name: 'Salvar' }).click();
     await expect(page.getByRole('dialog')).not.toBeVisible();
 
@@ -242,7 +247,7 @@ test('admin cria concessionária pra um seller e reassocia o dono pra outro', as
         .getByRole('row', { name: new RegExp(dealershipName) })
         .getByRole('button', { name: 'Editar' })
         .click();
-    await expect(page.getByLabel(/Dono/)).toHaveValue(ownerBId);
+    await expect(page.getByLabel(/Dono/)).toHaveValue(`${ownerBName} (${ownerBEmail})`);
 });
 
 test('página pública da concessionária mostra nome, endereço e vendedor sem exigir conta', async ({ page }) => {

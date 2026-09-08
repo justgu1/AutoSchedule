@@ -46,26 +46,48 @@ export function AuthenticatedLayout() {
             <AppBar position="static" color="default" elevation={1}>
                 <Toolbar sx={{ justifyContent: 'space-between' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                        <Typography variant="h6" component="span">
+                        <Typography
+                            variant="h6"
+                            component={RouterLink}
+                            to="/"
+                            sx={{ color: 'text.primary', textDecoration: 'none' }}
+                        >
                             AutoSchedule
                         </Typography>
-                        <Button component={RouterLink} to="/me" size="small">
+                        <Button component={RouterLink} to="/me" size="small" sx={{ color: 'primary.dark' }}>
                             Meu perfil
                         </Button>
                         {(me.data.role === 'admin' || me.data.role === 'seller') && (
-                            <Button component={RouterLink} to="/dealerships" size="small">
+                            <Button
+                                component={RouterLink}
+                                to="/dealerships"
+                                size="small"
+                                sx={{ color: 'primary.dark' }}
+                            >
                                 Concessionárias
                             </Button>
                         )}
                         {(me.data.role === 'admin' || me.data.role === 'seller') && (
-                            <Button component={RouterLink} to="/vehicles" size="small">
+                            <Button component={RouterLink} to="/vehicles" size="small" sx={{ color: 'primary.dark' }}>
                                 Veículos
+                            </Button>
+                        )}
+                        {(me.data.role === 'admin' || me.data.role === 'seller') && (
+                            <Button
+                                component={RouterLink}
+                                to="/appointments"
+                                size="small"
+                                sx={{ color: 'primary.dark' }}
+                            >
+                                Agendamentos
                             </Button>
                         )}
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                         <Typography variant="body2">{me.data.name}</Typography>
-                        <Button size="small" onClick={handleLogout}>
+                        {/* `primary.dark` em vez do padrão -- o azul default do MUI (#1976d2) fica em 4.2:1 contra
+                            o cinza do AppBar, abaixo do mínimo 4.5:1 de WCAG 2.1 AA (mesmo ajuste de PublicLayout). */}
+                        <Button size="small" onClick={handleLogout} sx={{ color: 'primary.dark' }}>
                             Sair
                         </Button>
                     </Box>

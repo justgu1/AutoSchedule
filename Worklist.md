@@ -139,12 +139,12 @@ Fluxo do cliente final -- o motivo de tudo acima existir:
 
 ### Issue: Agendamento do cliente
 
-- [ ] Detalhe do veículo, datas e horários disponíveis -- API pronta (`GET /vehicles/{id}/availability/dates|slots`), tela pendente
-- [ ] Formulário (nome, e-mail, telefone), sem exigir conta -- API pronta (`POST /appointments`), tela pendente
+- [x] Detalhe do veículo, datas e horários disponíveis -- calendário restrito às datas livres, grade de horários
+- [x] Formulário (nome, e-mail, telefone), sem exigir conta
 - [x] Criação transacional (valida disponibilidade -> cria/localiza customer -> cria appointment -> audita)
 - [x] Proteção contra reserva concorrente do mesmo veículo/horário (`409 Conflict`)
 - [x] Notificação por e-mail (cliente, vendedores da concessionária) -- inclui o ciclo de retirada/devolução do veículo e o e-mail de confirmação por token, além do planejado originalmente
-- [ ] Painel do vendedor (gestão de regras/exceções, lista de agendamentos, marcar retirada/devolução) e fluxo público de agendamento -- frontend pendente (PR 2)
+- [x] Painel do vendedor (gestão de regras/exceções, lista de agendamentos, marcar retirada/devolução) e fluxo público de agendamento
 
 ## Epic: Qualidade
 

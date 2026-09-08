@@ -8,6 +8,7 @@ use App\Application\Dealership\DealershipFinder;
 use App\Application\Shared\ActorContext;
 use App\Application\Vehicle\DTO\PublicVehicleProfile;
 use App\Application\Vehicle\DTO\VehicleProfile;
+use App\Application\Vehicle\VehicleAmenities;
 use App\Application\Vehicle\VehicleFinder;
 use App\Application\Vehicle\VehicleGallery;
 use App\Application\Vehicle\ViewVehicle;
@@ -19,8 +20,11 @@ use App\Domain\User\UserRole;
 use App\Domain\Vehicle\Vehicle;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\DirectTransaction;
 use Tests\Support\InMemoryDealershipRepository;
 use Tests\Support\InMemoryFileRepository;
+use Tests\Support\InMemoryVehicleAmenityCatalog;
+use Tests\Support\InMemoryVehicleAmenityLinkRepository;
 use Tests\Support\InMemoryVehicleImageRepository;
 use Tests\Support\InMemoryVehicleRepository;
 
@@ -39,12 +43,14 @@ final class ViewVehicleTest extends TestCase
             phone: null,
         );
         $dealerships = new InMemoryDealershipRepository([$this->dealership->id => $this->dealership]);
-        $this->vehicle = Vehicle::register($this->dealership->id, 'Chevrolet', 'Onix', 'LTZ', 2023, new Money(8990000));
+        $this->vehicle = Vehicle::register($this->dealership->id, 'Chevrolet', 'Onix', 'LTZ', 2023, 2023, new Money(8990000));
         $vehicles = new InMemoryVehicleRepository();
         $vehicles->insert($this->vehicle);
         $gallery = new VehicleGallery(new InMemoryVehicleImageRepository(), new InMemoryFileRepository(), new NoopStorageProvider());
 
-        $this->viewVehicle = new ViewVehicle(new VehicleFinder($vehicles), $gallery, new DealershipFinder($dealerships));
+        $amenities = new VehicleAmenities(new InMemoryVehicleAmenityCatalog(), new InMemoryVehicleAmenityLinkRepository(), new DirectTransaction());
+
+        $this->viewVehicle = new ViewVehicle(new VehicleFinder($vehicles), $gallery, $amenities, new DealershipFinder($dealerships));
     }
 
     #[Test]
