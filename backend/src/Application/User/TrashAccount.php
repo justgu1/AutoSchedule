@@ -12,6 +12,7 @@ use App\Domain\Auth\Ports\RefreshTokenRepository;
 use App\Domain\Dealership\Ports\DealershipRepository;
 use App\Domain\User\Ports\UserRepository;
 use App\Domain\User\UserRole;
+use App\Domain\Vehicle\Ports\VehicleRepository;
 
 /** Revoga todo refresh token junto: ninguém segue logado numa conta na lixeira. */
 final readonly class TrashAccount
@@ -21,6 +22,7 @@ final readonly class TrashAccount
         private UserRepository $users,
         private RefreshTokenRepository $refreshTokens,
         private DealershipRepository $dealerships,
+        private VehicleRepository $vehicles,
         private LastAdminGuard $lastAdminGuard,
         private AuditLogger $audit,
         private Transaction $transaction,
@@ -40,6 +42,7 @@ final readonly class TrashAccount
             $this->refreshTokens->revokeAllForUser($user->id);
             // Marcada como cascata pra o restore devolver só o que caiu por causa da conta, não o que o dono já tinha arquivado.
             $this->dealerships->trashAllOwnedBy($user->id);
+            $this->vehicles->trashAllOwnedByUser($user->id);
         });
 
         $this->audit->record($context->audits(AuditEvent::AccountTrashed, $user->id));

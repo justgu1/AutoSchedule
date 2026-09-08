@@ -41,6 +41,41 @@ final readonly class ValidatedInput
         return $this->stringOrNull($field) ?? $fallback;
     }
 
+    public function intOrNull(string $field): ?int
+    {
+        $value = $this->values[$field] ?? null;
+
+        if ($value === null) {
+            return null;
+        }
+
+        if (!is_int($value) && (!is_string($value) || !is_numeric($value))) {
+            throw new \LogicException(sprintf('Field "%s" was not validated as a number.', $field));
+        }
+
+        return (int) $value;
+    }
+
+    /** JSON manda número, formulário manda string, e decimal só sobrevive inteiro como string. */
+    public function decimalStringOrNull(string $field): ?string
+    {
+        $value = $this->values[$field] ?? null;
+
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if (!is_int($value) && !is_float($value)) {
+            throw new \LogicException(sprintf('Field "%s" was not validated as a number.', $field));
+        }
+
+        return (string) $value;
+    }
+
     /** @return list<string> */
     public function fields(): array
     {

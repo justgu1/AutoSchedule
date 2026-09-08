@@ -9,4 +9,5 @@ enum AuditableType: string
 {
     case User = 'User';
     case Dealership = 'Dealership';
+    case Vehicle = 'Vehicle';
 }

@@ -11,6 +11,7 @@ use App\Domain\Audit\Ports\AuditLogger;
 use App\Domain\Dealership\Ports\DealershipRepository;
 use App\Domain\User\Ports\UserRepository;
 use App\Domain\User\User;
+use App\Domain\Vehicle\Ports\VehicleRepository;
 
 /**
  * Login com sucesso é a chance de recuperar a conta, sem exigir passo extra do usuário.
@@ -21,6 +22,7 @@ final readonly class AccountRestorer
     public function __construct(
         private UserRepository $users,
         private DealershipRepository $dealerships,
+        private VehicleRepository $vehicles,
         private AuditLogger $audit,
         private Transaction $transaction,
     ) {
@@ -35,6 +37,7 @@ final readonly class AccountRestorer
         $this->transaction->run(function () use ($user): void {
             $this->users->restore($user->id);
             $this->dealerships->restoreAutoTrashedOwnedBy($user->id);
+            $this->vehicles->restoreAutoTrashedOwnedByUser($user->id);
         });
 
         $this->audit->record($context->actedBy($user->id)->audits(AuditEvent::AccountRestored, $user->id));

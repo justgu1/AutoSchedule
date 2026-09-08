@@ -119,6 +119,22 @@ final class VehicleRlsPolicyTest extends TestCase
         $this->assertSame(0, $affected);
     }
 
+    /** O `WITH CHECK` avalia a linha nova: mover pra concessionária alheia é recusado mesmo com o veículo sendo seu. */
+    #[Test]
+    public function seller_nao_consegue_mover_o_proprio_veiculo_pra_concessionaria_de_outro_seller(): void
+    {
+        $this->rls->beginTransaction();
+        $this->setContext($this->sellerId, 'seller');
+
+        try {
+            $this->expectException(\PDOException::class);
+            $this->rls->prepare('UPDATE vehicles SET dealership_id = ? WHERE id = ?')
+                ->execute([$this->otherDealershipId, $this->vehicleId]);
+        } finally {
+            $this->rls->rollBack();
+        }
+    }
+
     /** Sem request HTTP não há identidade pra setar, então o background depende da policy de serviço. */
     #[Test]
     public function contexto_de_servico_enxerga_e_atualiza_qualquer_veiculo(): void
