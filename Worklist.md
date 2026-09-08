@@ -122,7 +122,7 @@ Backlog do projeto: epic > issue > task. Cada `[x]` já está em `main`; `[ ]` �
 - [x] `Vehicle` (marca/modelo/versão/ano/preço/descrição/status), pertence a uma concessionária -- status é só a lixeira (`active`/`trashed`/`deleted`), idêntica à da conta e da concessionária; sem estado "vendido" nem "agendado" guardado; dono transitivo pela concessionária (RLS por `EXISTS`, sem `owner_user_id` duplicado)
 - [ ] Galeria de fotos (mesmo padrão de `dealership_images`)
 - [ ] Busca (PostgreSQL Full Text Search + `pg_trgm`)
-- [ ] CRUD (seller gerencia os das próprias concessionárias, admin qualquer um)
+- [x] CRUD (seller gerencia os das próprias concessionárias, admin qualquer um) -- lixeira/restore/purge iguais aos outros domínios, cascata de dois níveis (conta -> concessionária -> veículo), auditoria `vehicle.*`
 
 ## Epic: Disponibilidade e agendamento
 
@@ -149,7 +149,7 @@ Fluxo do cliente final -- o motivo de tudo acima existir:
 - [x] Suíte E2E (Playwright): login, registro, reset de senha, logout, self-upgrade, lixeira de conta, teclado, acessibilidade
 - [x] Suíte de carga (k6)
 - [x] Acessibilidade WCAG 2.1 AA (axe-core)
-- [ ] Suíte própria pro `UserController`/`DealershipController` (hoje cobertos indiretamente -- ver `docs/test-catalog.md`)
+- [ ] Suíte própria pro `UserController`/`DealershipController`/`VehicleController` (hoje cobertos indiretamente -- ver `docs/test-catalog.md`)
 - [x] E2E do domínio de concessionária
 
 ### Issue: Camada de aplicação explícita

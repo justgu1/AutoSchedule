@@ -73,6 +73,9 @@ final class Validator
             'min' => self::size($value) >= (float) $parameter,
             'max' => self::size($value) <= (float) $parameter,
             'in' => in_array((string) $value, explode(',', (string) $parameter), true),
+            'numeric' => is_int($value) || is_float($value) || (is_string($value) && is_numeric($value)),
+            // Lê o valor, não o tamanho, ao contrário de min/max -- por isso é regra separada e não parâmetro delas.
+            'between' => self::withinRange($value, $parameter),
             default => throw new \InvalidArgumentException("Unknown validation rule \"{$rule}\"."),
         };
     }
@@ -80,6 +83,17 @@ final class Validator
     private static function size(mixed $value): float
     {
         return is_string($value) ? (float) mb_strlen($value) : (float) $value;
+    }
+
+    private static function withinRange(mixed $value, ?string $parameter): bool
+    {
+        if (!is_int($value) && !is_float($value) && (!is_string($value) || !is_numeric($value))) {
+            return false;
+        }
+
+        [$min, $max] = array_pad(explode(',', (string) $parameter, 2), 2, null);
+
+        return (float) $value >= (float) $min && (float) $value <= (float) $max;
     }
 
     private static function message(string $field, string $rule, ?string $parameter): string
@@ -92,6 +106,8 @@ final class Validator
             'min' => "The {$field} field must be at least {$parameter}.",
             'max' => "The {$field} field must be at most {$parameter}.",
             'in' => "The {$field} field must be one of: {$parameter}.",
+            'numeric' => "The {$field} field must be a number.",
+            'between' => "The {$field} field must be between " . str_replace(',', ' and ', (string) $parameter) . '.',
             default => "The {$field} field is invalid.",
         };
     }

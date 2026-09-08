@@ -144,6 +144,8 @@ seller -> dealership (owner_user_id) -> vehicles / availability / appointments
 
 Admin tem acesso global, customer só aos próprios dados.
 
+O elo `dealership -> vehicles` é resolvido por `EXISTS` dentro da própria policy, sem copiar `owner_user_id` pra `vehicles`. A cópia divergiria justamente quando o admin reassocia a concessionária a outro seller, e é por isso também que a policy de INSERT de veículo checa a concessionária, não só a role -- o dono ali vem do payload, não de quem está chamando.
+
 RLS é camada adicional, nunca substitui essa checagem -- a rota já barrou quem não podia antes de qualquer SQL rodar. A role de runtime é `NOSUPERUSER NOBYPASSRLS`; `AuthContextMiddleware` seta `app.current_user_id`/`app.current_user_role` via `SET LOCAL`, só dentro da transação da própria request.
 
 ```text

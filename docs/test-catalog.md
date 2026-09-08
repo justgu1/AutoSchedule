@@ -41,8 +41,13 @@ Convenção: `Arquivo::método` para PHPUnit (backend); `arquivo.spec.ts > nome 
 | Status é só a lixeira de 3 estados da conta e da concessionária (`active`/`trashed`/`deleted`), reversível 30 dias -- "vendido" e "agendado" não são estado guardado | `VehicleTest::register_monta_um_veiculo_novo_ativo_e_sem_anonimizacao`, `::allows_restore_permite_so_trashed_ainda_nao_anonimizado`, `::allows_purge_exige_trashed_ha_mais_de_grace_days`; `PostgresVehicleRepositoryTest::trash_move_pra_status_trashed_e_seta_trashed_at`, `::restore_volta_status_active_e_limpa_trashed_at`, `::find_trashed_so_traz_trashed_ainda_nao_anonimizado` |
 | Purge só encerra o ciclo de vida -- veículo não tem PII, então marca e modelo sobrevivem pro histórico de agendamento | `VehicleTest::anonymized_encerra_o_ciclo_de_vida_sem_mexer_nos_dados_do_anuncio`; `PostgresVehicleRepositoryTest::listagem_ignora_veiculo_deletado` |
 | Lixeira em cascata (concessionária ou conta do dono) só restaura automaticamente quem caiu por causa dela | `PostgresVehicleRepositoryTest::trash_all_in_dealership_so_afeta_os_ativos_e_marca_por_cascata`, `::restore_auto_trashed_in_dealership_so_restaura_quem_caiu_por_cascata`, `::cascata_por_dono_alcanca_todas_as_concessionarias_dele` |
-| RLS: seller só enxerga/altera veículo das próprias concessionárias e não consegue inserir na alheia (o dono vem do payload, então o INSERT também checa); admin enxerga qualquer um; sem contexto, nenhuma linha; contexto de serviço enxerga e atualiza; leitura pública enxerga só veículo `active` de concessionária `active` | `VehicleRlsPolicyTest` (8 casos) |
-| Preço em centavos inteiros, nunca float -- ida e volta pelo banco preserva o centavo | `MoneyTest` (5 casos); `PostgresVehicleRepositoryTest::preco_faz_a_ida_e_volta_pelo_banco_sem_perder_centavo` |
+| RLS: seller só enxerga/altera veículo das próprias concessionárias e não consegue inserir na alheia (o dono vem do payload, então o INSERT também checa); admin enxerga qualquer um; sem contexto, nenhuma linha; contexto de serviço enxerga e atualiza; leitura pública enxerga só veículo `active` de concessionária `active` | `VehicleRlsPolicyTest` (9 casos) |
+| Preço em centavos inteiros, nunca float -- ida e volta pelo banco preserva o centavo, e a API troca decimal como string | `MoneyTest` (5 casos); `PostgresVehicleRepositoryTest::preco_faz_a_ida_e_volta_pelo_banco_sem_perder_centavo`; `CreateVehicleTest::ano_e_preco_chegam_como_numero_do_json_sem_quebrar` |
+| Seller cria veículo só nas próprias concessionárias; admin, em qualquer uma -- concessionária alheia é 404, não 403 | `CreateVehicleTest` (4 casos) |
+| Mover de concessionária pelo mesmo `PATCH`: quem move precisa alcançar as duas pontas (seller só as próprias, admin qualquer uma), e a movimentação gera evento próprio | `UpdateVehicleTest` (4 casos); `VehicleRlsPolicyTest::seller_nao_consegue_mover_o_proprio_veiculo_pra_concessionaria_de_outro_seller` |
+| Lixeira da concessionária arrasta o estoque, e o restore devolve só o que caiu por cascata | `VehicleTrashCascadeTest` (3 casos) |
+| Todo evento de auditoria tem tipo auditável -- prefixo novo sem braço no `match` seria 500 na primeira gravação | `AuditEventTest::todo_evento_tem_um_tipo_auditavel_correspondente` |
+| Ano e preço são validados como número e faixa na borda, não como tamanho de string | `ValidatorTest::rejeita_valor_que_nao_e_numero`, `::rejeita_valor_fora_da_faixa_do_between`, `::aceita_numero_como_string_ou_como_numero` |
 
 ### Galeria (veículo), Disponibilidade, Exemplo, Exceções, Agendamento, Status, Concorrência, Cliente
 
@@ -146,6 +151,9 @@ Pontos sem teste automatizado direto, documentados aqui em vez de silenciosament
 - **`DealershipController` na mesma situação:** dono automático na criação por seller contra
   `owner_user_id` obrigatório por admin, reassociação de dono no `PATCH`, e o limite de 20MB mais a
   validação de MIME real no upload de foto.
+- **`VehicleController` na mesma situação:** as regras de validação declaradas nele (faixa de ano,
+  preço numérico, `dealership_id` fora do `PATCH`) são cobertas por `ValidatorTest` e pelos casos de
+  uso, mais verificação manual via curl -- mas não pelo endpoint em si.
 - **Indicador visual de foco (WCAG 2.4.7).** É visual; não há asserção confiável sem
   screenshot-diff. Revisão manual.
 - **Uso sem JavaScript.** Não aplicável hoje: a SPA é 100% client-rendered, sem SSR. O `<noscript>`

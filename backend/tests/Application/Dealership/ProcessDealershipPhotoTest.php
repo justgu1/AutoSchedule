@@ -9,14 +9,12 @@ use App\Application\Dealership\ProcessDealershipPhoto;
 use App\Application\File\UploadFile;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Dealership\Dealership;
-use App\Domain\Dealership\Ports\DealershipRepository;
 use App\Domain\File\OptimizedImage;
 use App\Domain\File\Ports\FileRepository;
 use App\Domain\File\Ports\ImageOptimizer;
 use App\Domain\File\Ports\StorageProvider;
 use App\Domain\File\StoredFile;
 use App\Domain\Shared\Address;
-use App\Domain\Shared\Trashable;
 use App\Domain\Shared\Uf;
 use App\Infrastructure\File\LocalTempFileStore;
 use App\Infrastructure\Jobs\JobStatusStore;
@@ -26,6 +24,7 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\DirectTransaction;
 use Tests\Support\FakeAuditLogger;
+use Tests\Support\InMemoryDealershipRepository;
 
 /** O que importa aqui é a orquestração; o único ponto real é o `JobStatusStore`. */
 #[Group('integration')]
@@ -174,83 +173,6 @@ final class ProcessDealershipPhotoTest extends TestCase
             address: new Address('01000-000', 'Rua Antiga', '10', null, 'Bairro', 'Cidade', Uf::SP),
             phone: '11988888888',
         );
-    }
-}
-
-final class InMemoryDealershipRepository implements DealershipRepository
-{
-    /** @var array<string, Dealership> */
-    private array $dealerships = [];
-
-    public function findById(string $id): ?Dealership
-    {
-        return $this->dealerships[$id] ?? null;
-    }
-
-    public function findBySlug(string $slug): ?Dealership
-    {
-        foreach ($this->dealerships as $dealership) {
-            if ($dealership->slug === $slug) {
-                return $dealership;
-            }
-        }
-
-        return null;
-    }
-
-    public function insert(Dealership $dealership): void
-    {
-        $this->dealerships[$dealership->id] = $dealership;
-    }
-
-    public function update(Dealership $dealership): void
-    {
-        $this->dealerships[$dealership->id] = $dealership;
-    }
-
-    public function findByOwner(string $ownerUserId, int $limit, int $offset): array
-    {
-        return [];
-    }
-
-    public function countByOwner(string $ownerUserId): int
-    {
-        return 0;
-    }
-
-    public function findPage(int $limit, int $offset): array
-    {
-        return [];
-    }
-
-    public function count(): int
-    {
-        return 0;
-    }
-
-    public function trash(string $id): void
-    {
-    }
-
-    public function restore(string $id): void
-    {
-    }
-
-    public function findTrashed(): array
-    {
-        return [];
-    }
-
-    public function purge(Trashable $entity): void
-    {
-    }
-
-    public function trashAllOwnedBy(string $ownerUserId): void
-    {
-    }
-
-    public function restoreAutoTrashedOwnedBy(string $ownerUserId): void
-    {
     }
 }
 

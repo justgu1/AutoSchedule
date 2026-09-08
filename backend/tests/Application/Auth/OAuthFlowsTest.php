@@ -28,8 +28,6 @@ use App\Domain\Auth\RefreshToken;
 use App\Domain\Auth\UserIdentity;
 use App\Domain\Auth\ValueObjects\AccessTokenClaims;
 use App\Domain\Auth\ValueObjects\GoogleIdentityClaims;
-use App\Domain\Dealership\Dealership;
-use App\Domain\Dealership\Ports\DealershipRepository;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
 use App\Domain\Shared\Email;
@@ -43,6 +41,8 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\DirectTransaction;
 use Tests\Support\FakeAuditLogger;
+use Tests\Support\InMemoryDealershipRepository;
+use Tests\Support\InMemoryVehicleRepository;
 
 /** Os quatro fluxos de `POST /oauth/token` mais o logout, cada um no seu caso de uso, sobre os mesmos dublês. */
 final class OAuthFlowsTest extends TestCase
@@ -401,7 +401,7 @@ final class OAuthFlowsTest extends TestCase
 
     private function accountRestorer(): AccountRestorer
     {
-        return new AccountRestorer($this->users, new InMemoryDealershipRepository(), $this->audit, new DirectTransaction());
+        return new AccountRestorer($this->users, new InMemoryDealershipRepository(), new InMemoryVehicleRepository(), $this->audit, new DirectTransaction());
     }
 
     private function loginWithPassword(?ClientAuthenticator $clients = null): LoginWithPassword
@@ -512,7 +512,6 @@ final class InMemoryUserRepository implements UserRepository
     {
         $this->byId[$user->id] = $user;
     }
-
 
     public function trash(string $id): void
     {
@@ -694,68 +693,3 @@ final class FakeGoogleIdTokenVerifier implements GoogleIdTokenVerifier
 }
 
 /** O restore só chama restoreAutoTrashedOwnedBy() no caminho de restore -- os testes daqui não afirmam nada sobre concessionária, só precisam do contrato satisfeito. */
-final class InMemoryDealershipRepository implements DealershipRepository
-{
-    public function findById(string $id): ?Dealership
-    {
-        return null;
-    }
-
-    public function findBySlug(string $slug): ?Dealership
-    {
-        return null;
-    }
-
-    public function insert(Dealership $dealership): void
-    {
-    }
-
-    public function update(Dealership $dealership): void
-    {
-    }
-
-    public function findByOwner(string $ownerUserId, int $limit, int $offset): array
-    {
-        return [];
-    }
-
-    public function countByOwner(string $ownerUserId): int
-    {
-        return 0;
-    }
-
-    public function findPage(int $limit, int $offset): array
-    {
-        return [];
-    }
-
-    public function count(): int
-    {
-        return 0;
-    }
-
-    public function trash(string $id): void
-    {
-    }
-
-    public function restore(string $id): void
-    {
-    }
-
-    public function findTrashed(): array
-    {
-        return [];
-    }
-
-    public function purge(Trashable $entity): void
-    {
-    }
-
-    public function trashAllOwnedBy(string $ownerUserId): void
-    {
-    }
-
-    public function restoreAutoTrashedOwnedBy(string $ownerUserId): void
-    {
-    }
-}
