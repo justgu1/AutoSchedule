@@ -26,7 +26,6 @@ final readonly class User
     ) {
     }
 
-    /** Creates a brand-new user with a generated id, an Argon2id password hash and fresh timestamps. */
     public static function register(
         string $name,
         string $email,
@@ -58,7 +57,6 @@ final readonly class User
         return password_verify($plainPassword, $this->passwordHash);
     }
 
-    /** Devolve uma cópia com nome/telefone atualizados -- usado pelo self-service (PATCH /me). */
     public function withProfile(string $name, ?string $phone): self
     {
         return new self(
@@ -78,7 +76,6 @@ final readonly class User
         );
     }
 
-    /** Devolve uma cópia com uma nova senha (hash Argon2id) e passwordSetAt renovado. */
     public function withNewPassword(string $plainPassword): self
     {
         $now = new \DateTimeImmutable();
@@ -100,18 +97,12 @@ final readonly class User
         );
     }
 
-    /**
-     * Self-service só permite uma escalada: `customer` virando `seller`, por
-     * vontade própria (ex: login social provisiona `customer`, mas a pessoa
-     * quer vender). Nunca vira `admin`, nunca desce de role, nunca a partir de
-     * `seller`/`admin` -- qualquer outra transição passa só pelo CRUD admin.
-     */
+    /** A única escalada que dispensa admin: customer virando seller por vontade própria. */
     public function isEligibleForSelfServiceRoleChange(UserRole $to): bool
     {
         return $this->role === UserRole::Customer && $to === UserRole::Seller;
     }
 
-    /** Devolve uma cópia com role trocado -- usado pelo CRUD admin (/users) e pela escalada self-service restrita acima. */
     public function withRole(UserRole $role): self
     {
         return new self(
@@ -131,13 +122,13 @@ final readonly class User
         );
     }
 
-    /** Só dá pra restaurar da lixeira antes da anonimização definitiva ter rodado. */
+    /** Anonimização é irreversível, então ela é o que fecha a janela de restore. */
     public function isEligibleForRestore(): bool
     {
         return $this->status === TrashableStatus::Trashed && !$this->anonymizedAt instanceof \DateTimeImmutable;
     }
 
-    /** Passou da janela de recuperação (30 dias) sem ser restaurado -- elegível pra rotina de purge. */
+    /** Passou da janela de recuperação sem ser restaurado. */
     public function isEligibleForPurge(int $graceDays, \DateTimeImmutable $now): bool
     {
         if ($this->status !== TrashableStatus::Trashed || $this->anonymizedAt instanceof \DateTimeImmutable || !$this->deletedAt instanceof \DateTimeImmutable) {
@@ -147,20 +138,13 @@ final readonly class User
         return $this->deletedAt <= $now->modify("-{$graceDays} days");
     }
 
-    /**
-     * Devolve uma cópia com PII escrubada pro "direito ao esquecimento" da LGPD —
-     * id, hash de senha, role e timestamps são mantidos pra histórico/auditoria
-     * que referencia esse usuário continuar válido. Não seta deleted_at por
-     * conta própria; quem faz o soft-delete é o repositório.
-     */
+    /** Escruba PII (LGPD Art. 12) e preserva id/role/timestamps, senão a auditoria que referencia o usuário perde sentido. */
     public function anonymized(): self
     {
         return new self(
             id: $this->id,
             name: 'Deleted user',
-            // Id inteiro, não um prefixo -- os primeiros 8 hex de um UUIDv7 só
-            // mudam a cada ~65s (são os bits mais altos do timestamp em ms), então
-            // um prefixo curto colide fácil entre exclusões próximas no tempo.
+            // Id inteiro, não prefixo: os primeiros hex de um UUIDv7 são timestamp e colidem entre exclusões próximas.
             email: sprintf('deleted-%s@anonymized.local', $this->id),
             phone: null,
             passwordHash: $this->passwordHash,

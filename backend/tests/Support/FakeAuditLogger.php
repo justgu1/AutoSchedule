@@ -7,11 +7,7 @@ namespace Tests\Support;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
 
-/**
- * Dublê compartilhado: auditoria aparece em quase todo caso de uso, e antes
- * disto cada suíte dependia de outro arquivo de teste ter sido carregado
- * primeiro pra classe existir.
- */
+/** Compartilhado porque antes cada suíte dependia de outro arquivo de teste ter carregado primeiro. */
 final class FakeAuditLogger implements AuditLogger
 {
     /** @var list<AuditEvent> */

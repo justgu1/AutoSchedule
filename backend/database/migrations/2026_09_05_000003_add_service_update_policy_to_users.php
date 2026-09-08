@@ -7,10 +7,7 @@ use App\Infrastructure\Database\Migration;
 return new class () implements Migration {
     public function up(\PDO $pdo): void
     {
-        // Confirmação de reset de senha (PUT /me/password com reset_token) faz
-        // UPDATE em users SEM Bearer -- users_self_or_admin_update exige
-        // current_user_id/role, que não existem nesse fluxo. Mesma lógica de
-        // users_service_insert: só vale pra rota marcada como serviceContext.
+        // Confirmar reset de senha atualiza o usuário sem Bearer, então nenhuma policy baseada em identidade serve.
         $pdo->exec(<<<'SQL'
             CREATE POLICY users_service_update ON users
                 FOR UPDATE

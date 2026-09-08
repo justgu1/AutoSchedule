@@ -14,7 +14,7 @@ jobs:
 
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.4'
+          php-version: '8.5'
           extensions: pdo_pgsql, opcache
           coverage: none
 
@@ -37,6 +37,10 @@ jobs:
       - name: Deptrac
         working-directory: backend
         run: vendor/bin/deptrac analyse --config-file=deptrac.yaml --no-progress
+
+      - name: Comentários
+        working-directory: backend
+        run: php tools/check-comments.php
 
       - name: Build
         run: docker build -f infra/docker/backend/Dockerfile -t autoschedule-backend:ci .
@@ -112,7 +116,7 @@ jobs:
 
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.4'
+          php-version: '8.5'
           extensions: pdo_pgsql, opcache
           coverage: none
 

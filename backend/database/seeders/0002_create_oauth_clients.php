@@ -13,8 +13,7 @@ return new class () implements Seeder {
             ON CONFLICT (client_id) DO NOTHING
             SQL);
 
-        // Client público: sem secret, usado pelo SPA first-party (login direto
-        // email+senha + refresh_token, sem redirect).
+        // Client público: SPA first-party não tem onde guardar secret.
         $statement->execute([
             'client_id' => 'autoschedule-web',
             'name' => 'AutoSchedule Web',
@@ -38,9 +37,7 @@ return new class () implements Seeder {
             'allowed_scopes' => '{service:internal}',
         ]);
 
-        // Só imprime o secret quando essa execução realmente inseriu a linha --
-        // ON CONFLICT DO NOTHING faz rowCount() ser 0 num re-seed, e o
-        // $serviceSecret não bateria com o hash que já está guardado.
+        // Num re-seed o insert não acontece, e este secret não bateria com o hash já guardado.
         if ($statement->rowCount() > 0) {
             fwrite(STDOUT, "autoschedule-service client secret: {$serviceSecret}\n");
         }

@@ -26,9 +26,7 @@ final readonly class RefreshToken
     }
 
     /**
-     * Primeiro token de uma família nova (uma por login). Só o hash é
-     * persistido -- o token em texto puro é devolvido uma vez só, pra
-     * mandar pro client.
+     * Primeiro token de uma família (uma por login); o texto puro sai daqui uma vez só, o resto é hash.
      *
      * @param list<string> $scopes
      * @return array{0: string, 1: self} token em texto puro, entidade pra persistir
@@ -39,8 +37,7 @@ final readonly class RefreshToken
     }
 
     /**
-     * Token rotacionado: mesma família de $this, usado pro repositório marcar
-     * $this como revogado+substituído atomicamente junto de inserir a linha nova.
+     * Mesma família de $this, pro repositório revogar e substituir na mesma operação.
      *
      * @return array{0: string, 1: self} token em texto puro, entidade pra persistir
      */

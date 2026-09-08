@@ -71,6 +71,7 @@ Mailpit é dependência real do próprio stack (container do compose) -- mocar n
 - **PHPStan** (nível 10, backend): `make static-analysis`. Débito pré-existente fica em `backend/phpstan-baseline.neon` -- código novo não entra nessa baseline, só o nível 10 direto.
 - **PHP-CS-Fixer** (backend): `make lint` (checa), `make lint-fix` (aplica).
 - **Rector** (backend): `make rector` (checa), `make rector-fix` (aplica) -- refatoração automatizada pra PHP moderno, sempre revisada como qualquer outro diff antes de commitar.
+- **Comentários** (backend): `php tools/check-comments.php`. Checa as regras de `docs/code-style.md` que nenhuma ferramenta pronta cobre.
 - **Deptrac** (backend): `make arch`. Checa a regra de dependência entre as camadas (`backend/deptrac.yaml`, ver `docs/architecture.md`). Sem baseline de propósito -- entrou com o código já passando, então qualquer violação é nova.
 - **ESLint** (`typescript-eslint`, type-aware) + **Prettier** (frontend): `npm run lint`, `npm run format`/`format:fix`.
 

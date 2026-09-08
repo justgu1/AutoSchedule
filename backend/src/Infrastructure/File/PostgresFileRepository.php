@@ -6,16 +6,17 @@ namespace App\Infrastructure\File;
 
 use App\Domain\File\Ports\FileRepository;
 use App\Domain\File\StoredFile;
+use App\Infrastructure\Database\DatabaseConnection;
 
 final readonly class PostgresFileRepository implements FileRepository
 {
-    public function __construct(private \PDO $pdo)
+    public function __construct(private DatabaseConnection $connection)
     {
     }
 
     public function findById(string $id): ?StoredFile
     {
-        $statement = $this->pdo->prepare('SELECT * FROM files WHERE id = :id');
+        $statement = $this->connection->pdo()->prepare('SELECT * FROM files WHERE id = :id');
         $statement->execute(['id' => $id]);
         $row = $statement->fetch();
 
@@ -24,7 +25,7 @@ final readonly class PostgresFileRepository implements FileRepository
 
     public function findByPath(string $path): ?StoredFile
     {
-        $statement = $this->pdo->prepare('SELECT * FROM files WHERE path = :path');
+        $statement = $this->connection->pdo()->prepare('SELECT * FROM files WHERE path = :path');
         $statement->execute(['path' => $path]);
         $row = $statement->fetch();
 
@@ -33,7 +34,7 @@ final readonly class PostgresFileRepository implements FileRepository
 
     public function insert(StoredFile $file): void
     {
-        $statement = $this->pdo->prepare(<<<'SQL'
+        $statement = $this->connection->pdo()->prepare(<<<'SQL'
             INSERT INTO files (id, path, original_name, mime_type, size_bytes, checksum, uploaded_by, created_at)
             VALUES (:id, :path, :original_name, :mime_type, :size_bytes, :checksum, :uploaded_by, :created_at)
             SQL);
@@ -52,7 +53,7 @@ final readonly class PostgresFileRepository implements FileRepository
 
     public function delete(string $id): void
     {
-        $statement = $this->pdo->prepare('DELETE FROM files WHERE id = :id');
+        $statement = $this->connection->pdo()->prepare('DELETE FROM files WHERE id = :id');
         $statement->execute(['id' => $id]);
     }
 

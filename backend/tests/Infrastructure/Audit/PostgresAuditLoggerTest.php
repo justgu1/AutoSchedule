@@ -11,11 +11,9 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
+use Tests\Support\FixedConnection;
+use Tests\Support\TestDatabase;
 
-/**
- * Teste de integração: grava no Postgres real -- precisa rodar dentro do
- * compose (mesmo padrão dos outros testes de Postgres).
- */
 #[Group('integration')]
 final class PostgresAuditLoggerTest extends TestCase
 {
@@ -23,18 +21,8 @@ final class PostgresAuditLoggerTest extends TestCase
 
     protected function setUp(): void
     {
-        // Role padrão (não autoschedule_app): a fixture de users pro teste de
-        // actor/target precisa de INSERT sem passar pelo RLS, que exige
-        // app.current_user_role='admin' via SET LOCAL -- PostgresAuditLogger em
-        // si não lida com RLS, só grava em audit_logs.
-        $this->connection = new PostgresConnection(
-            driver: getenv('DB_DRIVER') ?: 'pgsql',
-            host: getenv('DB_HOST') ?: '127.0.0.1',
-            port: (int) (getenv('DB_PORT') ?: 5432),
-            database: getenv('DB_DATABASE') ?: 'autoschedule',
-            username: getenv('DB_USERNAME') ?: 'pgsql',
-            password: getenv('DB_PASSWORD') ?: 'password',
-        );
+        // Fixture de users precisa furar o RLS; o próprio PostgresAuditLogger não lida com isso.
+        $this->connection = TestDatabase::connect();
         $this->connection->pdo()->beginTransaction();
     }
 
@@ -46,7 +34,7 @@ final class PostgresAuditLoggerTest extends TestCase
     #[Test]
     public function grava_o_evento_com_ip_user_agent_e_contexto(): void
     {
-        $logger = new PostgresAuditLogger($this->connection->pdo(), new NullLogger());
+        $logger = new PostgresAuditLogger($this->connection, new NullLogger());
 
         $logger->record(AuditEvent::LoginFailed, null, 'User', null, ['email' => 'ada@example.com'], '203.0.113.9', 'phpunit-agent');
 
@@ -66,7 +54,7 @@ final class PostgresAuditLoggerTest extends TestCase
     {
         $admin = $this->insertUser('admin@example.com');
         $target = $this->insertUser('target@example.com');
-        $logger = new PostgresAuditLogger($this->connection->pdo(), new NullLogger());
+        $logger = new PostgresAuditLogger($this->connection, new NullLogger());
 
         $logger->record(AuditEvent::UserCreated, $admin, 'User', $target, ['role' => 'seller'], '203.0.113.9', 'phpunit-agent');
 
@@ -81,10 +69,9 @@ final class PostgresAuditLoggerTest extends TestCase
     #[Test]
     public function auditable_type_diferente_de_user_nao_preenche_user_id(): void
     {
-        // user_id tem FK pra `users` -- gravar um id que não é de usuário ali
-        // quebraria a constraint. auditable_id não tem essa restrição.
+        // user_id tem FK pra users e auditable_id não, daí a assimetria.
         $dealershipId = '00000000-0000-4000-8000-000000000001';
-        $logger = new PostgresAuditLogger($this->connection->pdo(), new NullLogger());
+        $logger = new PostgresAuditLogger($this->connection, new NullLogger());
 
         $logger->record(AuditEvent::DealershipCreated, null, 'Dealership', $dealershipId, [], '203.0.113.9', 'phpunit-agent');
 
@@ -100,10 +87,8 @@ final class PostgresAuditLoggerTest extends TestCase
     #[Test]
     public function falha_ao_gravar_nao_propaga_excecao(): void
     {
-        // PDO quebrado (host inexistente) força o catch a acionar -- é o
-        // ponto que importa: auditoria nunca pode derrubar a resposta principal.
-        $brokenPdo = new \PDO('sqlite::memory:');
-        $logger = new PostgresAuditLogger($brokenPdo, new NullLogger());
+        // PDO quebrado de propósito: auditoria nunca pode derrubar a resposta principal.
+        $logger = new PostgresAuditLogger(new FixedConnection(new \PDO('sqlite::memory:')), new NullLogger());
 
         $logger->record(AuditEvent::LoginSucceeded, null, 'User', null, [], '127.0.0.1', null);
 

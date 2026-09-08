@@ -82,7 +82,6 @@ final readonly class Dealership
         );
     }
 
-    /** Devolve uma cópia com os dados de perfil atualizados -- usado por `PATCH /dealerships/{id}`. */
     public function withProfile(
         string $name,
         string $zipCode,
@@ -185,13 +184,13 @@ final readonly class Dealership
         );
     }
 
-    /** Só dá pra restaurar da lixeira antes da anonimização definitiva ter rodado. */
+    /** Ver User::isEligibleForRestore(). */
     public function isEligibleForRestore(): bool
     {
         return $this->status === TrashableStatus::Trashed && !$this->anonymizedAt instanceof \DateTimeImmutable;
     }
 
-    /** Passou da janela de recuperação (30 dias) sem ser restaurada -- elegível pra rotina de purge. */
+    /** Ver User::isEligibleForPurge(). */
     public function isEligibleForPurge(int $graceDays, \DateTimeImmutable $now): bool
     {
         if ($this->status !== TrashableStatus::Trashed || $this->anonymizedAt instanceof \DateTimeImmutable || !$this->trashedAt instanceof \DateTimeImmutable) {
@@ -202,13 +201,8 @@ final readonly class Dealership
     }
 
     /**
-     * Escruba identificador direto (nome, telefone, endereço, complemento,
-     * place id, foto) -- mantém zip/cidade/estado/lat/long, não identificam
-     * sozinhos e servem pra estatística agregada. Mesmo espírito de
-     * `User::anonymized()`. `slug` também é trocado -- ele nasce do nome, uma
-     * URL pública antiga não pode continuar divulgando o nome do negócio
-     * removido. Quem chama ainda precisa apagar o arquivo da foto do
-     * storage -- aqui só solta a referência.
+     * Mesmo espírito de User::anonymized(): cai o que identifica direto, fica o que só serve agregado.
+     * O slug troca junto porque nasce do nome, e URL pública antiga não pode seguir divulgando o negócio.
      */
     public function anonymized(): self
     {
@@ -240,14 +234,8 @@ final readonly class Dealership
     }
 
     /**
-     * Slugify do nome + 6 caracteres do próprio id -- os ÚLTIMOS, não os
-     * primeiros: UUID v7 tem timestamp nos bits iniciais, então duas
-     * concessionárias criadas perto uma da outra no tempo (bem comum em
-     * teste, ou só em uso normal) teriam o mesmo prefixo e colidiriam de
-     * verdade toda vez, não só em teoria. Os últimos caracteres são a parte
-     * aleatória. Ainda não elimina colisão 100% (a fatia perde entropia),
-     * mas o `UNIQUE` da coluna é o backstop: colidir é raro o bastante pra
-     * não valer complexidade de retry, e um erro nesse caso extremo é aceitável.
+     * Os ÚLTIMOS 6 caracteres do id, não os primeiros: em UUIDv7 o começo é timestamp e colidiria entre
+     * criações próximas. O UNIQUE da coluna é o backstop pro resíduo de colisão, sem retry.
      */
     private static function buildSlug(string $name, string $id): string
     {

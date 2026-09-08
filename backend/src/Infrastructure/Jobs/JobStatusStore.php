@@ -8,10 +8,7 @@ use App\Application\Ports\JobProgress;
 use App\Infrastructure\Redis\RedisConnection;
 
 /**
- * Progresso de um job assíncrono, pra quem enfileirou poder acompanhar (`GET
- * /jobs/{id}` ou `/events`, SSE) -- não é o estado do job em si (isso é
- * `RedisQueue`), só o que o job já contou de si mesmo enquanto roda.
- * TTL evita acumular chave de job antigo pra sempre.
+ * TTL porque progresso de job antigo não interessa a ninguém e acumularia pra sempre.
  */
 final readonly class JobStatusStore implements JobProgress
 {

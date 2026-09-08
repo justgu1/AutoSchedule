@@ -11,52 +11,58 @@ use PHPUnit\Framework\TestCase;
 final class ConfigLoaderTest extends TestCase
 {
     #[Test]
-    public function config_expoe_os_valores_de_app_php(): void
+    public function le_valor_de_app_php_na_raiz(): void
     {
-        $app = new Config();
-
-        $this->assertSame('AutoSchedule', $app->config('name'));
-        $this->assertIsArray($app->config('database'));
+        $this->assertSame('AutoSchedule', new Config()->string('name'));
     }
 
     #[Test]
-    public function config_expoe_cada_outro_arquivo_de_config_pelo_proprio_nome_de_arquivo(): void
+    public function le_cada_outro_arquivo_como_grupo_com_o_nome_do_arquivo(): void
     {
-        $app = new Config();
+        $config = new Config();
 
-        $auth = $app->config('auth');
-
-        $this->assertIsArray($auth);
-        $this->assertArrayHasKey('jwt', $auth);
+        $this->assertSame('autoschedule', $config->string('auth.jwt.issuer'));
+        $this->assertSame(900, $config->int('auth.access_token_ttl'));
+        $this->assertFalse($config->bool('security.cookie_secure'));
     }
 
     #[Test]
-    public function config_devolve_o_default_quando_a_chave_nao_existe(): void
+    public function chave_ausente_explode_em_vez_de_devolver_default(): void
     {
-        $app = new Config();
+        $this->expectException(\RuntimeException::class);
 
-        $this->assertSame('fallback', $app->config('does-not-exist', 'fallback'));
+        new Config()->string('nao.existe');
     }
 
-    /**
-     * Regressão: secret selado (SealedSecret/kubeseal) com `\n` sobrando (ex:
-     * gerado com `echo` em vez de `printf`) já derrubou login do Google e
-     * autenticação do Postgres/Redis em produção -- comparação/parse contra
-     * um valor externo limpo nunca batia. `Config` corta espaço em
-     * branco de todo valor de config na raiz, então nenhuma env var
-     * individual precisa se preocupar com isso de novo.
-     */
     #[Test]
-    public function config_corta_espaco_em_branco_de_valores_string_incluindo_aninhados(): void
+    public function tipo_errado_explode_no_boot(): void
+    {
+        $this->expectException(\RuntimeException::class);
+
+        new Config()->int('auth.jwt.issuer');
+    }
+
+    /** Regressão: secret selado com `\n` sobrando já derrubou login do Google e autenticação do Postgres em produção. */
+    #[Test]
+    public function corta_espaco_em_branco_na_leitura_da_env(): void
     {
         putenv('GOOGLE_CLIENT_ID=client-id-com-newline' . "\n");
 
         try {
-            $app = new Config();
+            $this->assertSame('client-id-com-newline', new Config()->string('google.client_id'));
+        } finally {
+            putenv('GOOGLE_CLIENT_ID');
+        }
+    }
 
-            $google = $app->config('google');
-            $this->assertIsArray($google);
-            $this->assertSame('client-id-com-newline', $google['client_id']);
+    /** Espaço no meio é valor legítimo: o trim global anterior mexia em segredo que ninguém pediu pra mexer. */
+    #[Test]
+    public function nao_mexe_no_meio_do_valor(): void
+    {
+        putenv('GOOGLE_CLIENT_ID=com espaco no meio');
+
+        try {
+            $this->assertSame('com espaco no meio', new Config()->string('google.client_id'));
         } finally {
             putenv('GOOGLE_CLIENT_ID');
         }

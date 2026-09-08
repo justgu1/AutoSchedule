@@ -13,10 +13,8 @@ use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
 
 /**
- * Verifica o id_token do Google Identity Services -- sem SDK do Google, só o
- * firebase/php-jwt que já é dependência (mesma lib que assina/valida os
- * tokens da própria aplicação). O JWKS do Google roda em cache no Redis (as
- * chaves trocam raramente, não vale buscar a cada login).
+ * Sem SDK do Google: o firebase/php-jwt já é dependência e faz o mesmo trabalho.
+ * O JWKS fica em cache porque as chaves trocam raramente e buscar a cada login não se paga.
  */
 final readonly class GoogleJwksIdTokenVerifier implements GoogleIdTokenVerifier
 {

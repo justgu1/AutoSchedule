@@ -7,11 +7,11 @@ namespace Tests\Infrastructure\User;
 use App\Domain\Shared\TrashableStatus;
 use App\Domain\User\User;
 use App\Domain\User\UserRole;
-use App\Infrastructure\Database\PostgresConnection;
 use App\Infrastructure\User\PostgresUserRepository;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\TestDatabase;
 
 /**
  * Teste de integração: conecta no Postgres real do docker-compose. Isolado
@@ -25,17 +25,11 @@ final class PostgresUserRepositoryTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->pdo = new PostgresConnection(
-            driver: getenv('DB_DRIVER') ?: 'pgsql',
-            host: getenv('DB_HOST') ?: '127.0.0.1',
-            port: (int) (getenv('DB_PORT') ?: 5432),
-            database: getenv('DB_DATABASE') ?: 'autoschedule',
-            username: getenv('DB_USERNAME') ?: 'pgsql',
-            password: getenv('DB_PASSWORD') ?: 'password',
-        )->pdo();
+        $connection = TestDatabase::connect();
+        $this->pdo = $connection->pdo();
 
         $this->pdo->beginTransaction();
-        $this->repository = new PostgresUserRepository($this->pdo);
+        $this->repository = new PostgresUserRepository($connection);
     }
 
     protected function tearDown(): void

@@ -13,15 +13,12 @@ use App\Domain\Exceptions\DomainException;
 use App\Domain\Shared\Uuid;
 
 /**
- * Só uma foto por concessionária -- um upload novo substitui a anterior.
- * Otimização (WebP) e gravação rodam fora do request, no worker
- * (`ProcessDealershipPhotoJob`) -- aqui só valida o essencial e copia pro
- * armazenamento temporário compartilhado, porque o `tmp_name` do PHP some
- * assim que a request termina. Quem chamou acompanha o progresso via `job_id`.
+ * Uma foto por concessionária: upload novo substitui a anterior.
+ * Otimizar e gravar sai do request porque depende de terceiro (GD, MinIO) e não pode travar a resposta.
  */
 final readonly class EnqueueDealershipPhoto
 {
-    /** Recusa antes de sequer copiar o arquivo pra fila -- algo que vai ser rejeitado de qualquer jeito. */
+    /** Recusa antes de copiar: o que vai ser rejeitado no worker não vale a viagem. */
     private const int MAX_PHOTO_BYTES = 20 * 1024 * 1024;
 
     public function __construct(

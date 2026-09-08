@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace App\Application\Shared;
 
 /**
- * Payload já validado, com acesso tipado -- é aqui que `mixed` morre, em vez
- * de vazar da validação até a entidade. Pedir campo que a regra não declarou
- * (ou que veio com outro tipo) é erro de programação, não do cliente: daí
- * `LogicException` e não `DomainException`.
+ * É aqui que `mixed` morre, em vez de vazar da validação até a entidade.
+ * Pedir campo que a regra não declarou é erro de programação, daí `LogicException`.
  */
 final readonly class ValidatedInput
 {

@@ -4,11 +4,7 @@ declare(strict_types=1);
 
 use App\Infrastructure\Database\Migration;
 
-/**
- * Cache do ViaCEP -- CEP não muda de endereço, então não precisa de TTL nem
- * de RLS (não é dado de usuário, é referência pública, qualquer CEP válido
- * é público por natureza).
- */
+/** CEP não troca de endereço, então nem TTL nem RLS fazem sentido: é referência pública. */
 return new class () implements Migration {
     public function up(\PDO $pdo): void
     {

@@ -7,9 +7,7 @@ use App\Infrastructure\Database\Migration;
 return new class () implements Migration {
     public function up(\PDO $pdo): void
     {
-        // Sem RLS -- mesmo padrão de oauth_refresh_tokens/password_reset_tokens:
-        // só a aplicação toca essa tabela (linka/consulta identidade social
-        // durante o login), nunca é exposta direto por rota nenhuma.
+        // Sem RLS porque nenhuma rota expõe esta tabela: só a aplicação a toca, durante o login.
         $pdo->exec(<<<'SQL'
             CREATE TABLE user_identities (
                 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

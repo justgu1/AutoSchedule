@@ -10,7 +10,7 @@ use App\Domain\Auth\Ports\OAuthClientRepository;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
 
-/** Porta de entrada comum dos quatro fluxos de `POST /oauth/token`. */
+/** Porta de entrada comum dos quatro grants. */
 final readonly class ClientAuthenticator
 {
     public function __construct(private OAuthClientRepository $clients)
@@ -21,8 +21,7 @@ final readonly class ClientAuthenticator
     {
         $client = $this->clients->findByClientId($clientId);
 
-        // Cliente inexistente e cliente sem esse grant dão a mesma resposta --
-        // não vaza quais client_id existem nem o que cada um pode fazer.
+        // Mesma resposta pros dois casos: não vaza quais client_id existem nem o que cada um pode.
         if (!$client instanceof OAuthClient || !$client->supportsGrantType($grantType)) {
             throw new DomainException('Invalid client.', DomainErrorType::Unauthorized);
         }

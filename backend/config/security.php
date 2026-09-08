@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Env;
+
 return [
-    'hsts_enabled' => filter_var(getenv('SECURITY_HSTS_ENABLED') ?: false, FILTER_VALIDATE_BOOL),
-    'cookie_secure' => filter_var(getenv('COOKIE_SECURE') ?: false, FILTER_VALIDATE_BOOL),
+    'hsts_enabled' => Env::bool('SECURITY_HSTS_ENABLED', false),
+    'cookie_secure' => Env::bool('COOKIE_SECURE', false),
 ];

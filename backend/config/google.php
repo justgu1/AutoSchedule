@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Env;
+
 return [
-    'client_id' => getenv('GOOGLE_CLIENT_ID') ?: '',
+    'client_id' => Env::string('GOOGLE_CLIENT_ID', ''),
 ];

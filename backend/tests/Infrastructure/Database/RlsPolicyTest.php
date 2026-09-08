@@ -6,18 +6,14 @@ namespace Tests\Infrastructure\Database;
 
 use App\Domain\User\User;
 use App\Domain\User\UserRole;
-use App\Infrastructure\Database\PostgresConnection;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\TestDatabase;
 
 /**
- * Teste de integração: valida as policies de RLS de `users` de verdade,
- * conectando como autoschedule_app (a role admin/pgsql é superuser e sempre
- * ignora RLS, não serve pra esse teste). Como são DUAS conexões/sessões
- * diferentes, os dados de fixture precisam ser commitados de verdade pela
- * conexão admin (senão a sessão autoschedule_app nunca os enxerga) --
- * limpeza no tearDown é um DELETE, não rollback de transação.
+ * Conecta como autoschedule_app porque a role admin é superuser e ignora RLS.
+ * Duas sessões: a fixture precisa ser commitada, então a limpeza é DELETE e não rollback.
  */
 #[Group('integration')]
 final class RlsPolicyTest extends TestCase
@@ -29,28 +25,14 @@ final class RlsPolicyTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->admin = new PostgresConnection(
-            driver: getenv('DB_DRIVER') ?: 'pgsql',
-            host: getenv('DB_HOST') ?: '127.0.0.1',
-            port: (int) (getenv('DB_PORT') ?: 5432),
-            database: getenv('DB_DATABASE') ?: 'autoschedule',
-            username: getenv('DB_USERNAME') ?: 'pgsql',
-            password: getenv('DB_PASSWORD') ?: 'password',
-        )->pdo();
+        $this->admin = TestDatabase::connect()->pdo();
 
         $this->customer = User::register('Customer RLS', 'rls-customer@example.com', null, 'secret', UserRole::Customer);
         $this->otherCustomer = User::register('Other Customer RLS', 'rls-other@example.com', null, 'secret', UserRole::Customer);
         $this->insertUser($this->customer);
         $this->insertUser($this->otherCustomer);
 
-        $this->rls = new PostgresConnection(
-            driver: getenv('DB_DRIVER') ?: 'pgsql',
-            host: getenv('DB_HOST') ?: '127.0.0.1',
-            port: (int) (getenv('DB_PORT') ?: 5432),
-            database: getenv('DB_DATABASE') ?: 'autoschedule',
-            username: getenv('DB_APP_USERNAME') ?: 'autoschedule_app',
-            password: getenv('DB_APP_PASSWORD') ?: 'changeme',
-        )->pdo();
+        $this->rls = TestDatabase::connectAsApp()->pdo();
     }
 
     protected function tearDown(): void
@@ -104,13 +86,7 @@ final class RlsPolicyTest extends TestCase
         $this->assertSame([], $ids);
     }
 
-    /**
-     * `GET /dealerships/{id}` (rota `publicRead`) mostra quem é o vendedor
-     * responsável mesmo pra quem não é dono/admin -- só o seller dono de
-     * concessionária ATIVA fica visível com a flag setada, o customer nunca
-     * aparece (não tem por quê) e um seller sem concessionária ativa também
-     * não.
-     */
+    /** Só o seller dono de concessionária ativa fica visível na leitura pública; customer nunca. */
     #[Test]
     public function contexto_de_leitura_publica_enxerga_so_seller_com_concessionaria_ativa(): void
     {

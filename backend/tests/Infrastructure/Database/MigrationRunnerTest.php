@@ -5,18 +5,12 @@ declare(strict_types=1);
 namespace Tests\Infrastructure\Database;
 
 use App\Infrastructure\Database\MigrationRunner;
-use App\Infrastructure\Database\PostgresConnection;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\TestDatabase;
 
-/**
- * Teste de integração: conecta no Postgres real do docker-compose
- * e roda as migrations reais de backend/database/migrations/
- * Cada teste roda dentro de uma transação
- * desfeita no tearDown — Postgres suporta DDL transacional, então as
- * tabelas/tipos/registros criados somem sem sujar o banco de dev.
- */
+/** Postgres tem DDL transacional, então o rollback do tearDown desfaz até a tabela criada. */
 #[Group('integration')]
 final class MigrationRunnerTest extends TestCase
 {
@@ -25,23 +19,13 @@ final class MigrationRunnerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->pdo = new PostgresConnection(
-            driver: getenv('DB_DRIVER') ?: 'pgsql',
-            host: getenv('DB_HOST') ?: '127.0.0.1',
-            port: (int) (getenv('DB_PORT') ?: 5432),
-            database: getenv('DB_DATABASE') ?: 'autoschedule',
-            username: getenv('DB_USERNAME') ?: 'pgsql',
-            password: getenv('DB_PASSWORD') ?: 'password',
-        )->pdo();
+        $connection = TestDatabase::connect();
+        $this->pdo = $connection->pdo();
 
         $this->pdo->beginTransaction();
 
-        // Dropa toda tabela que uma migration real cria, pra run() poder
-        // aplicar tudo de novo do zero dentro da transação deste teste.
-        // Estender essa lista sempre que uma migration nova criar tabela.
-        // Ordem importa aqui: CASCADE numa tabela referenciada só dropa a
-        // *constraint* de FK na tabela dependente, não a tabela em si -- por
-        // isso toda tabela com FK ainda precisa do próprio DROP explícito.
+        // Ordem importa: CASCADE derruba a constraint de FK, não a tabela dependente, que precisa do próprio DROP.
+        // Estender a lista quando uma migration nova criar tabela.
         $this->pdo->exec('DROP TABLE IF EXISTS dealership_images CASCADE');
         $this->pdo->exec('DROP TABLE IF EXISTS dealerships CASCADE');
         $this->pdo->exec('DROP TABLE IF EXISTS zip_code_cache CASCADE');

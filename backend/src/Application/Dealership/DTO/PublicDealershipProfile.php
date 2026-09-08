@@ -7,13 +7,8 @@ namespace App\Application\Dealership\DTO;
 use App\Domain\Dealership\Dealership;
 
 /**
- * Perfil exposto por `GET /dealerships/{id}` pra quem não é dono/admin
- * (inclusive sem conta nenhuma) -- deliberadamente mais enxuto que
- * `DealershipProfile` (sem `id`/`owner_user_id`/`status`, que não interessam
- * nem devem vazar pro cliente final; `slug` no lugar do `id`, é o que monta
- * a URL amigável). `sellerName` é só o nome do vendedor -- nenhum outro dado
- * dele (telefone/e-mail do próprio `User`) é exposto aqui; contato é o
- * `phone`/`email` da concessionária mesma, não da pessoa.
+ * Deliberadamente mais enxuto que `DealershipProfile`: sem `id`/`owner_user_id`/`status`, e `slug` no lugar do id.
+ * Do vendedor sai só o nome -- contato exposto é o da concessionária, nunca o da pessoa.
  */
 final readonly class PublicDealershipProfile
 {
@@ -71,8 +66,7 @@ final readonly class PublicDealershipProfile
             'email' => $this->email,
             'photo_url' => $this->photoUrl,
             'seller_name' => $this->sellerName,
-            // Vazio até a Epic Veículo existir -- contrato já reservado aqui
-            // pra o front não precisar mudar quando a listagem chegar.
+            // Reservado: o front já lê a chave, então a Epic Veículo não muda o contrato.
             'vehicles' => [],
         ];
     }

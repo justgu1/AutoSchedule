@@ -6,11 +6,12 @@ namespace Tests\Infrastructure\Http\Middleware;
 
 use App\Domain\Auth\ValueObjects\AccessTokenClaims;
 use App\Domain\User\UserRole;
+use App\Infrastructure\Http\HttpMethod;
 use App\Infrastructure\Http\JsonResponse;
 use App\Infrastructure\Http\Middleware\RateLimitMiddleware;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
-use App\Infrastructure\Http\Router;
+use App\Infrastructure\Http\Route;
 use App\Infrastructure\RateLimit\RateLimiter;
 use App\Infrastructure\RateLimit\RateLimitPolicy;
 use App\Infrastructure\RateLimit\RateLimitResult;
@@ -25,9 +26,8 @@ final class RateLimitMiddlewareTest extends TestCase
     {
         $middleware = new RateLimitMiddleware(
             new FakeRateLimiter(new RateLimitResult(allowed: true, remaining: 4, resetSeconds: 30)),
-            new Router(),
             new RateLimitPolicy('general', 5, 60),
-            new FakeTokenIssuer(),
+            new RateLimitPolicy('auth', 5, 60),
             new NullLogger(),
         );
 
@@ -46,9 +46,8 @@ final class RateLimitMiddlewareTest extends TestCase
     {
         $middleware = new RateLimitMiddleware(
             new FakeRateLimiter(new RateLimitResult(allowed: false, remaining: 0, resetSeconds: 12)),
-            new Router(),
             new RateLimitPolicy('general', 5, 60),
-            new FakeTokenIssuer(),
+            new RateLimitPolicy('auth', 5, 60),
             new NullLogger(),
         );
         $nextCalled = false;
@@ -70,14 +69,13 @@ final class RateLimitMiddlewareTest extends TestCase
     #[Test]
     public function usa_a_policy_da_rota_quando_declarada_em_vez_da_geral(): void
     {
-        $router = new Router();
         $authPolicy = new RateLimitPolicy('auth', 5, 60);
-        $router->post('/api/oauth/token', static fn (Request $request): Response => new JsonResponse([]), rateLimit: $authPolicy);
         $limiter = new FakeRateLimiter(new RateLimitResult(allowed: true, remaining: 4, resetSeconds: 60));
-        $middleware = new RateLimitMiddleware($limiter, $router, new RateLimitPolicy('general', 1000, 60), new FakeTokenIssuer(), new NullLogger());
+        $middleware = new RateLimitMiddleware($limiter, new RateLimitPolicy('general', 1000, 60), $authPolicy, new NullLogger());
+        $route = new Route(HttpMethod::Post, '/api/oauth/token', static fn (Request $request): Response => new JsonResponse([]))->rateLimit('auth');
 
         $middleware->handle(
-            new Request(method: 'POST', path: '/api/oauth/token'),
+            new Request(method: 'POST', path: '/api/oauth/token')->withAttribute('route', $route),
             static fn (Request $request): Response => new JsonResponse([]),
         );
 
@@ -85,20 +83,14 @@ final class RateLimitMiddlewareTest extends TestCase
     }
 
     #[Test]
-    public function chave_usa_o_id_do_usuario_quando_o_bearer_decodifica(): void
+    public function chave_usa_o_id_do_usuario_quando_ha_claims_no_request(): void
     {
         $claims = AccessTokenClaims::issue('11111111-1111-4111-8111-111111111111', 'autoschedule-web', UserRole::Customer, [], 900);
         $limiter = new FakeRateLimiter(new RateLimitResult(allowed: true, remaining: 999, resetSeconds: 60));
-        $middleware = new RateLimitMiddleware(
-            $limiter,
-            new Router(),
-            new RateLimitPolicy('general', 1000, 60),
-            new FakeTokenIssuer(['valid-token' => $claims]),
-            new NullLogger(),
-        );
+        $middleware = new RateLimitMiddleware($limiter, new RateLimitPolicy('general', 1000, 60), new RateLimitPolicy('auth', 5, 60), new NullLogger());
 
         $middleware->handle(
-            new Request(method: 'GET', path: '/api/me', headers: ['authorization' => 'Bearer valid-token']),
+            new Request(method: 'GET', path: '/api/me')->withAttribute('auth', $claims),
             static fn (Request $request): Response => new JsonResponse([]),
         );
 
@@ -106,31 +98,10 @@ final class RateLimitMiddlewareTest extends TestCase
     }
 
     #[Test]
-    public function chave_usa_o_id_do_usuario_quando_o_cookie_access_token_decodifica(): void
-    {
-        $claims = AccessTokenClaims::issue('11111111-1111-4111-8111-111111111111', 'autoschedule-web', UserRole::Customer, [], 900);
-        $limiter = new FakeRateLimiter(new RateLimitResult(allowed: true, remaining: 999, resetSeconds: 60));
-        $middleware = new RateLimitMiddleware(
-            $limiter,
-            new Router(),
-            new RateLimitPolicy('general', 1000, 60),
-            new FakeTokenIssuer(['valid-token' => $claims]),
-            new NullLogger(),
-        );
-
-        $middleware->handle(
-            new Request(method: 'GET', path: '/api/me', cookies: ['access_token' => 'valid-token']),
-            static fn (Request $request): Response => new JsonResponse([]),
-        );
-
-        $this->assertSame('general:user:11111111-1111-4111-8111-111111111111', $limiter->lastKey);
-    }
-
-    #[Test]
-    public function chave_cai_pro_ip_quando_nao_ha_bearer(): void
+    public function chave_cai_pro_ip_quando_nao_ha_claims(): void
     {
         $limiter = new FakeRateLimiter(new RateLimitResult(allowed: true, remaining: 999, resetSeconds: 60));
-        $middleware = new RateLimitMiddleware($limiter, new Router(), new RateLimitPolicy('general', 1000, 60), new FakeTokenIssuer(), new NullLogger());
+        $middleware = new RateLimitMiddleware($limiter, new RateLimitPolicy('general', 1000, 60), new RateLimitPolicy('auth', 5, 60), new NullLogger());
 
         $middleware->handle(
             new Request(method: 'GET', path: '/api', ip: '203.0.113.9'),
@@ -143,7 +114,7 @@ final class RateLimitMiddlewareTest extends TestCase
     #[Test]
     public function falha_aberta_quando_o_limiter_lanca_excecao(): void
     {
-        $middleware = new RateLimitMiddleware(new BrokenRateLimiter(), new Router(), new RateLimitPolicy('general', 5, 60), new FakeTokenIssuer(), new NullLogger());
+        $middleware = new RateLimitMiddleware(new BrokenRateLimiter(), new RateLimitPolicy('general', 5, 60), new RateLimitPolicy('auth', 5, 60), new NullLogger());
         $nextCalled = false;
 
         $response = $middleware->handle(

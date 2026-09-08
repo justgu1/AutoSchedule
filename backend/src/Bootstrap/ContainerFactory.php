@@ -53,6 +53,8 @@ use App\Infrastructure\File\GdImageOptimizer;
 use App\Infrastructure\File\LocalTempFileStore;
 use App\Infrastructure\File\PostgresFileRepository;
 use App\Infrastructure\Http\Controllers\OAuthController;
+use App\Infrastructure\Http\ExceptionHandler;
+use App\Infrastructure\Http\Router;
 use App\Infrastructure\Jobs\JobStatusStore;
 use App\Infrastructure\Logging\Logger;
 use App\Infrastructure\Mail\MailTemplate;
@@ -66,122 +68,158 @@ use App\Infrastructure\Scheduler\PurgeTrashedEntitiesTask;
 use App\Infrastructure\Scheduler\Scheduler;
 use App\Infrastructure\Storage\MinioAdapter;
 use App\Infrastructure\User\PostgresUserRepository;
+use Psr\Log\LoggerInterface;
 
 /**
- * Composition root: liga cada port à implementação concreta e monta o que
- * depende de config. Separado de routes/api.php, que só sabe QUAIS rotas
- * existem.
- *
- * O que NÃO aparece aqui é resolvido por autowiring (`Container::autowire`):
- * caso de uso e controller cujas dependências são todas ports/classes já
- * registrados abaixo não precisam de binding próprio -- o construtor deles já
- * diz tudo. Só entra nesta lista quem depende de config, de escalar, ou de uma
- * escolha que o typehint sozinho não resolve.
+ * Composition root. O que não aparece aqui é resolvido por autowiring: caso de uso e controller
+ * cujas dependências já estão registradas abaixo não precisam de linha própria.
  */
 final class ContainerFactory
 {
-    public static function build(Config $app): Container
+    public static function build(Config $config): Container
     {
         $container = new Container();
 
-        // Conecta como autoschedule_app (não a role admin/superuser usada por
-        // bin/migrate.php e bin/seed.php) -- é a role restrita (NOSUPERUSER
-        // NOBYPASSRLS) que faz o RLS de users valer a pena em runtime.
-        $container->set(DatabaseConnection::class, static fn (): DatabaseConnection => new PostgresConnection(
-            driver: $app->string('database.driver'),
-            host: $app->string('database.host'),
-            port: $app->int('database.port'),
-            database: $app->string('database.database'),
-            username: $app->string('database.app_username'),
-            password: $app->string('database.app_password'),
+        self::bindPorts($container);
+        self::bindConfigured($container, $config);
+        self::bindScheduler($container);
+
+        return $container;
+    }
+
+    private static function bindPorts(Container $container): void
+    {
+        $container->bind(UserRepository::class, PostgresUserRepository::class);
+        $container->bind(DealershipRepository::class, PostgresDealershipRepository::class);
+        $container->bind(FileRepository::class, PostgresFileRepository::class);
+        $container->bind(OAuthClientRepository::class, PostgresOAuthClientRepository::class);
+        $container->bind(RefreshTokenRepository::class, PostgresRefreshTokenRepository::class);
+        $container->bind(PasswordResetTokenRepository::class, PostgresPasswordResetTokenRepository::class);
+        $container->bind(UserIdentityRepository::class, PostgresUserIdentityRepository::class);
+        $container->bind(ZipCodeCacheRepository::class, PostgresZipCodeCacheRepository::class);
+        $container->bind(ZipCodeProvider::class, ViaCepZipCodeProvider::class);
+        $container->bind(AuditLogger::class, PostgresAuditLogger::class);
+        $container->bind(LoggerInterface::class, Logger::class);
+        $container->bind(MailTemplateRenderer::class, MailTemplate::class);
+        $container->bind(RateLimiter::class, RedisRateLimiter::class);
+        $container->bind(Queue::class, RedisQueue::class);
+        $container->bind(JobProgress::class, JobStatusStore::class);
+    }
+
+    private static function bindConfigured(Container $container, Config $config): void
+    {
+        // Conecta como a role restrita (NOSUPERUSER NOBYPASSRLS), não a das migrations: é o que faz o RLS valer em runtime.
+        $container->singleton(DatabaseConnection::class, static fn (): DatabaseConnection => new PostgresConnection(
+            driver: $config->string('database.driver'),
+            host: $config->string('database.host'),
+            port: $config->int('database.port'),
+            database: $config->string('database.database'),
+            username: $config->string('database.app_username'),
+            password: $config->string('database.app_password'),
         ));
 
-        $container->set(TokenIssuer::class, static fn (): TokenIssuer => new JwtTokenIssuer(
-            privateKeyPem: self::readKey($app->string('auth.jwt.private_key_path')),
-            publicKeyPem: self::readKey($app->string('auth.jwt.public_key_path')),
-            issuer: $app->string('auth.jwt.issuer'),
-            audience: $app->string('auth.jwt.audience'),
+        $container->singleton(RedisConnection::class, static fn (): RedisConnection => new RedisConnection(
+            host: $config->string('redis.host'),
+            port: $config->int('redis.port'),
+            prefix: $config->string('redis.prefix'),
+            username: $config->stringOrNull('redis.username'),
+            password: $config->stringOrNull('redis.password'),
         ));
 
-        $container->set(
-            UserRepository::class,
-            static fn (Container $c): UserRepository => new PostgresUserRepository($c->get(DatabaseConnection::class)->pdo()),
-        );
-        $container->set(
-            OAuthClientRepository::class,
-            static fn (Container $c): OAuthClientRepository => new PostgresOAuthClientRepository($c->get(DatabaseConnection::class)->pdo()),
-        );
-        $container->set(
-            RefreshTokenRepository::class,
-            static fn (Container $c): RefreshTokenRepository => new PostgresRefreshTokenRepository($c->get(DatabaseConnection::class)->pdo()),
-        );
-        $container->set(
-            AuditLogger::class,
-            static fn (Container $c): AuditLogger => new PostgresAuditLogger($c->get(DatabaseConnection::class)->pdo(), new Logger()),
-        );
-        $container->set(
-            PasswordResetTokenRepository::class,
-            static fn (Container $c): PasswordResetTokenRepository => new PostgresPasswordResetTokenRepository($c->get(DatabaseConnection::class)->pdo()),
-        );
-        $container->set(
-            UserIdentityRepository::class,
-            static fn (Container $c): UserIdentityRepository => new PostgresUserIdentityRepository($c->get(DatabaseConnection::class)->pdo()),
-        );
-        $container->set(GoogleIdTokenVerifier::class, static fn (Container $c): GoogleIdTokenVerifier => new GoogleJwksIdTokenVerifier(
-            clientId: $app->string('google.client_id'),
+        $container->singleton(TokenIssuer::class, static fn (): TokenIssuer => new JwtTokenIssuer(
+            privateKeyPem: self::readKey($config->string('auth.jwt.private_key_path')),
+            publicKeyPem: self::readKey($config->string('auth.jwt.public_key_path')),
+            issuer: $config->string('auth.jwt.issuer'),
+            audience: $config->string('auth.jwt.audience'),
+        ));
+
+        $container->singleton(GoogleIdTokenVerifier::class, static fn (Container $c): GoogleIdTokenVerifier => new GoogleJwksIdTokenVerifier(
+            clientId: $config->string('google.client_id'),
             redis: $c->get(RedisConnection::class),
         ));
-        $container->set(MailProvider::class, static fn (): MailProvider => new SymfonyMailProvider($app->string('mail.dsn'), $app->string('mail.from')));
-        $container->set(MailTemplateRenderer::class, static fn (): MailTemplateRenderer => new MailTemplate());
-        $container->set(StorageProvider::class, static fn (): StorageProvider => new MinioAdapter(
-            endpoint: $app->string('storage.endpoint'),
-            bucket: $app->string('storage.bucket'),
-            region: $app->string('storage.region'),
-            accessKey: $app->string('storage.access_key'),
-            secretKey: $app->string('storage.secret_key'),
-            publicUrl: $app->string('storage.public_url'),
+
+        $container->singleton(StorageProvider::class, static fn (): StorageProvider => new MinioAdapter(
+            endpoint: $config->string('storage.endpoint'),
+            bucket: $config->string('storage.bucket'),
+            region: $config->string('storage.region'),
+            accessKey: $config->string('storage.access_key'),
+            secretKey: $config->string('storage.secret_key'),
+            publicUrl: $config->string('storage.public_url'),
         ));
-        $container->set(
-            FileRepository::class,
-            static fn (Container $c): FileRepository => new PostgresFileRepository($c->get(DatabaseConnection::class)->pdo()),
-        );
-        $container->set(
-            ImageOptimizer::class,
-            static fn (): ImageOptimizer => new GdImageOptimizer($app->string('storage.temp_path')),
-        );
-        $container->set(
-            TempFileStore::class,
-            static fn (): TempFileStore => new LocalTempFileStore($app->string('storage.temp_path')),
-        );
-        $container->set(
-            DealershipRepository::class,
-            static fn (Container $c): DealershipRepository => new PostgresDealershipRepository($c->get(DatabaseConnection::class)->pdo()),
-        );
-        $container->set(RedisConnection::class, static fn (): RedisConnection => new RedisConnection(
-            host: $app->string('redis.host'),
-            port: $app->int('redis.port'),
-            prefix: $app->string('redis.prefix'),
-            username: $app->stringOrNull('redis.username'),
-            password: $app->stringOrNull('redis.password'),
+
+        $container->singleton(MailProvider::class, static fn (): MailProvider => new SymfonyMailProvider(
+            $config->string('mail.dsn'),
+            $config->string('mail.from'),
         ));
-        $container->set(
-            RateLimiter::class,
-            static fn (Container $c): RateLimiter => new RedisRateLimiter($c->get(RedisConnection::class)),
-        );
-        $container->set(
-            RedisQueue::class,
-            static fn (Container $c): RedisQueue => new RedisQueue($c->get(RedisConnection::class)),
-        );
-        // Alias pro port -- mesmo singleton de RedisQueue::class.
-        $container->set(Queue::class, static fn (Container $c): Queue => $c->get(RedisQueue::class));
-        $container->set(
-            JobStatusStore::class,
-            static fn (Container $c): JobStatusStore => new JobStatusStore($c->get(RedisConnection::class)),
-        );
-        $container->set(JobProgress::class, static fn (Container $c): JobProgress => $c->get(JobStatusStore::class));
-        // Cada domínio com lixeira reversível registra aqui sua própria purga,
-        // reaproveitando a mesma ScheduledTask genérica (App\Infrastructure\Scheduler\PurgeTrashedEntitiesTask).
-        $container->set(Scheduler::class, static function (Container $c): Scheduler {
+
+        $container->singleton(Router::class, static fn (Container $c): Router => new Router($c));
+
+        $container->singleton(ExceptionHandler::class, static fn (Container $c): ExceptionHandler => new ExceptionHandler(
+            debug: $config->bool('debug'),
+            logger: $c->get(LoggerInterface::class),
+        ));
+
+        $container->singleton(ImageOptimizer::class, static fn (): ImageOptimizer => new GdImageOptimizer($config->string('storage.temp_path')));
+        $container->singleton(TempFileStore::class, static fn (): TempFileStore => new LocalTempFileStore($config->string('storage.temp_path')));
+
+        $container->singleton(PaginationPolicy::class, static fn (): PaginationPolicy => new PaginationPolicy(
+            $config->int('pagination.default_per_page'),
+            $config->int('pagination.max_per_page'),
+        ));
+
+        $container->singleton(TokenPairIssuer::class, static fn (Container $c): TokenPairIssuer => new TokenPairIssuer(
+            tokens: $c->get(TokenIssuer::class),
+            refreshTokens: $c->get(RefreshTokenRepository::class),
+            accessTokenTtl: $config->int('auth.access_token_ttl'),
+            refreshTokenTtl: $config->int('auth.refresh_token_ttl'),
+        ));
+
+        $container->singleton(RefreshAccessToken::class, static fn (Container $c): RefreshAccessToken => new RefreshAccessToken(
+            clients: $c->get(ClientAuthenticator::class),
+            refreshTokens: $c->get(RefreshTokenRepository::class),
+            users: $c->get(UserRepository::class),
+            tokens: $c->get(TokenIssuer::class),
+            audit: $c->get(AuditLogger::class),
+            accessTokenTtl: $config->int('auth.access_token_ttl'),
+            refreshTokenTtl: $config->int('auth.refresh_token_ttl'),
+        ));
+
+        $container->singleton(IssueServiceToken::class, static fn (Container $c): IssueServiceToken => new IssueServiceToken(
+            clients: $c->get(ClientAuthenticator::class),
+            tokens: $c->get(TokenIssuer::class),
+            audit: $c->get(AuditLogger::class),
+            accessTokenTtl: $config->int('auth.access_token_ttl'),
+        ));
+
+        $container->singleton(RequestPasswordReset::class, static fn (Container $c): RequestPasswordReset => new RequestPasswordReset(
+            users: $c->get(UserRepository::class),
+            passwordResetTokens: $c->get(PasswordResetTokenRepository::class),
+            mailTemplates: $c->get(MailTemplateRenderer::class),
+            queue: $c->get(Queue::class),
+            passwordResetTtl: $config->int('auth.password_reset_ttl'),
+            frontendUrl: $config->string('mail.frontend_url'),
+            templatePath: dirname(__DIR__, 2) . '/resources/mail/password-reset.html',
+        ));
+
+        $container->singleton(OAuthController::class, static fn (Container $c): OAuthController => new OAuthController(
+            loginWithPassword: $c->get(LoginWithPassword::class),
+            refreshAccessToken: $c->get(RefreshAccessToken::class),
+            loginWithGoogle: $c->get(LoginWithGoogle::class),
+            issueServiceToken: $c->get(IssueServiceToken::class),
+            revokeSession: $c->get(Logout::class),
+            refreshTokenTtl: $config->int('auth.refresh_token_ttl'),
+            cookieSecure: $config->bool('security.cookie_secure'),
+        ));
+
+        // O worker resolve o job pelo nome que veio no envelope, então registrar explícito é o que
+        // garante que a fila não dependa de um autowire nunca exercitado.
+        $container->singleton(SendEmailJob::class, static fn (Container $c): SendEmailJob => new SendEmailJob($c->get(MailProvider::class)));
+    }
+
+    /** Cada domínio com lixeira reversível registra a própria purga sobre a mesma ScheduledTask. */
+    private static function bindScheduler(Container $container): void
+    {
+        $container->singleton(Scheduler::class, static function (Container $c): Scheduler {
             $users = $c->get(UserRepository::class);
             $dealerships = $c->get(DealershipRepository::class);
             $audit = $c->get(AuditLogger::class);
@@ -214,62 +252,6 @@ final class ContainerFactory
                 ],
             );
         });
-        $container->set(PaginationPolicy::class, static fn (): PaginationPolicy => new PaginationPolicy(
-            $app->int('pagination.default_per_page'),
-            $app->int('pagination.max_per_page'),
-        ));
-
-        // Casos de uso que dependem de config -- o resto o autowire resolve.
-        $container->set(TokenPairIssuer::class, static fn (Container $c): TokenPairIssuer => new TokenPairIssuer(
-            tokens: $c->get(TokenIssuer::class),
-            refreshTokens: $c->get(RefreshTokenRepository::class),
-            accessTokenTtl: $app->int('auth.access_token_ttl'),
-            refreshTokenTtl: $app->int('auth.refresh_token_ttl'),
-        ));
-        $container->set(RefreshAccessToken::class, static fn (Container $c): RefreshAccessToken => new RefreshAccessToken(
-            clients: $c->get(ClientAuthenticator::class),
-            refreshTokens: $c->get(RefreshTokenRepository::class),
-            users: $c->get(UserRepository::class),
-            tokens: $c->get(TokenIssuer::class),
-            audit: $c->get(AuditLogger::class),
-            accessTokenTtl: $app->int('auth.access_token_ttl'),
-            refreshTokenTtl: $app->int('auth.refresh_token_ttl'),
-        ));
-        $container->set(IssueServiceToken::class, static fn (Container $c): IssueServiceToken => new IssueServiceToken(
-            clients: $c->get(ClientAuthenticator::class),
-            tokens: $c->get(TokenIssuer::class),
-            audit: $c->get(AuditLogger::class),
-            accessTokenTtl: $app->int('auth.access_token_ttl'),
-        ));
-        $container->set(RequestPasswordReset::class, static fn (Container $c): RequestPasswordReset => new RequestPasswordReset(
-            users: $c->get(UserRepository::class),
-            passwordResetTokens: $c->get(PasswordResetTokenRepository::class),
-            mailTemplates: $c->get(MailTemplateRenderer::class),
-            queue: $c->get(Queue::class),
-            passwordResetTtl: $app->int('auth.password_reset_ttl'),
-            frontendUrl: $app->string('mail.frontend_url'),
-            templatePath: dirname(__DIR__, 2) . '/resources/mail/password-reset.html',
-        ));
-
-        // O worker resolve o job pelo nome da classe que veio no envelope --
-        // registrar explícito é o que garante que a fila não dependa de um
-        // autowire que ninguém exercitou até o job falhar em produção.
-        $container->set(SendEmailJob::class, static fn (Container $c): SendEmailJob => new SendEmailJob($c->get(MailProvider::class)));
-
-        $container->set(OAuthController::class, static fn (Container $c): OAuthController => new OAuthController(
-            loginWithPassword: $c->get(LoginWithPassword::class),
-            refreshAccessToken: $c->get(RefreshAccessToken::class),
-            loginWithGoogle: $c->get(LoginWithGoogle::class),
-            issueServiceToken: $c->get(IssueServiceToken::class),
-            revokeSession: $c->get(Logout::class),
-            refreshTokenTtl: $app->int('auth.refresh_token_ttl'),
-            cookieSecure: $app->bool('security.cookie_secure'),
-        ));
-
-        $container->set(ZipCodeCacheRepository::class, static fn (Container $c): ZipCodeCacheRepository => new PostgresZipCodeCacheRepository($c->get(DatabaseConnection::class)));
-        $container->set(ZipCodeProvider::class, static fn (): ZipCodeProvider => new ViaCepZipCodeProvider());
-
-        return $container;
     }
 
     private static function readKey(string $path): string

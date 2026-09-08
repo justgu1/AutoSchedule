@@ -36,7 +36,7 @@ Antes desse fluxo existir, o projeto precisou de uma base de conta/autenticaçã
 
 **Frontend** — React, TypeScript, Vite, Material UI, TanStack Query
 
-**Backend** — PHP 8.4, PHP-FPM, Composer, PDO (PostgreSQL)
+**Backend** — PHP 8.5, PHP-FPM, Composer, PDO (PostgreSQL)
 
 **Infraestrutura local** — Docker, Docker Compose, Nginx, PostgreSQL, Redis, MinIO, Mailpit
 

@@ -6,11 +6,7 @@ namespace App\Application\Shared;
 
 use App\Domain\User\UserRole;
 
-/**
- * Quem disparou a ação, com que autoridade e de onde. Tudo opcional porque
- * caso de uso não depende de `Request`: job no worker não tem IP nem user
- * agent, e rota pública não tem ator nenhum.
- */
+/** Tudo opcional porque caso de uso não depende de `Request`: job não tem IP, rota pública não tem ator. */
 final readonly class ActorContext
 {
     public function __construct(

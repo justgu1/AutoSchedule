@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Infrastructure\Http;
 
+use App\Infrastructure\Http\Cookie;
 use App\Infrastructure\Http\Response;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -90,8 +91,8 @@ final class ResponseTest extends TestCase
         $comCookie = $response->withCookie('access_token', 'abc123', maxAge: 900);
 
         $this->assertSame([], $response->cookies());
-        $this->assertSame(
-            ['value' => 'abc123', 'maxAge' => 900, 'httpOnly' => true, 'sameSite' => 'Strict', 'secure' => false],
+        $this->assertEquals(
+            new Cookie('abc123', maxAge: 900),
             $comCookie->cookies()['access_token'],
         );
     }
@@ -101,7 +102,7 @@ final class ResponseTest extends TestCase
     {
         $response = new Response()->withCookie('access_token', '', maxAge: -1);
 
-        $this->assertSame(-1, $response->cookies()['access_token']['maxAge']);
+        $this->assertSame(-1, $response->cookies()['access_token']->maxAge);
     }
 
     #[Test]
@@ -110,7 +111,7 @@ final class ResponseTest extends TestCase
         $response = new Response()->withCookie('XSRF-TOKEN', 'xyz', httpOnly: false, secure: true);
 
         $cookie = $response->cookies()['XSRF-TOKEN'];
-        $this->assertFalse($cookie['httpOnly']);
-        $this->assertTrue($cookie['secure']);
+        $this->assertFalse($cookie->httpOnly);
+        $this->assertTrue($cookie->secure);
     }
 }

@@ -6,11 +6,7 @@ namespace App\Domain\File\Ports;
 
 use App\Domain\File\OptimizedImage;
 
-/**
- * Converte qualquer imagem enviada pro padrão do site: WebP, redimensionada,
- * já pronta pra servir via CDN. Todo upload de foto (concessionária, e no
- * futuro veículo) passa por aqui antes de ir pro storage.
- */
+/** Todo upload de foto passa por aqui antes do storage: o formato do site é WebP, não o que o cliente mandou. */
 interface ImageOptimizer
 {
     /** @return OptimizedImage caminho de um arquivo temporário -- quem chama apaga depois de usar. */

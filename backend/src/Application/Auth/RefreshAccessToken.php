@@ -41,11 +41,9 @@ final readonly class RefreshAccessToken
         }
 
         if ($current->isRevoked()) {
-            // Reuso de um token já rotacionado: pode ter sido roubado, então
-            // queima a família inteira -- todo descendente para de funcionar.
+            // Reuso de token já rotacionado sugere roubo, então queima a família inteira.
             $this->refreshTokens->revokeFamily($current->familyId);
-            // Ninguém provou identidade pra fazer esse request -- é o dono do
-            // token roubado que sofre, não quem o usou (esse é o desconhecido).
+            // O alvo é o dono da família, não quem reusou -- esse é o desconhecido.
             $this->audit->record(AuditEvent::RefreshTokenReused, null, 'User', $current->userId, [], $context->ipAddress, $context->userAgent);
 
             throw new DomainException('Invalid or expired refresh token.', DomainErrorType::Unauthorized);

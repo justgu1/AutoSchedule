@@ -7,10 +7,7 @@ use App\Infrastructure\Database\Migration;
 return new class () implements Migration {
     public function up(\PDO $pdo): void
     {
-        // user_id é a conta AFETADA pela ação (o "no quê"); actor_id é quem
-        // executou a ação (o "quem"). Pra ação sobre a própria conta os dois
-        // são o mesmo id; num admin mexendo em outro usuário, divergem -- sem
-        // essa coluna não dava pra saber quem de fato agiu.
+        // user_id é a conta afetada, actor_id é quem agiu: divergem quando um admin mexe em outro usuário.
         $pdo->exec('ALTER TABLE audit_logs ADD COLUMN actor_id uuid REFERENCES users(id) ON DELETE SET NULL');
         $pdo->exec('CREATE INDEX audit_logs_actor_id_idx ON audit_logs (actor_id)');
     }

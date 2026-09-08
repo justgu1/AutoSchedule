@@ -14,12 +14,7 @@ use App\Domain\User\Ports\UserRepository;
 use App\Domain\User\User;
 use App\Domain\User\UserRole;
 
-/**
- * Self troca name/phone e, no máximo, escala a própria role de `customer`
- * pra `seller` (`User::isEligibleForSelfServiceRoleChange`) -- qualquer
- * outra transição no caminho self é rejeitada. Admin mexendo em outro id
- * troca pra qualquer role (com a trava do último admin).
- */
+/** Dois caminhos com poder diferente: admin troca qualquer role, self só a escalada que `User` permite. */
 final readonly class UpdateUserProfile
 {
     public function __construct(
@@ -41,8 +36,7 @@ final readonly class UpdateUserProfile
         }
 
         $this->users->update($user);
-        // Só o nome dos campos de perfil alterados (sem valor -- não duplica PII),
-        // mas role muda quem pode fazer o quê no sistema, então guarda de/para inteiro.
+        // Só o nome dos campos, pra não duplicar PII na auditoria; role é exceção porque muda permissão.
         $auditContext = ['fields' => $changes->fields()];
 
         if ($user->role !== $previousRole) {

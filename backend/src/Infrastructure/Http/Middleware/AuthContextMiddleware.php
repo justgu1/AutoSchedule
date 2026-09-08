@@ -4,58 +4,44 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Http\Middleware;
 
-use App\Domain\Auth\Ports\TokenIssuer;
+use App\Domain\Auth\ValueObjects\AccessTokenClaims;
 use App\Infrastructure\Database\DatabaseConnection;
 use App\Infrastructure\Http\Middleware;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
-use App\Infrastructure\Http\Router;
 
 /**
- * Decodifica o access token (header `Authorization: Bearer` ou cookie
- * `access_token` -- o que vier primeiro) e anexa as claims ao Request.
- * Autenticado, seta `current_user_id`/`role` pro RLS.
- *
- * Sem token nenhum, a rota pode estar marcada como serviceContext (ex: login
- * busca usuário por email antes de existir qualquer autenticação) -- nesse
- * caso seta um contexto de serviço mais restrito (só enxerga o necessário
- * pra autenticação em si).
- *
- * `publicRead` é composto, não alternativo: uma rota marcada assim (ex:
- * `GET /dealerships/{id}`) recebe a flag `is_public_read` JUNTO com
- * `current_user_id`/`role` quando há Bearer válido -- precisa das duas coisas
- * pra um seller autenticado (não dono, não admin) ainda cair no fallback
- * público em vez de tomar 404. Só quando pelo menos um dos três se aplica é
- * que abre transação; rota pública comum sem nenhuma marca segue direto.
+ * As três marcas de contexto do RLS são compostas, não alternativas: um seller autenticado numa leitura
+ * pública precisa da flag pública E da própria identidade, senão o RLS esconde a linha e ele toma 404.
  */
 final readonly class AuthContextMiddleware implements Middleware
 {
-    public function __construct(
-        private TokenIssuer $tokens,
-        private DatabaseConnection $connection,
-        private Router $router,
-    ) {
+    public function __construct(private DatabaseConnection $connection)
+    {
     }
 
     public function handle(Request $request, \Closure $next): Response
     {
-        $token = $this->extractToken($request);
-        $claims = null;
+        // O rate limit já contou a tentativa, então agora dá pra recusar o token inválido.
+        $failure = $request->attribute('auth_error');
 
-        if ($token !== null) {
-            $claims = $this->tokens->decodeAccessToken($token);
-            $request = $request->withAttribute('auth', $claims);
+        if ($failure instanceof \Throwable) {
+            throw $failure;
         }
 
-        $isServiceContext = !$claims instanceof \App\Domain\Auth\ValueObjects\AccessTokenClaims && $this->router->isServiceContext($request->method(), $request->path());
-        $isPublicRead = $this->router->isPublicRead($request->method(), $request->path());
+        $claims = $request->attribute('auth');
+        $authenticated = $claims instanceof AccessTokenClaims;
+        $route = $request->route();
 
-        if (!$claims instanceof \App\Domain\Auth\ValueObjects\AccessTokenClaims && !$isServiceContext && !$isPublicRead) {
+        $isServiceContext = !$authenticated && ($route?->needsServiceContext() ?? false);
+        $isPublicRead = $route?->allowsPublicRead() ?? false;
+
+        if (!$authenticated && !$isServiceContext && !$isPublicRead) {
             return $next($request);
         }
 
         return $this->runInTransaction($request, $next, static function (\PDO $pdo) use ($claims, $isServiceContext, $isPublicRead): void {
-            if ($claims instanceof \App\Domain\Auth\ValueObjects\AccessTokenClaims) {
+            if ($claims instanceof AccessTokenClaims) {
                 $pdo->exec('SET LOCAL app.current_user_id = ' . $pdo->quote($claims->subject));
                 $pdo->exec('SET LOCAL app.current_user_role = ' . $pdo->quote($claims->role?->value ?? ''));
             }
@@ -68,17 +54,6 @@ final readonly class AuthContextMiddleware implements Middleware
                 $pdo->exec("SET LOCAL app.is_public_read = 'true'");
             }
         });
-    }
-
-    private function extractToken(Request $request): ?string
-    {
-        $header = $request->header('authorization');
-
-        if ($header !== null && str_starts_with($header, 'Bearer ')) {
-            return substr($header, 7);
-        }
-
-        return $request->cookie('access_token');
     }
 
     private function runInTransaction(Request $request, \Closure $next, \Closure $setContext): Response

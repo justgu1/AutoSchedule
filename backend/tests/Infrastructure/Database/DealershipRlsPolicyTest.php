@@ -4,16 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Infrastructure\Database;
 
-use App\Infrastructure\Database\PostgresConnection;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\TestDatabase;
 
 /**
- * Teste de integração: valida as policies de RLS de `dealerships` de
- * verdade, conectando como autoschedule_app (a role admin/pgsql é superuser
- * e sempre ignora RLS). Duas conexões/sessões diferentes -- fixture
- * commitada pela conexão admin, limpeza no tearDown é DELETE, não rollback.
+ * Conecta como autoschedule_app porque a role admin é superuser e ignora RLS.
+ * Duas sessões: a fixture é commitada pela admin, então a limpeza é DELETE e não rollback.
  */
 #[Group('integration')]
 final class DealershipRlsPolicyTest extends TestCase
@@ -28,14 +26,7 @@ final class DealershipRlsPolicyTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->admin = new PostgresConnection(
-            driver: getenv('DB_DRIVER') ?: 'pgsql',
-            host: getenv('DB_HOST') ?: '127.0.0.1',
-            port: (int) (getenv('DB_PORT') ?: 5432),
-            database: getenv('DB_DATABASE') ?: 'autoschedule',
-            username: getenv('DB_USERNAME') ?: 'pgsql',
-            password: getenv('DB_PASSWORD') ?: 'password',
-        )->pdo();
+        $this->admin = TestDatabase::connect()->pdo();
 
         $this->sellerId = $this->insertSellerUser('rls-seller@example.com');
         $this->otherSellerId = $this->insertSellerUser('rls-other-seller@example.com');
@@ -44,14 +35,7 @@ final class DealershipRlsPolicyTest extends TestCase
         $this->trashedDealershipId = $this->insertDealership($this->otherSellerId, 'RLS Trashed Center');
         $this->admin->exec("UPDATE dealerships SET status = 'trashed' WHERE id = " . $this->admin->quote($this->trashedDealershipId));
 
-        $this->rls = new PostgresConnection(
-            driver: getenv('DB_DRIVER') ?: 'pgsql',
-            host: getenv('DB_HOST') ?: '127.0.0.1',
-            port: (int) (getenv('DB_PORT') ?: 5432),
-            database: getenv('DB_DATABASE') ?: 'autoschedule',
-            username: getenv('DB_APP_USERNAME') ?: 'autoschedule_app',
-            password: getenv('DB_APP_PASSWORD') ?: 'changeme',
-        )->pdo();
+        $this->rls = TestDatabase::connectAsApp()->pdo();
     }
 
     protected function tearDown(): void
@@ -73,14 +57,7 @@ final class DealershipRlsPolicyTest extends TestCase
         $this->assertSame([$this->dealershipId], $ids);
     }
 
-    /**
-     * `AuthContextMiddleware` compõe `is_public_read` com o contexto
-     * autenticado normal (não é alternativo) -- um seller batendo em
-     * `GET /dealerships/{id}` de outro seller precisa das duas coisas juntas
-     * pra cair no fallback público em vez de tomar 404. Sem essa composição,
-     * `seller_so_enxerga_a_propria_concessionaria` (acima) continuaria
-     * verdade só nas rotas de gerenciamento -- aqui é o caso da rota pública.
-     */
+    /** Sem compor a flag pública com a identidade, o seller autenticado tomaria 404 na concessionária alheia. */
     #[Test]
     public function seller_com_contexto_de_leitura_publica_tambem_enxerga_concessionaria_de_outro_seller(): void
     {
@@ -117,12 +94,7 @@ final class DealershipRlsPolicyTest extends TestCase
         $this->assertSame([], $ids);
     }
 
-    /**
-     * `GET /dealerships/{id}` (rota `publicRead`) só enxerga concessionária
-     * `active` -- trashed continua invisível mesmo com a flag setada, e a
-     * flag sozinha (sem `current_user_id`/role de dono/admin) não abre nada
-     * além disso.
-     */
+    /** A flag pública não é curinga: trashed segue invisível, e sozinha ela não abre mais nada. */
     #[Test]
     public function contexto_de_leitura_publica_enxerga_so_concessionaria_ativa(): void
     {
@@ -136,11 +108,7 @@ final class DealershipRlsPolicyTest extends TestCase
         $this->assertNotContains($this->trashedDealershipId, $ids);
     }
 
-    /**
-     * Scheduler/worker rodam sem request HTTP, sem `current_user_id`/role pra
-     * setar -- a mesma policy de serviço que o login/registro usa em `users`
-     * é o que deixa o purge agendado e o job de foto enxergarem a linha.
-     */
+    /** Sem request HTTP não há identidade pra setar, então o background depende da policy de serviço. */
     #[Test]
     public function contexto_de_servico_enxerga_e_atualiza_qualquer_linha(): void
     {

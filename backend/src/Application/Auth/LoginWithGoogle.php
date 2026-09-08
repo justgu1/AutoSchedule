@@ -18,14 +18,7 @@ use App\Domain\User\Ports\UserRepository;
 use App\Domain\User\User;
 use App\Domain\User\UserRole;
 
-/**
- * E-mail verificado pelo Google já prova posse -- conta existente com o
- * mesmo e-mail é linkada automaticamente (sem mudar role), e-mail novo
- * cria conta `customer` (mesma regra do registro manual: customer só
- * precisa de login pra ver histórico). Senha aleatória inutilizável --
- * conta social-only até pedir "esqueci minha senha" se quiser também
- * logar com senha.
- */
+/** E-mail verificado pelo Google já prova posse, então linka a conta existente sem mudar role. */
 final readonly class LoginWithGoogle
 {
     public function __construct(
@@ -73,7 +66,7 @@ final readonly class LoginWithGoogle
             return $this->tokenPairs->issue($client, $existingByEmail->id, $existingByEmail->role, $client->allowedScopes, $restored);
         }
 
-        // Ninguém sabe/usa essa senha -- só ocupa o campo NOT NULL; login dessa conta é sempre via Google até um reset trocar por uma real.
+        // Senha inutilizável só pra ocupar o NOT NULL: a conta é social-only até um reset trocar por uma real.
         $newUser = User::register($claims->name, $claims->email, null, bin2hex(random_bytes(32)), UserRole::Customer);
         $this->users->insert($newUser);
         $this->identities->insert(UserIdentity::link($newUser->id, 'google', $claims->subject, $claims->email));

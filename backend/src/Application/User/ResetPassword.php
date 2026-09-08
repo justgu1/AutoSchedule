@@ -39,8 +39,7 @@ final readonly class ResetPassword
         $this->audit->record(AuditEvent::PasswordChanged, $user->id, 'User', $user->id, ['via' => 'reset'], $context->ipAddress, $context->userAgent);
 
         $this->passwordResetTokens->markUsed($token->id);
-        // Um reset bem-sucedido invalida qualquer outro link ainda pendente do
-        // mesmo usuário -- não deixa um link antigo ainda funcionando depois.
+        // Invalida os outros links pendentes: nenhum e-mail antigo pode continuar valendo.
         $this->passwordResetTokens->invalidateAllForUser($user->id);
         $this->refreshTokens->revokeAllForUser($user->id);
     }

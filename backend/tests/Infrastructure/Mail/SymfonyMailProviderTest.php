@@ -8,13 +8,7 @@ use App\Infrastructure\Mail\SymfonyMailProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
-/**
- * Teste de integração: manda e-mail de verdade pro Mailpit real (mesmo
- * padrão de verificação já usado pro fluxo de reset de senha) -- confirma que
- * o DSN sem auth (dev) ainda funciona depois da mudança de host/porta soltos
- * pra DSN completo. Host vem de env (`MAIL_HOST`) -- via docker-compose é
- * `mailpit`, via CI (service container do GitHub Actions) é `127.0.0.1`.
- */
+/** Host vem de env porque o compose e o CI expõem o Mailpit em endereços diferentes. */
 final class SymfonyMailProviderTest extends TestCase
 {
     #[Test]
@@ -32,10 +26,7 @@ final class SymfonyMailProviderTest extends TestCase
     #[Test]
     public function aceita_dsn_smtps_com_auth_sem_lancar_excecao_na_construcao(): void
     {
-        // smtps:// (TLS implícito, porta 465) é o esquema usado por SMTP real
-        // em produção -- Transport::fromDsn só parseia aqui, não conecta
-        // (conexão de verdade só acontece em send()), então dá pra confirmar
-        // que o esquema é aceito sem precisar de um servidor SMTP real.
+        // fromDsn só parseia, então dá pra validar o esquema de produção sem servidor SMTP real.
         $provider = new SymfonyMailProvider('smtps://user:pass@smtp.example.invalid:465', 'test@autoschedule.local');
 
         $this->assertInstanceOf(SymfonyMailProvider::class, $provider);

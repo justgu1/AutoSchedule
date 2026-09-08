@@ -23,11 +23,7 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FakeAuditLogger;
 
-/**
- * Unitário com fakes -- o único ponto de integração real é `JobStatusStore`
- * (Redis de verdade, já coberto em `JobStatusStoreTest`); aqui o que importa
- * é a orquestração: otimiza, grava, atualiza a concessionária, reporta progresso.
- */
+/** O que importa aqui é a orquestração; o único ponto real é o `JobStatusStore`. */
 #[Group('integration')]
 final class ProcessDealershipPhotoJobTest extends TestCase
 {

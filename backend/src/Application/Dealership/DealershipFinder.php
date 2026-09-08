@@ -10,10 +10,8 @@ use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
 
 /**
- * O identificador aceita o UUID (uso interno/gerenciamento) ou o `slug`
- * (URL pública amigável) -- os dois formatos nunca colidem entre si. RLS
- * já barra dono errado (linha nem aparece), então "não é sua" e "não
- * existe" viram o mesmo 404, de propósito.
+ * Aceita UUID ou slug porque os dois formatos nunca colidem entre si.
+ * "Não é sua" e "não existe" viram o mesmo 404 de propósito: o RLS já esconde a linha alheia.
  */
 final readonly class DealershipFinder
 {

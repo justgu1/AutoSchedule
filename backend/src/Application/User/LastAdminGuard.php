@@ -9,17 +9,14 @@ use App\Domain\Exceptions\DomainException;
 use App\Domain\User\Ports\UserRepository;
 use App\Domain\User\UserRole;
 
-/**
- * Invariante sobre o conjunto de usuários, não sobre um usuário -- por isso
- * não cabe em `User`: só dá pra responder consultando quantos admins existem.
- */
+/** Não cabe em `User` porque é invariante do conjunto: só responde quem sabe quantos admins existem. */
 final readonly class LastAdminGuard
 {
     public function __construct(private UserRepository $users)
     {
     }
 
-    /** Chamado só quando o usuário já é admin -- barra o passo que o tiraria do papel (delete ou troca de role) se ele for o único. */
+    /** Barra o passo que deixaria o sistema sem nenhum admin. */
     public function assertNotLastAdmin(): void
     {
         if ($this->users->countByRole(UserRole::Admin) <= 1) {

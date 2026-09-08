@@ -12,12 +12,8 @@ use App\Domain\User\Ports\UserRepository;
 use App\Domain\User\User;
 
 /**
- * Login com sucesso é a chance de recuperar a conta -- se ainda não foi
- * anonimizada em definitivo, sai da lixeira aqui, sem exigir passo extra do
- * usuário. Devolve se restaurou, pro token final avisar o frontend.
- *
- * Mora na camada Application porque compõe dois contextos: restaurar a conta
- * arrasta junto a concessionária que caiu na lixeira por causa dela.
+ * Login com sucesso é a chance de recuperar a conta, sem exigir passo extra do usuário.
+ * Mora na Application porque compõe dois contextos: restaurar a conta arrasta a concessionária.
  */
 final readonly class AccountRestorer
 {

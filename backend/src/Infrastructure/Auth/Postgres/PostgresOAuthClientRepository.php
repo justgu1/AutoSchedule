@@ -8,17 +8,18 @@ use App\Domain\Auth\ClientType;
 use App\Domain\Auth\GrantType;
 use App\Domain\Auth\OAuthClient;
 use App\Domain\Auth\Ports\OAuthClientRepository;
+use App\Infrastructure\Database\DatabaseConnection;
 use App\Infrastructure\Database\PostgresArray;
 
 final readonly class PostgresOAuthClientRepository implements OAuthClientRepository
 {
-    public function __construct(private \PDO $pdo)
+    public function __construct(private DatabaseConnection $connection)
     {
     }
 
     public function findByClientId(string $clientId): ?OAuthClient
     {
-        $statement = $this->pdo->prepare('SELECT * FROM oauth_clients WHERE client_id = :client_id');
+        $statement = $this->connection->pdo()->prepare('SELECT * FROM oauth_clients WHERE client_id = :client_id');
         $statement->execute(['client_id' => $clientId]);
         $row = $statement->fetch();
 

@@ -39,11 +39,9 @@ final readonly class GdImageOptimizer implements ImageOptimizer
         imagealphablending($resized, false);
         imagesavealpha($resized, true);
         imagecopyresampled($resized, $source, 0, 0, 0, 0, $targetWidth, $targetHeight, $width, $height);
-        imagedestroy($source);
 
         $path = sprintf('%s/%s.webp', rtrim($this->tempPath, '/'), Uuid::v7());
         imagewebp($resized, $path, self::WEBP_QUALITY);
-        imagedestroy($resized);
 
         return new OptimizedImage($path, $targetWidth, $targetHeight);
     }

@@ -29,11 +29,8 @@ final readonly class DealershipPhotos
     }
 
     /**
-     * Content-addressed (`UploadFile` dedupa por checksum) -- em teoria duas
-     * concessionárias poderiam acabar apontando pro mesmo arquivo se subissem
-     * bytes idênticos, e apagar aqui quebraria a outra. Aceito o risco: fotos
-     * reais nunca colidem byte a byte na prática, e não vale a complexidade de
-     * contar referências pra isso.
+     * `UploadFile` dedupa por checksum, então duas concessionárias com bytes idênticos compartilham arquivo
+     * e este delete quebraria a outra. Risco aceito: foto real não colide byte a byte, e contar referência não se paga.
      */
     public function delete(?string $fileId): void
     {

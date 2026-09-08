@@ -9,7 +9,7 @@ use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
 use App\Domain\Dealership\Ports\DealershipRepository;
 
-/** Move pra lixeira -- recuperável por 30 dias (`RestoreDealership`/`PurgeDealership`). */
+/** Reversível por `RestoreDealership` enquanto a purga agendada não passar. */
 final readonly class TrashDealership
 {
     public function __construct(

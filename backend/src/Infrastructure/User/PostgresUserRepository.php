@@ -8,10 +8,11 @@ use App\Domain\Shared\TrashableStatus;
 use App\Domain\User\Ports\UserRepository;
 use App\Domain\User\User;
 use App\Domain\User\UserRole;
+use App\Infrastructure\Database\DatabaseConnection;
 
 final readonly class PostgresUserRepository implements UserRepository
 {
-    public function __construct(private \PDO $pdo)
+    public function __construct(private DatabaseConnection $connection)
     {
     }
 
@@ -27,7 +28,7 @@ final readonly class PostgresUserRepository implements UserRepository
 
     public function existsByEmail(string $email): bool
     {
-        $statement = $this->pdo->prepare("SELECT 1 FROM users WHERE email = :email AND status <> 'deleted'");
+        $statement = $this->connection->pdo()->prepare("SELECT 1 FROM users WHERE email = :email AND status <> 'deleted'");
         $statement->execute(['email' => $email]);
 
         return $statement->fetchColumn() !== false;
@@ -35,7 +36,7 @@ final readonly class PostgresUserRepository implements UserRepository
 
     public function insert(User $user): void
     {
-        $statement = $this->pdo->prepare(<<<'SQL'
+        $statement = $this->connection->pdo()->prepare(<<<'SQL'
             INSERT INTO users (id, name, email, phone, password, role, password_set_at, email_verified_at, created_at, updated_at)
             VALUES (:id, :name, :email, :phone, :password, :role, :password_set_at, :email_verified_at, :created_at, :updated_at)
             SQL);
@@ -45,7 +46,7 @@ final readonly class PostgresUserRepository implements UserRepository
 
     public function update(User $user): void
     {
-        $statement = $this->pdo->prepare(<<<'SQL'
+        $statement = $this->connection->pdo()->prepare(<<<'SQL'
             UPDATE users SET
                 name = :name, email = :email, phone = :phone, password = :password,
                 role = :role, password_set_at = :password_set_at, email_verified_at = :email_verified_at,
@@ -60,7 +61,7 @@ final readonly class PostgresUserRepository implements UserRepository
 
     public function trash(string $id): void
     {
-        $statement = $this->pdo->prepare(
+        $statement = $this->connection->pdo()->prepare(
             "UPDATE users SET status = 'trashed', deleted_at = now(), updated_at = now() WHERE id = :id",
         );
         $statement->execute(['id' => $id]);
@@ -68,7 +69,7 @@ final readonly class PostgresUserRepository implements UserRepository
 
     public function restore(string $id): void
     {
-        $statement = $this->pdo->prepare(
+        $statement = $this->connection->pdo()->prepare(
             "UPDATE users SET status = 'active', deleted_at = NULL, updated_at = now() WHERE id = :id",
         );
         $statement->execute(['id' => $id]);
@@ -84,7 +85,7 @@ final readonly class PostgresUserRepository implements UserRepository
 
         $anonymized = $user->anonymized();
 
-        $statement = $this->pdo->prepare(<<<'SQL'
+        $statement = $this->connection->pdo()->prepare(<<<'SQL'
             UPDATE users SET
                 name = :name, email = :email, phone = :phone,
                 status = 'deleted', anonymized_at = now(), deleted_at = now(), updated_at = now()
@@ -101,7 +102,7 @@ final readonly class PostgresUserRepository implements UserRepository
 
     public function findPurgeEligible(int $graceDays, \DateTimeImmutable $now): array
     {
-        $statement = $this->pdo->prepare(<<<'SQL'
+        $statement = $this->connection->pdo()->prepare(<<<'SQL'
             SELECT * FROM users
             WHERE status = 'trashed' AND anonymized_at IS NULL AND deleted_at <= :threshold
             SQL);
@@ -112,7 +113,7 @@ final readonly class PostgresUserRepository implements UserRepository
 
     public function findPage(int $limit, int $offset): array
     {
-        $statement = $this->pdo->prepare(
+        $statement = $this->connection->pdo()->prepare(
             "SELECT * FROM users WHERE status <> 'deleted' ORDER BY created_at LIMIT :limit OFFSET :offset",
         );
         $statement->bindValue('limit', $limit, \PDO::PARAM_INT);
@@ -124,12 +125,12 @@ final readonly class PostgresUserRepository implements UserRepository
 
     public function count(): int
     {
-        return (int) $this->pdo->query("SELECT COUNT(*) FROM users WHERE status <> 'deleted'")->fetchColumn();
+        return (int) $this->connection->pdo()->query("SELECT COUNT(*) FROM users WHERE status <> 'deleted'")->fetchColumn();
     }
 
     public function countByRole(UserRole $role): int
     {
-        $statement = $this->pdo->prepare("SELECT COUNT(*) FROM users WHERE role = :role AND status = 'active'");
+        $statement = $this->connection->pdo()->prepare("SELECT COUNT(*) FROM users WHERE role = :role AND status = 'active'");
         $statement->execute(['role' => $role->value]);
 
         return (int) $statement->fetchColumn();
@@ -137,7 +138,7 @@ final readonly class PostgresUserRepository implements UserRepository
 
     private function findOneBy(string $column, string $value): ?User
     {
-        $statement = $this->pdo->prepare("SELECT * FROM users WHERE {$column} = :value AND status <> 'deleted'");
+        $statement = $this->connection->pdo()->prepare("SELECT * FROM users WHERE {$column} = :value AND status <> 'deleted'");
         $statement->execute(['value' => $value]);
         $row = $statement->fetch();
 

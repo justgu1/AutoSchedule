@@ -31,12 +31,10 @@ final readonly class LoginWithPassword
         $user = $this->users->findByEmail($email);
 
         if (!$user instanceof User || !$user->verifyPassword($password)) {
-            // Identidade não provada -- sem actor. $user?->id como alvo quando o
-            // email existe (senha errada), null quando nem a conta existe.
+            // Sem actor: identidade não foi provada. O alvo só é conhecido quando o e-mail existe.
             $this->audit->record(AuditEvent::LoginFailed, null, 'User', $user?->id, ['email' => $email], $context->ipAddress, $context->userAgent);
 
-            // De propósito, a mesma mensagem/status pra "email não existe" e "senha
-            // errada" -- não pode vazar se a conta existe ou não.
+            // Mesma resposta pra e-mail inexistente e senha errada: não pode vazar se a conta existe.
             throw new DomainException('Invalid credentials.', DomainErrorType::Unauthorized);
         }
 

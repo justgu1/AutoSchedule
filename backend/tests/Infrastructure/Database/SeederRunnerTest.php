@@ -4,18 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Infrastructure\Database;
 
-use App\Infrastructure\Database\PostgresConnection;
 use App\Infrastructure\Database\SeederRunner;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\TestDatabase;
 
-/**
- * Teste de integração: conecta no Postgres real do docker-compose e roda os
- * seeders reais de backend/database/seeders/. Depende da tabela `users`
- * (migration da PR anterior) já existir. Isolado por transação (rollback no
- * tearDown), igual o MigrationRunnerTest.
- */
+/** Isolado por transação com rollback no tearDown, igual o MigrationRunnerTest. */
 #[Group('integration')]
 final class SeederRunnerTest extends TestCase
 {
@@ -26,20 +21,12 @@ final class SeederRunnerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->pdo = new PostgresConnection(
-            driver: getenv('DB_DRIVER') ?: 'pgsql',
-            host: getenv('DB_HOST') ?: '127.0.0.1',
-            port: (int) (getenv('DB_PORT') ?: 5432),
-            database: getenv('DB_DATABASE') ?: 'autoschedule',
-            username: getenv('DB_USERNAME') ?: 'pgsql',
-            password: getenv('DB_PASSWORD') ?: 'password',
-        )->pdo();
+        $connection = TestDatabase::connect();
+        $this->pdo = $connection->pdo();
 
         $this->pdo->beginTransaction();
 
-        // Estado real do banco de dev pode já ter o admin e os oauth clients
-        // seedados (via `make seed`). Zera dentro da própria transação, some
-        // no rollback.
+        // O banco pode já estar seedado; zerar dentro da transação some no rollback.
         $statement = $this->pdo->prepare('DELETE FROM users WHERE email = ?');
         $statement->execute([self::ADMIN_EMAIL]);
 

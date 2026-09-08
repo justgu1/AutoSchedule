@@ -6,16 +6,17 @@ namespace App\Infrastructure\Auth\Postgres;
 
 use App\Domain\Auth\PasswordResetToken;
 use App\Domain\Auth\Ports\PasswordResetTokenRepository;
+use App\Infrastructure\Database\DatabaseConnection;
 
 final readonly class PostgresPasswordResetTokenRepository implements PasswordResetTokenRepository
 {
-    public function __construct(private \PDO $pdo)
+    public function __construct(private DatabaseConnection $connection)
     {
     }
 
     public function insert(PasswordResetToken $token): void
     {
-        $statement = $this->pdo->prepare(<<<'SQL'
+        $statement = $this->connection->pdo()->prepare(<<<'SQL'
             INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at)
             VALUES (:id, :user_id, :token_hash, :expires_at)
             SQL);
@@ -30,7 +31,7 @@ final readonly class PostgresPasswordResetTokenRepository implements PasswordRes
 
     public function findByRawToken(string $rawToken): ?PasswordResetToken
     {
-        $statement = $this->pdo->prepare('SELECT * FROM password_reset_tokens WHERE token_hash = :token_hash');
+        $statement = $this->connection->pdo()->prepare('SELECT * FROM password_reset_tokens WHERE token_hash = :token_hash');
         $statement->execute(['token_hash' => hash('sha256', $rawToken)]);
         $row = $statement->fetch();
 
@@ -39,13 +40,13 @@ final readonly class PostgresPasswordResetTokenRepository implements PasswordRes
 
     public function markUsed(string $id): void
     {
-        $statement = $this->pdo->prepare('UPDATE password_reset_tokens SET used_at = now() WHERE id = :id');
+        $statement = $this->connection->pdo()->prepare('UPDATE password_reset_tokens SET used_at = now() WHERE id = :id');
         $statement->execute(['id' => $id]);
     }
 
     public function invalidateAllForUser(string $userId): void
     {
-        $statement = $this->pdo->prepare(<<<'SQL'
+        $statement = $this->connection->pdo()->prepare(<<<'SQL'
             UPDATE password_reset_tokens SET used_at = now() WHERE user_id = :user_id AND used_at IS NULL
             SQL);
 

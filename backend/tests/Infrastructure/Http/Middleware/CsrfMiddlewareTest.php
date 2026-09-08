@@ -26,7 +26,7 @@ final class CsrfMiddlewareTest extends TestCase
         );
 
         $this->assertArrayHasKey('XSRF-TOKEN', $response->cookies());
-        $this->assertFalse($response->cookies()['XSRF-TOKEN']['httpOnly']);
+        $this->assertFalse($response->cookies()['XSRF-TOKEN']->httpOnly);
     }
 
     #[Test]

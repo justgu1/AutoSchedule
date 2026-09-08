@@ -3,7 +3,7 @@
     "description": "AutoSchedule backend",
     "type": "project",
     "require": {
-        "php": "^8.4",
+        "php": "^8.5",
         "predis/predis": "^2.3",
         "psr/log": "^3.0",
         "firebase/php-jwt": "^7.1",

@@ -5,23 +5,13 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
-use App\Config;
+use App\Bootstrap\CliKernel;
 use App\Infrastructure\Database\MigrationRunner;
-use App\Infrastructure\Database\PostgresConnection;
 
-$app = new Config();
-$config = $app->config('database');
-
-$connection = new PostgresConnection(
-    $config['driver'],
-    $config['host'],
-    $config['port'],
-    $config['database'],
-    $config['username'],
-    $config['password'],
+$runner = new MigrationRunner(
+    CliKernel::boot()->maintenanceConnection()->pdo(),
+    dirname(__DIR__) . '/database/migrations',
 );
-
-$runner = new MigrationRunner($connection->pdo(), dirname(__DIR__) . '/database/migrations');
 
 $rollback = ($argv[1] ?? null) === '--rollback';
 $names = $rollback ? $runner->rollback() : $runner->run();

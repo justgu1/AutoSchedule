@@ -4,38 +4,34 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Http\Middleware;
 
-use App\Domain\Auth\Ports\TokenIssuer;
+use App\Domain\Auth\ValueObjects\AccessTokenClaims;
 use App\Infrastructure\Http\Middleware;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
-use App\Infrastructure\Http\Router;
 use App\Infrastructure\RateLimit\RateLimiter;
 use App\Infrastructure\RateLimit\RateLimitPolicy;
 use Psr\Log\LoggerInterface;
 
 /**
- * Roda antes de qualquer outro middleware (inclusive AuthContextMiddleware) --
- * tráfego abusivo é barrado com um único round-trip ao Redis, antes de abrir
- * transação ou tocar no Postgres. Cabeçalhos seguem o rascunho IETF de
- * RateLimit Header Fields (mesmo formato que a Cloudflare adota hoje).
+ * Vem antes da autenticação no pipeline: tráfego abusivo custa um round-trip ao Redis, não uma transação.
+ * Os cabeçalhos seguem o rascunho IETF de RateLimit Header Fields.
  */
 final readonly class RateLimitMiddleware implements Middleware
 {
     public function __construct(
         private RateLimiter $limiter,
-        private Router $router,
         private RateLimitPolicy $defaultPolicy,
-        private TokenIssuer $tokens,
+        private RateLimitPolicy $authPolicy,
         private LoggerInterface $logger,
     ) {
     }
 
     public function handle(Request $request, \Closure $next): Response
     {
-        $policy = $this->router->rateLimitPolicy($request->method(), $request->path()) ?? $this->defaultPolicy;
+        $policy = $request->route()?->rateLimitPolicy() === 'auth' ? $this->authPolicy : $this->defaultPolicy;
 
         try {
-            $result = $this->limiter->attempt($policy->name . ':' . $this->identify($request), $policy);
+            $result = $this->limiter->attempt($policy->name . ':' . $this->bucketFor($request), $policy);
         } catch (\Throwable $exception) {
             // Fail-open: Redis fora do ar não pode derrubar a API inteira, só
             // perde a proteção de rate limit enquanto isso.
@@ -59,21 +55,11 @@ final readonly class RateLimitMiddleware implements Middleware
             ->withHeader('RateLimit-Policy', $policyHeader);
     }
 
-    /** Por usuário quando o access token (header ou cookie) decodifica (mesmo IP, contas diferentes não competem pela mesma cota); por IP caso contrário. */
-    private function identify(Request $request): string
+    /** Por usuário quando há token válido, pra contas diferentes no mesmo IP não competirem pela mesma cota. */
+    private function bucketFor(Request $request): string
     {
-        $header = $request->header('authorization');
-        $token = $header !== null && str_starts_with($header, 'Bearer ') ? substr($header, 7) : $request->cookie('access_token');
+        $claims = $request->attribute('auth');
 
-        if ($token !== null) {
-            try {
-                return 'user:' . $this->tokens->decodeAccessToken($token)->subject;
-            } catch (\Throwable) {
-                // Token inválido -- a validação de verdade é do AuthContextMiddleware,
-                // aqui só cai pro IP como qualquer request sem token.
-            }
-        }
-
-        return 'ip:' . $request->ip();
+        return $claims instanceof AccessTokenClaims ? 'user:' . $claims->subject : 'ip:' . $request->ip();
     }
 }

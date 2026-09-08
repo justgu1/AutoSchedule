@@ -5,42 +5,14 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
-use App\Config;
-use App\Bootstrap\ContainerFactory;
-use App\Infrastructure\Database\DatabaseConnection;
 use App\Application\Ports\Job;
+use App\Bootstrap\CliKernel;
 use App\Infrastructure\Queue\RedisQueue;
 
-$app = new Config();
-$container = ContainerFactory::build($app);
-/** @var RedisQueue $queue */
-$queue = $container->get(RedisQueue::class);
+$kernel = CliKernel::boot();
+$kernel->enterServiceContext();
 
-// Sem isso, RLS esconde toda linha de `users`/`dealerships` das queries que
-// os jobs fazem -- não tem request HTTP aqui, então `current_user_id`/`role`
-// nunca são setados; a policy de serviço (mesma usada por login/registro) é
-// o único jeito de um processo em background enxergar qualquer linha.
-// `SET` (não `SET LOCAL`) porque essa conexão vive pelo processo inteiro, sem
-// transação por job.
-//
-// Retry porque este processo pode subir antes da migration que cria a role
-// `autoschedule_app` (ou antes do Postgres aceitar conexões) -- sem loop,
-// crasha de vez e nunca mais processa fila nenhuma.
-$maxAttempts = 30;
-for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
-    try {
-        $container->get(DatabaseConnection::class)->pdo()->exec("SET app.is_service_context = 'true'");
-
-        break;
-    } catch (\PDOException $exception) {
-        if ($attempt === $maxAttempts) {
-            throw $exception;
-        }
-
-        echo sprintf("Aguardando banco de dados (tentativa %d/%d): %s\n", $attempt, $maxAttempts, $exception->getMessage());
-        sleep(1);
-    }
-}
+$queue = $kernel->container->get(RedisQueue::class);
 
 echo "Worker started.\n";
 
@@ -53,7 +25,7 @@ while (true) {
 
     try {
         /** @var Job $job */
-        $job = $container->get($envelope['job_class']);
+        $job = $kernel->container->get($envelope['job_class']);
         $job->handle($envelope['payload']);
     } catch (\Throwable $exception) {
         echo sprintf("Job %s failed (attempt %d): %s\n", $envelope['job_class'], $envelope['attempts'] + 1, $exception->getMessage());
