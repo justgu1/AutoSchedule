@@ -2,7 +2,7 @@
 
 ## Banco de dados
 
-PostgreSQL é o único banco do projeto. `uuid` como identificador (gerado no banco, `gen_random_uuid()`) em vez de serial -- não expõe contagem de linhas, não depende de round-trip pra saber o id antes de inserir. `timestamptz` sempre, nunca `timestamp` sem fuso -- o container roda em UTC e "hoje" muda de acordo com quem pergunta. `numeric(12,2)` pra dinheiro, nunca `float`/`double` (arredondamento binário não é problema que se quer perto de preço).
+PostgreSQL é o único banco do projeto. `uuid` como identificador (gerado no banco, `gen_random_uuid()`) em vez de serial -- não expõe contagem de linhas, não depende de round-trip pra saber o id antes de inserir. `timestamptz` sempre, nunca `timestamp` sem fuso -- a aplicação roda em `America/Sao_Paulo` (`config/app.php`), e "hoje"/"agora" precisam ser o horário de quem usa o sistema, não UTC cru. `numeric(12,2)` pra dinheiro, nunca `float`/`double` (arredondamento binário não é problema que se quer perto de preço).
 
 ## Modelo de dados
 
@@ -164,15 +164,17 @@ Table appointments {
   vehicle_id uuid [not null]
   user_id uuid [not null]
   scheduled_at timestamptz [not null]
-  duration_minutes smallint [not null, default: 60]
-  expires_at timestamptz
   customer_name varchar(120) [not null]
   customer_email varchar(180) [not null]
   customer_phone varchar(20) [not null]
-  status appointment_status [not null]
+  status appointment_status [not null, default: 'pending']
+  confirmation_token_hash varchar(64)
+  confirmation_email_sent_at timestamptz
+  expires_at timestamptz
+  picked_up_at timestamptz
+  released_at timestamptz
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
-  deleted_at timestamptz
 }
 
 Table audit_logs {
@@ -260,13 +262,19 @@ vehicles:    findById                                                -> sem filt
 
 ## Disponibilidade
 
-A disponibilidade combina a disponibilidade da concessionária, a disponibilidade do veículo, exceções e agendamentos existentes.
+A disponibilidade combina a regra recorrente da concessionária, a regra recorrente do veículo, exceções e agendamentos existentes -- calculada em `Domain/Availability/AvailabilityCalculator`, puro, sem consulta ao banco.
 
-Os intervalos devem respeitar:
+`dealership_availability_rules`/`vehicle_availability_rules` guardam janelas por dia da semana; `availability_exceptions` referencia concessionária **ou** veículo, nunca os dois nem nenhum, e tem prioridade sobre a regra recorrente daquela data:
 
 ```sql
-CHECK (start_time < end_time)
+CONSTRAINT ..._weekday_range CHECK (weekday BETWEEN 0 AND 6)
+CONSTRAINT ..._valid_interval CHECK (start_time < end_time)
+CONSTRAINT availability_exceptions_exactly_one_scope CHECK ((dealership_id IS NOT NULL) <> (vehicle_id IS NOT NULL))
+CONSTRAINT availability_exceptions_valid_interval CHECK (start_time IS NULL OR end_time IS NULL OR start_time < end_time)
+CONSTRAINT availability_exceptions_open_needs_interval CHECK (is_available = false OR (start_time IS NOT NULL AND end_time IS NOT NULL))
 ```
+
+`is_available = false` sem horário bloqueia o dia inteiro (feriado, fechamento excepcional); com horário, subtrai só aquele intervalo da janela recorrente (manutenção, veículo indisponível numa faixa); `is_available = true` substitui a janela do dia inteiro, exigindo horário próprio (plantão especial).
 
 Convenção de `weekday`:
 
@@ -280,16 +288,21 @@ Convenção de `weekday`:
 6 = Sábado
 ```
 
+RLS das três tabelas delega inteiramente pro RLS da concessionária/veículo (`EXISTS (SELECT 1 FROM dealerships/vehicles WHERE id = ...)`), sem repetir predicado de dono/serviço/leitura pública -- inclusive a leitura pública, que o motor de cálculo precisa pra rodar sem sessão.
+
 ## Agendamentos
 
-O PostgreSQL deve impedir reservas concorrentes do mesmo veículo e horário:
+Duração sempre 60 minutos (`Appointment::DURATION_MINUTES`), não é campo armazenado. O PostgreSQL impede reservas concorrentes do mesmo veículo e horário:
 
 ```sql
 CREATE UNIQUE INDEX appointments_active_vehicle_time_unique
 ON appointments (vehicle_id, scheduled_at)
-WHERE deleted_at IS NULL
-  AND status IN ('pending', 'confirmed');
+WHERE status IN ('pending', 'confirmed');
 ```
+
+Ciclo de teste-drive rastreado em cima do status, não como estados novos: `picked_up_at`/`released_at` marcam quando o veículo saiu e voltou (funcionário ou rotina automática); `confirmation_token_hash`/`confirmation_email_sent_at` controlam o e-mail de confirmação (só o hash é persistido, mesmo mecanismo do token de reset de senha); `expires_at` só passa a valer a partir do envio desse e-mail, não da criação. `completed` nasce da liberação do veículo (só depois de retirado); `no_show` nasce de uma rotina quando o prazo de devolução passa sem retirada.
+
+RLS não delega pro veículo: nome/e-mail/telefone do cliente são PII, e a policy de leitura pública é restrita a `status IN ('pending', 'confirmed')` -- só o suficiente pro motor de disponibilidade saber o que está ocupado (a aplicação nunca seleciona os campos de cliente nesse caminho).
 
 ## Galeria
 

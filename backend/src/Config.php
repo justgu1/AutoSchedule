@@ -9,6 +9,7 @@ final class Config
     /** Lista explícita, não `glob()`: dá pra saber o que a aplicação carrega sem rodar nada. */
     private const array FILES = [
         'app',
+        'appointments',
         'auth',
         'cors',
         'google',

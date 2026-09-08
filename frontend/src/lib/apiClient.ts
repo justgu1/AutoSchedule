@@ -99,12 +99,12 @@ export async function apiUpload<T>(path: string, formData: FormData): Promise<T>
 }
 
 /**
- * Sem `credentials` -- página pública tem que mostrar sempre a mesma coisa,
- * mesmo se o dono/admin estiver logado no mesmo navegador. Não reaproveita
- * `apiFetch` por isso: aquele sempre manda cookie.
+ * `credentials: 'omit'` explícito -- página pública tem que mostrar sempre a mesma coisa, mesmo se
+ * o dono/admin estiver logado no mesmo navegador. Omitir a opção não bastaria: o default do fetch
+ * pra request same-origin é `'same-origin'`, que manda o cookie de sessão do mesmo jeito.
  */
 async function requestPublic(path: string): Promise<ApiEnvelope> {
-    const response = await fetch(`${BASE_URL}${path}`);
+    const response = await fetch(`${BASE_URL}${path}`, { credentials: 'omit' });
     const payload = (await response.json().catch(() => null)) as ApiEnvelope | null;
 
     if (!response.ok) {

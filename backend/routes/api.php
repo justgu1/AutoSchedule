@@ -5,10 +5,14 @@ declare(strict_types=1);
 use App\Domain\Shared\TrashState;
 use App\Domain\User\UserRole;
 use App\Infrastructure\Http\Controllers\ApiCatalogController;
+use App\Infrastructure\Http\Controllers\AppointmentController;
+use App\Infrastructure\Http\Controllers\AvailabilityExceptionController;
+use App\Infrastructure\Http\Controllers\DealershipAvailabilityController;
 use App\Infrastructure\Http\Controllers\DealershipController;
 use App\Infrastructure\Http\Controllers\JobController;
 use App\Infrastructure\Http\Controllers\OAuthController;
 use App\Infrastructure\Http\Controllers\UserController;
+use App\Infrastructure\Http\Controllers\VehicleAvailabilityController;
 use App\Infrastructure\Http\Controllers\VehicleController;
 use App\Infrastructure\Http\Controllers\ZipCodeController;
 use App\Infrastructure\Http\Router;
@@ -61,6 +65,32 @@ return static function (Router $router): void {
     $router->get('/api/vehicles/{id}', [VehicleController::class, 'show'])
         ->publicRead()
         ->describes('Returns a vehicle -- full profile for its owner/admin, public profile (with the dealership it belongs to) for anyone else. Only active vehicles of an active dealership are visible to non-owners.');
+
+    $router->get('/api/vehicles/{id}/availability/dates', [VehicleAvailabilityController::class, 'dates'])
+        ->publicRead()
+        ->describes('Dates within a month (query: month, default current) that have at least one free slot to book a test drive.');
+
+    $router->get('/api/vehicles/{id}/availability/slots', [VehicleAvailabilityController::class, 'slots'])
+        ->publicRead()
+        ->describes('Free time slots for one date (query: date, required).');
+
+    $router->post('/api/appointments', [AppointmentController::class, 'store'])
+        ->serviceContext()
+        ->rateLimit('auth')
+        ->describes('Books a test drive, no account required -- finds or creates a customer account by email.')
+        ->accepts('vehicle_id', 'scheduled_at', 'customer_name', 'customer_email', 'customer_phone');
+
+    $router->post('/api/appointments/{id}/confirm', [AppointmentController::class, 'confirm'])
+        ->serviceContext()
+        ->rateLimit('auth')
+        ->describes('Confirms a pending appointment -- the caller\'s own session (owner/admin) or the token from the confirmation email.')
+        ->accepts('token');
+
+    $router->post('/api/appointments/{id}/cancel', [AppointmentController::class, 'cancel'])
+        ->serviceContext()
+        ->rateLimit('auth')
+        ->describes('Cancels a pending appointment -- the caller\'s own session (owner/admin) or the token from the confirmation email.')
+        ->accepts('token');
 
     $router->get('/api/zip-codes/{zip_code}', [ZipCodeController::class, 'show'])
         ->describes('Resolves a Brazilian CEP into street/neighborhood/city/state (ViaCEP, cached after the first lookup).');
@@ -167,5 +197,56 @@ return static function (Router $router): void {
 
         $router->delete('/api/vehicles/{id}/photos/{image_id}', [VehicleController::class, 'removePhoto'])
             ->describes('Removes one image from the vehicle gallery.');
+
+        $router->get('/api/dealerships/{id}/availability-rules', [DealershipAvailabilityController::class, 'index'])
+            ->describes('Lists the recurring weekly availability windows of a dealership.');
+
+        $router->post('/api/dealerships/{id}/availability-rules', [DealershipAvailabilityController::class, 'store'])
+            ->describes('Adds a recurring weekly availability window to a dealership.')
+            ->accepts('weekday', 'start_time', 'end_time');
+
+        $router->patch('/api/availability-rules/{id}', [DealershipAvailabilityController::class, 'update'])
+            ->describes('Updates a dealership availability rule.')
+            ->accepts('weekday', 'start_time', 'end_time');
+
+        $router->delete('/api/availability-rules/{id}', [DealershipAvailabilityController::class, 'destroy'])
+            ->describes('Removes a dealership availability rule.');
+
+        $router->get('/api/vehicles/{id}/availability-rules', [VehicleAvailabilityController::class, 'index'])
+            ->describes('Lists the recurring weekly availability windows of a vehicle.');
+
+        $router->post('/api/vehicles/{id}/availability-rules', [VehicleAvailabilityController::class, 'store'])
+            ->describes('Adds a recurring weekly availability window to a vehicle.')
+            ->accepts('weekday', 'start_time', 'end_time');
+
+        $router->patch('/api/vehicle-availability-rules/{id}', [VehicleAvailabilityController::class, 'update'])
+            ->describes('Updates a vehicle availability rule.')
+            ->accepts('weekday', 'start_time', 'end_time');
+
+        $router->delete('/api/vehicle-availability-rules/{id}', [VehicleAvailabilityController::class, 'destroy'])
+            ->describes('Removes a vehicle availability rule.');
+
+        $router->get('/api/availability-exceptions', [AvailabilityExceptionController::class, 'index'])
+            ->describes('Lists exceptions for a dealership or a vehicle (query: dealership_id or vehicle_id, exactly one).');
+
+        $router->post('/api/availability-exceptions', [AvailabilityExceptionController::class, 'store'])
+            ->describes('Blocks, opens, or narrows availability on one date for a dealership or a vehicle.')
+            ->accepts('dealership_id', 'vehicle_id', 'date', 'start_time', 'end_time', 'is_available', 'reason');
+
+        $router->patch('/api/availability-exceptions/{id}', [AvailabilityExceptionController::class, 'update'])
+            ->describes('Updates an availability exception. The scope (dealership/vehicle) cannot change.')
+            ->accepts('date', 'start_time', 'end_time', 'is_available', 'reason');
+
+        $router->delete('/api/availability-exceptions/{id}', [AvailabilityExceptionController::class, 'destroy'])
+            ->describes('Removes an availability exception.');
+
+        $router->get('/api/appointments', [AppointmentController::class, 'index'])
+            ->describes('Lists appointments -- admin sees all, seller sees only the ones on their own vehicles (query: status, vehicle_id, page, per_page).');
+
+        $router->post('/api/appointments/{id}/pickup', [AppointmentController::class, 'pickup'])
+            ->describes('Marks the vehicle as picked up for a confirmed appointment\'s test drive.');
+
+        $router->post('/api/appointments/{id}/release', [AppointmentController::class, 'release'])
+            ->describes('Marks the vehicle as returned -- completes the appointment.');
     });
 };

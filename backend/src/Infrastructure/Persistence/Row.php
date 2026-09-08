@@ -60,6 +60,33 @@ final readonly class Row
     }
 
     /**
+     * `timestamptz` volta com o fuso embutido no próprio objeto -- comparar `format()` dele com um
+     * horário montado localmente compara string de fusos diferentes pro mesmo instante, calado.
+     */
+    public function localDateTime(string $column): \DateTimeImmutable
+    {
+        return $this->dateTime($column)->setTimezone(new \DateTimeZone(date_default_timezone_get()));
+    }
+
+    public function nullableLocalDateTime(string $column): ?\DateTimeImmutable
+    {
+        return ($this->values[$column] ?? null) === null ? null : $this->localDateTime($column);
+    }
+
+    /** `!` zera a data pro epoch: só a hora importa, e duas colunas `time` viram comparáveis entre si. */
+    public function time(string $column): \DateTimeImmutable
+    {
+        $value = \DateTimeImmutable::createFromFormat('!H:i:s', $this->string($column));
+
+        return $value instanceof \DateTimeImmutable ? $value : throw $this->unexpected($column, 'time');
+    }
+
+    public function nullableTime(string $column): ?\DateTimeImmutable
+    {
+        return ($this->values[$column] ?? null) === null ? null : $this->time($column);
+    }
+
+    /**
      * @template T of \BackedEnum
      *
      * @param class-string<T> $enum

@@ -80,9 +80,28 @@ Convenção: `Arquivo::método` para PHPUnit (backend); `arquivo.spec.ts > nome 
 | Site público: index lista o catálogo filtrável e o card abre a página do veículo, sem exigir conta; header troca "Entrar/Criar conta" por "Entrar no painel" conforme a sessão | E2E: `public-site.spec.ts > index lista o catálogo público...`, `> header oferece entrar e criar conta...` |
 | Painel do vendedor: CRUD, galeria e lixeira do próprio estoque; filtro de marca encontra o veículo pelo painel; customer não acessa a rota | E2E: `vehicles.spec.ts` (3 casos) |
 
-## Disponibilidade, Exemplo, Exceções, Agendamento, Status, Concorrência, Cliente
+## Disponibilidade
 
-Domínio ainda não implementado -- nenhum teste existe porque nenhum código existe. Não é lacuna de cobertura, é trabalho futuro (ver `Worklist.md`).
+| Regra | Testes |
+|---|---|
+| `WeeklyWindow` valida `weekday` 0-6 e `start_time < end_time` -- único lugar que valida, reaproveitado pelas duas tabelas de regra recorrente | `WeeklyWindowTest` (3 casos) |
+| `AvailabilityException` exige exatamente um escopo (concessionária ou veículo), intervalo válido, e horário obrigatório quando `is_available=true` | `AvailabilityExceptionTest` (5 casos) |
+| O motor de cálculo intersecta concessionária ∩ veículo, aplica a exceção com prioridade sobre a regra recorrente, remove slot ocupado, respeita `[start, end)` -- o exemplo de `business-rules.md` é o teste de referência | `AvailabilityCalculatorTest` (9 casos: exemplo da documentação, sem interseção, exceção total/parcial/substituição, agendamento ocupando slot, múltiplas janelas no mesmo dia, borda do intervalo, weekday errado não conta) |
+| RLS das três tabelas de disponibilidade delega inteiramente pro RLS da concessionária/veículo, sem repetir predicado -- inclusive a leitura pública que o motor de cálculo precisa | `PostgresDealershipAvailabilityRuleRepositoryTest`, `PostgresVehicleAvailabilityRuleRepositoryTest`, `PostgresAvailabilityExceptionRepositoryTest` |
+
+## Agendamento
+
+| Regra | Testes |
+|---|---|
+| Máquina de estado: `confirm`/`cancel` só de `pending` (sem caminho de volta depois de confirmado); `pickup` só de `confirmed`; `release` só depois de `pickup`, e já vira `completed`; `no_show` só sem `pickup` | `AppointmentTest` (14 casos, uma transição legal ou ilegal por teste) |
+| Prazo de devolução é sempre `scheduled_at + 60min`, nunca a hora real da retirada | `AppointmentTest::return_deadline_e_sempre_scheduled_at_mais_60_minutos` |
+| O token de confirmação nasce só quando o e-mail de fato sai (`markConfirmationSent`), nunca na criação -- texto puro gerado antes de existir e-mail seria descartado sem ninguém poder usá-lo | `AppointmentTest::request_monta_um_agendamento_pending_sem_token_de_confirmacao_ainda`, `::mark_confirmation_sent_gera_o_token_e_grava_o_prazo_a_partir_do_envio` |
+| RLS: seller só enxerga/altera agendamento das próprias concessionárias; admin, qualquer um; sem contexto, nenhuma linha; contexto de serviço insere/enxerga/atualiza qualquer um (criação pública, rotina agendada, clique por token); leitura pública enxerga só `pending`/`confirmed`, nunca `completed`/`cancelled`/`no_show` | `AppointmentRlsPolicyTest` (7 casos) |
+| Concorrência: duas reservas do mesmo veículo/horário, uma vira `409` -- reconferido na aplicação antes do INSERT, e o índice único do banco é o backstop final | Fumaça manual (`curl` simultâneo); índice único documentado em `docs/database.md#agendamentos` |
+| Confirmar/cancelar aceita sessão de admin/dono OU o token do e-mail, mesmo endpoint -- token errado ou ausente sem sessão vira `404`, igual agendamento inexistente | Fumaça manual (`ConfirmAppointment`/`CancelAppointment` via `AppointmentAccess`) |
+| Cliente é achado por e-mail ou criado (`role=customer`), sem sobrescrever o perfil de quem já existe -- o snapshot do agendamento é uma cópia própria | Fumaça manual (fluxo completo via `curl`, ver histórico de PR) |
+| E-mail de confirmação espera o veículo ficar livre (handoff do agendamento anterior + 15min de preparo), ou sai na hora se nada bloqueia -- reaproveita o mesmo `QueuedJob::SendEmail` do reset de senha | Fumaça manual (Mailpit real, ciclo completo: criação → e-mail de aviso ao vendedor → e-mail de confirmação ao cliente → clique confirma) |
+| Rotina automática libera o veículo (`completed`) ou marca `no_show` quando o prazo de devolução passa, ancorada no prazo, não em "agora" | Fumaça manual (agendamento real expirando em tempo de execução) |
 
 ## Autenticação
 
@@ -185,6 +204,11 @@ Pontos sem teste automatizado direto, documentados aqui em vez de silenciosament
   screenshot-diff. Revisão manual.
 - **Uso sem JavaScript.** Não aplicável hoje: a SPA é 100% client-rendered, sem SSR. O `<noscript>`
   avisa, mas não há conteúdo funcional sem JS.
+- **`AppointmentController`/`CreateAppointment` e a cadeia de e-mail não têm suíte de integração
+  própria** (só o domínio puro e o RLS têm): concorrência, confirmação por token, o algoritmo de
+  quando o e-mail de confirmação dispara, e as três rotinas agendadas (expira, libera, no-show)
+  foram verificados via `curl`/Mailpit reais, documentado no histórico da PR -- não por teste
+  automatizado. Mesma situação que `VehicleController`, um degrau abaixo.
 
 Duas coisas que **deixaram** de ser lacuna nesta rodada e ficam registradas para não voltarem
 como surpresa:

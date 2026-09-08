@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace App\Bootstrap;
 
+use App\Application\Appointment\CreateAppointment;
+use App\Application\Appointment\NotifyAppointmentStatusChanged;
+use App\Application\Appointment\ReleaseAppointment;
 use App\Application\Auth\IssueServiceToken;
 use App\Application\Auth\LoginWithGoogle;
 use App\Application\Auth\LoginWithPassword;
 use App\Application\Auth\Logout;
 use App\Application\Auth\RefreshAccessToken;
 use App\Application\Auth\TokenTtl;
+use App\Application\Availability\ListAvailableSlots;
+use App\Application\Dealership\DealershipFinder;
 use App\Application\Notification\SendEmail;
 use App\Application\Ports\JobProgress;
 use App\Application\Ports\MailTemplateRenderer;
@@ -17,7 +22,9 @@ use App\Application\Ports\Queue;
 use App\Application\Ports\TempFileStore;
 use App\Application\Ports\Transaction;
 use App\Application\User\RequestPasswordReset;
+use App\Application\Vehicle\VehicleFinder;
 use App\Config;
+use App\Domain\Appointment\Ports\AppointmentRepository;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
 use App\Domain\Auth\Ports\GoogleIdTokenVerifier;
@@ -26,6 +33,9 @@ use App\Domain\Auth\Ports\PasswordResetTokenRepository;
 use App\Domain\Auth\Ports\RefreshTokenRepository;
 use App\Domain\Auth\Ports\TokenIssuer;
 use App\Domain\Auth\Ports\UserIdentityRepository;
+use App\Domain\Availability\Ports\AvailabilityExceptionRepository;
+use App\Domain\Availability\Ports\DealershipAvailabilityRuleRepository;
+use App\Domain\Availability\Ports\VehicleAvailabilityRuleRepository;
 use App\Domain\Dealership\Ports\DealershipRepository;
 use App\Domain\File\Ports\FileRepository;
 use App\Domain\File\Ports\ImageOptimizer;
@@ -51,8 +61,11 @@ use App\Infrastructure\Mail\SymfonyMailProvider;
 use App\Infrastructure\Pagination\PaginationPolicy;
 use App\Infrastructure\Persistence\DatabaseConnection;
 use App\Infrastructure\Persistence\PdoTransaction;
+use App\Infrastructure\Persistence\PostgresAppointmentRepository;
 use App\Infrastructure\Persistence\PostgresAuditLogger;
+use App\Infrastructure\Persistence\PostgresAvailabilityExceptionRepository;
 use App\Infrastructure\Persistence\PostgresConnection;
+use App\Infrastructure\Persistence\PostgresDealershipAvailabilityRuleRepository;
 use App\Infrastructure\Persistence\PostgresDealershipRepository;
 use App\Infrastructure\Persistence\PostgresFileRepository;
 use App\Infrastructure\Persistence\PostgresOAuthClientRepository;
@@ -60,6 +73,7 @@ use App\Infrastructure\Persistence\PostgresPasswordResetTokenRepository;
 use App\Infrastructure\Persistence\PostgresRefreshTokenRepository;
 use App\Infrastructure\Persistence\PostgresUserIdentityRepository;
 use App\Infrastructure\Persistence\PostgresUserRepository;
+use App\Infrastructure\Persistence\PostgresVehicleAvailabilityRuleRepository;
 use App\Infrastructure\Persistence\PostgresVehicleImageRepository;
 use App\Infrastructure\Persistence\PostgresVehicleRepository;
 use App\Infrastructure\Persistence\PostgresZipCodeCacheRepository;
@@ -67,8 +81,11 @@ use App\Infrastructure\Queue\RedisQueue;
 use App\Infrastructure\RateLimit\RateLimiter;
 use App\Infrastructure\RateLimit\RedisRateLimiter;
 use App\Infrastructure\Redis\RedisConnection;
+use App\Infrastructure\Scheduler\AppointmentLifecycleSweepTask;
+use App\Infrastructure\Scheduler\ExpirePendingAppointmentsTask;
 use App\Infrastructure\Scheduler\PurgeTrashedEntitiesTask;
 use App\Infrastructure\Scheduler\Scheduler;
+use App\Infrastructure\Scheduler\SendAppointmentConfirmationEmailsTask;
 use App\Infrastructure\Storage\MinioAdapter;
 use App\Infrastructure\ZipCode\ViaCepZipCodeProvider;
 use Psr\Log\LoggerInterface;
@@ -85,7 +102,7 @@ final class ContainerFactory
 
         self::bindPorts($container);
         self::bindConfigured($container, $config);
-        self::bindScheduler($container);
+        self::bindScheduler($container, $config);
 
         return $container;
     }
@@ -96,6 +113,10 @@ final class ContainerFactory
         $container->bind(DealershipRepository::class, PostgresDealershipRepository::class);
         $container->bind(VehicleRepository::class, PostgresVehicleRepository::class);
         $container->bind(VehicleImageRepository::class, PostgresVehicleImageRepository::class);
+        $container->bind(DealershipAvailabilityRuleRepository::class, PostgresDealershipAvailabilityRuleRepository::class);
+        $container->bind(VehicleAvailabilityRuleRepository::class, PostgresVehicleAvailabilityRuleRepository::class);
+        $container->bind(AvailabilityExceptionRepository::class, PostgresAvailabilityExceptionRepository::class);
+        $container->bind(AppointmentRepository::class, PostgresAppointmentRepository::class);
         $container->bind(FileRepository::class, PostgresFileRepository::class);
         $container->bind(OAuthClientRepository::class, PostgresOAuthClientRepository::class);
         $container->bind(RefreshTokenRepository::class, PostgresRefreshTokenRepository::class);
@@ -188,6 +209,25 @@ final class ContainerFactory
             templatePath: dirname(__DIR__, 2) . '/resources/mail/password-reset.html',
         ));
 
+        $container->singleton(NotifyAppointmentStatusChanged::class, static fn (Container $c): NotifyAppointmentStatusChanged => new NotifyAppointmentStatusChanged(
+            queue: $c->get(Queue::class),
+            mailTemplates: $c->get(MailTemplateRenderer::class),
+            templatePath: dirname(__DIR__, 2) . '/resources/mail/appointment-status-changed.html',
+        ));
+
+        $container->singleton(CreateAppointment::class, static fn (Container $c): CreateAppointment => new CreateAppointment(
+            vehicles: $c->get(VehicleFinder::class),
+            dealerships: $c->get(DealershipFinder::class),
+            users: $c->get(UserRepository::class),
+            appointments: $c->get(AppointmentRepository::class),
+            listAvailableSlots: $c->get(ListAvailableSlots::class),
+            audit: $c->get(AuditLogger::class),
+            transaction: $c->get(Transaction::class),
+            queue: $c->get(Queue::class),
+            mailTemplates: $c->get(MailTemplateRenderer::class),
+            staffNotificationTemplatePath: dirname(__DIR__, 2) . '/resources/mail/appointment-created-staff.html',
+        ));
+
         $container->singleton(OAuthController::class, static fn (Container $c): OAuthController => new OAuthController(
             loginWithPassword: $c->get(LoginWithPassword::class),
             refreshAccessToken: $c->get(RefreshAccessToken::class),
@@ -204,7 +244,7 @@ final class ContainerFactory
     }
 
     /** Cada domínio com lixeira reversível registra a própria purga sobre a mesma ScheduledTask. */
-    private static function bindScheduler(Container $container): void
+    private static function bindScheduler(Container $container, Config $config): void
     {
         $container->singleton(Scheduler::class, static fn (Container $c): Scheduler => new Scheduler(
             redis: $c->get(RedisConnection::class),
@@ -231,6 +271,26 @@ final class ContainerFactory
                     repository: $c->get(VehicleRepository::class),
                     audit: $c->get(AuditLogger::class),
                     event: AuditEvent::VehiclePurged,
+                    transaction: $c->get(Transaction::class),
+                ),
+                new SendAppointmentConfirmationEmailsTask(
+                    appointments: $c->get(AppointmentRepository::class),
+                    transaction: $c->get(Transaction::class),
+                    queue: $c->get(Queue::class),
+                    mailTemplates: $c->get(MailTemplateRenderer::class),
+                    templatePath: dirname(__DIR__, 2) . '/resources/mail/appointment-confirmation-request.html',
+                    frontendUrl: $config->string('mail.frontend_url'),
+                    pendingTtlSeconds: $config->int('appointments.pending_ttl_seconds'),
+                ),
+                new ExpirePendingAppointmentsTask(
+                    appointments: $c->get(AppointmentRepository::class),
+                    transaction: $c->get(Transaction::class),
+                    audit: $c->get(AuditLogger::class),
+                    notify: $c->get(NotifyAppointmentStatusChanged::class),
+                ),
+                new AppointmentLifecycleSweepTask(
+                    appointments: $c->get(AppointmentRepository::class),
+                    release: $c->get(ReleaseAppointment::class),
                     transaction: $c->get(Transaction::class),
                 ),
             ],

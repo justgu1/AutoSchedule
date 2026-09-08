@@ -133,17 +133,18 @@ Fluxo do cliente final -- o motivo de tudo acima existir:
 
 ### Issue: Disponibilidade
 
-- [ ] Regras recorrentes por concessionária e por veículo (dia da semana + janela de horário)
-- [ ] Exceções pontuais por data (feriado, manutenção, horário especial)
-- [ ] Cálculo do horário efetivo: concessionária ∩ veículo ∩ exceção ∩ sem conflito de agendamento
+- [x] Regras recorrentes por concessionária e por veículo (dia da semana + janela de horário)
+- [x] Exceções pontuais por data (feriado, manutenção, horário especial)
+- [x] Cálculo do horário efetivo: concessionária ∩ veículo ∩ exceção ∩ sem conflito de agendamento
 
 ### Issue: Agendamento do cliente
 
-- [ ] Detalhe do veículo, datas e horários disponíveis
-- [ ] Formulário (nome, e-mail, telefone), sem exigir conta
-- [ ] Criação transacional (valida disponibilidade -> cria/localiza customer -> cria appointment -> audita)
-- [ ] Proteção contra reserva concorrente do mesmo veículo/horário (`409 Conflict`)
-- [ ] Notificação por e-mail (cliente, vendedores da concessionária, admin)
+- [ ] Detalhe do veículo, datas e horários disponíveis -- API pronta (`GET /vehicles/{id}/availability/dates|slots`), tela pendente
+- [ ] Formulário (nome, e-mail, telefone), sem exigir conta -- API pronta (`POST /appointments`), tela pendente
+- [x] Criação transacional (valida disponibilidade -> cria/localiza customer -> cria appointment -> audita)
+- [x] Proteção contra reserva concorrente do mesmo veículo/horário (`409 Conflict`)
+- [x] Notificação por e-mail (cliente, vendedores da concessionária) -- inclui o ciclo de retirada/devolução do veículo e o e-mail de confirmação por token, além do planejado originalmente
+- [ ] Painel do vendedor (gestão de regras/exceções, lista de agendamentos, marcar retirada/devolução) e fluxo público de agendamento -- frontend pendente (PR 2)
 
 ## Epic: Qualidade
 

@@ -76,6 +76,9 @@ final class Validator
             'numeric' => is_int($value) || is_float($value) || (is_string($value) && is_numeric($value)),
             // Lê o valor, não o tamanho, ao contrário de min/max -- por isso é regra separada e não parâmetro delas.
             'between' => self::withinRange($value, $parameter),
+            'boolean' => is_bool($value),
+            'date' => is_string($value) && \DateTimeImmutable::createFromFormat('!Y-m-d', $value) instanceof \DateTimeImmutable,
+            'time' => is_string($value) && \DateTimeImmutable::createFromFormat('!H:i', $value) instanceof \DateTimeImmutable,
             default => throw new \InvalidArgumentException("Unknown validation rule \"{$rule}\"."),
         };
     }
@@ -108,6 +111,9 @@ final class Validator
             'in' => "The {$field} field must be one of: {$parameter}.",
             'numeric' => "The {$field} field must be a number.",
             'between' => "The {$field} field must be between " . str_replace(',', ' and ', (string) $parameter) . '.',
+            'boolean' => "The {$field} field must be true or false.",
+            'date' => "The {$field} field must be a valid date (YYYY-MM-DD).",
+            'time' => "The {$field} field must be a valid time (HH:MM).",
             default => "The {$field} field is invalid.",
         };
     }
