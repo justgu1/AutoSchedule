@@ -21,15 +21,17 @@ Convenção: `Arquivo::método` para PHPUnit (backend); `arquivo.spec.ts > nome 
 | RLS: seller só enxerga/altera a própria concessionária; admin enxerga qualquer uma; sem contexto, nenhuma linha; só `admin`/`seller` inserem; scheduler/worker (contexto de serviço) enxergam e atualizam qualquer uma; contexto de leitura pública (`GET /dealerships/{id}`, composto com o contexto autenticado, não alternativo) só enxerga concessionária `active`, mesmo pra um seller vendo a de outro | `DealershipRlsPolicyTest` (8 casos) |
 | Mesmo modelo de lixeira de 3 estados da conta (`active`/`trashed`/`deleted`), reversível 30 dias | `DealershipTest::register_monta_uma_concessionaria_nova_ativa_e_sem_anonimizacao`, `::is_eligible_for_restore_permite_so_trashed_ainda_nao_anonimizado`, `::is_eligible_for_purge_exige_trashed_ha_mais_de_grace_days_e_ainda_nao_anonimizado`; `PostgresDealershipRepositoryTest::trash_move_pra_status_trashed_e_seta_trashed_at`, `::restore_volta_status_active_e_limpa_trashed_at`, `::find_purge_eligible_so_traz_trashed_ha_mais_de_grace_days_e_ainda_nao_anonimizado` |
 | Lixeira em cascata (conta do dono desativada) só restaura automaticamente quem foi trashed por causa dela -- lixeira manual fica parada | `PostgresDealershipRepositoryTest::trash_all_owned_by_so_afeta_as_ativas_e_marca_por_desativacao_do_dono`, `::restore_auto_trashed_owned_by_so_restaura_quem_foi_trashed_por_causa_do_dono` |
-| Purge anonimiza identificador direto mas preserva CEP/cidade/estado/geolocalização; rotina agendada reaproveita a mesma `ScheduledTask` genérica da conta de usuário | `DealershipTest::anonymized_escruba_identificador_direto_mas_preserva_geolocalizacao`; `PurgeTrashedDealershipsTaskTest` (3 casos) |
-| Foto: uma só, substituível, remove a anterior do storage ao trocar/remover | `PostgresDealershipRepositoryTest::persiste_a_foto_e_permite_substituir_por_outra_ou_remover`; `DealershipTest::with_photo_substitui_a_referencia_mas_preserva_o_resto`; `ProcessDealershipPhotoJobTest::substitui_a_foto_anterior_e_apaga_o_arquivo_velho_do_storage` |
-| Foto processada fora do request (job assíncrono): otimiza pro padrão do site (WebP, redimensionada), reporta progresso, falha vira status `failed` sem exceção escapar | `ProcessDealershipPhotoJobTest` (4 casos); `GdImageOptimizerTest` (4 casos, conversão real e redimensionamento); `JobStatusStoreTest` (3 casos) |
+| Purge escruba o que localiza a porta (rua, número, complemento) e o que identifica direto, mas preserva CEP/cidade/UF; rotina agendada reaproveita a mesma `ScheduledTask` genérica da conta de usuário | `DealershipTest::anonymized_escruba_identificador_direto_mas_preserva_localidade_agregada`; `PurgeTrashedDealershipsTaskTest` (3 casos) |
+| Foto: uma só, substituível, remove a anterior do storage ao trocar/remover | `PostgresDealershipRepositoryTest::persiste_a_foto_e_permite_substituir_por_outra_ou_remover`; `DealershipTest::with_photo_substitui_a_referencia_mas_preserva_o_resto`; `ProcessDealershipPhotoTest::substitui_a_foto_anterior_e_apaga_o_arquivo_velho_do_storage` |
+| Foto processada fora do request (job assíncrono): otimiza pro padrão do site (WebP, redimensionada), reporta progresso, falha vira status `failed` sem exceção escapar | `ProcessDealershipPhotoTest` (4 casos); `GdImageOptimizerTest` (4 casos, conversão real e redimensionamento); `JobStatusStoreTest` (3 casos) |
 | Limite de 20MB e validação de MIME real (`image/jpeg`/`image/png`/`image/webp`) no upload de foto | Validação declarada em `DealershipController::setPhoto()`; **sem teste automatizado direto do endpoint** -- verificado manualmente via curl (ver "Lacunas" no fim deste documento) |
 | `GET /zip-codes/{cep}` resolve CEP → endereço via ViaCEP e cacheia (`zip_code_cache`) -- só chama o terceiro na primeira vez que aquele CEP aparece | `LookupZipCodeTest` (3 casos: cache hit, cache miss grava, CEP inexistente devolve null sem gravar) |
 | Formulário de concessionária autopreenche endereço/bairro/cidade/UF a partir do CEP, chamando o próprio backend (nunca o ViaCEP direto) | E2E: `dealerships.spec.ts > seller cria, edita...` e `> admin cria concessionária...` (`/api/zip-codes/*` mocado via `page.route`, resultado determinístico) |
 | UF é um Autocomplete com busca, selecionável independente do CEP | E2E: `dealerships.spec.ts > UF é um autocomplete com busca, selecionável mesmo sem preencher o CEP` |
-| `GET /dealerships/{id}` é a mesma rota do gerenciamento -- dono/admin recebem o perfil completo, qualquer outro caso (outro seller, customer, sem conta) recebe o perfil público (nome, endereço, telefone/e-mail da concessionária, foto, só o **nome** do vendedor -- nenhum outro dado dele) e só se a concessionária estiver `active`; `vehicles` vazio até a Epic Veículo existir | `AuthContextMiddlewareTest::sem_bearer_em_rota_public_read_seta_o_contexto_de_leitura_publica`, `::com_bearer_valido_em_rota_public_read_seta_os_dois_contextos_juntos`; `RlsPolicyTest::contexto_de_leitura_publica_enxerga_so_seller_com_concessionaria_ativa`; E2E: `dealerships.spec.ts > página pública da concessionária mostra nome, endereço e vendedor sem exigir conta` |
-| URL pública usa `slug` (nome + parte do id), nunca o `id` -- estável mesmo se o nome mudar, só troca na anonimização | `DealershipTest::register_gera_um_slug_a_partir_do_nome_sem_expor_o_id_inteiro`, `::with_profile_troca_os_dados_mas_preserva_dono_status_e_slug`, `::anonymized_escruba_identificador_direto_mas_preserva_geolocalizacao` (slug troca); `PostgresDealershipRepositoryTest::persiste_e_encontra_por_slug` |
+| `GET /dealerships/{id}` é a mesma rota do gerenciamento -- dono/admin recebem o perfil completo, qualquer outro caso (outro seller, customer, sem conta) recebe o perfil público (nome, endereço, telefone/e-mail da concessionária, foto, só o **nome** do vendedor -- nenhum outro dado dele) e só se a concessionária estiver `active`; `vehicles` vazio até a Epic Veículo existir | `AuthContextMiddlewareTest::rota_de_leitura_publica_sem_claims_seta_a_flag_publica`, `::leitura_publica_com_claims_seta_os_dois_contextos_juntos`; `RlsPolicyTest::contexto_de_leitura_publica_enxerga_so_seller_com_concessionaria_ativa`; E2E: `dealerships.spec.ts > página pública da concessionária mostra nome, endereço e vendedor sem exigir conta` |
+| URL pública usa `slug` (nome + parte do id), nunca o `id` -- estável mesmo se o nome mudar, só troca na anonimização | `DealershipTest::register_gera_um_slug_a_partir_do_nome_sem_expor_o_id_inteiro`, `::with_profile_troca_os_dados_mas_preserva_dono_status_e_slug`, `::anonymized_escruba_identificador_direto_mas_preserva_localidade_agregada` (slug troca); `PostgresDealershipRepositoryTest::persiste_e_encontra_por_slug` |
+| UF é uma das 27 unidades federativas, validada na borda -- sigla inexistente é 422, nunca 500 | `ValidatorTest::rejeita_sigla_de_estado_que_nao_existe` |
+| Os sete campos de endereço andam juntos como um valor só (`Address`), e a anonimização é regra do próprio VO | `DealershipTest::anonymized_escruba_identificador_direto_mas_preserva_localidade_agregada`; `PostgresDealershipRepositoryTest::insere_e_encontra_por_id` (ida e volta do VO pelo banco) |
 
 ### Veículos, Galeria (veículo), Disponibilidade, Exemplo, Exceções, Agendamento, Status, Concorrência, Cliente
 
@@ -39,12 +41,13 @@ Domínio ainda não implementado (`Worklist.md`, Dia 2/3/4) -- nenhum teste exis
 
 | Regra | Testes |
 |---|---|
+| E-mail é normalizado na entrada (trim + minúsculas), então caixa diferente é a mesma conta -- e cadastro simultâneo do mesmo e-mail é 409, não 500 | `PostgresUserRepositoryTest::email_duplicado_vira_conflito_de_dominio_e_nao_erro_interno`; a normalização é invariante de `Email`, exercida por todo teste que constrói um |
 | Senha em hash Argon2id | `UserTest::register_nao_guarda_a_senha_em_texto_puro`, `UserTest::verify_password_confere_a_senha_em_texto_puro_contra_o_hash` |
 | Login: `{ email, password }` → token; senha errada e e-mail inexistente dão a mesma mensagem | `OAuthFlowsTest::login_with_password_com_credenciais_corretas_emite_tokens`, `::login_with_password_com_senha_errada_falha_com_mensagem_generica`, `::login_with_password_com_email_inexistente_falha_com_a_mesma_mensagem`; E2E: `auth.spec.ts > login > credenciais erradas mostra mensagem de erro` |
 | Refresh: `{ refresh_token }` → renovação; reuso de token já rotacionado revoga a família inteira | `OAuthFlowsTest::refresh_rotaciona_o_token_e_o_anterior_para_de_funcionar`, `::refresh_com_token_ja_rotacionado_revoga_a_familia_inteira`; `PostgresRefreshTokenRepositoryTest::rotate_marca_o_token_anterior_como_revogado_e_substituido`, `::rotate_de_um_token_ja_revogado_falha` |
 | `client_credentials`: `{ client_id, client_secret }` → token M2M, sem refresh, só client confidencial | `OAuthFlowsTest::client_credentials_com_secret_correto_emite_token_sem_refresh`, `::client_credentials_com_secret_errado_falha_com_mensagem_generica`, `::client_credentials_rejeita_client_publico`, `::client_credentials_rejeita_client_sem_esse_grant` |
 | Login social (Google): `{ id_token }` → linka conta existente por e-mail sem mudar role, ou cria `customer` novo; e-mail não verificado rejeitado | `OAuthFlowsTest::login_with_google_com_identidade_ja_linkada_loga_na_conta_existente`, `::login_with_google_com_email_de_conta_existente_linka_sem_mudar_role`, `::login_with_google_com_email_novo_cria_conta_customer`, `::login_with_google_rejeita_email_nao_verificado`, `::login_with_google_rejeita_client_sem_esse_grant` |
-| Tokens em cookie `HttpOnly`/`SameSite=Strict`, além do corpo | `ResponseTest::with_cookie_devolve_uma_nova_instancia_sem_mutar_a_original`, `::with_cookie_aceita_httponly_e_secure_configuraveis`; `AuthContextMiddlewareTest::sem_header_authorization_cai_pro_cookie_access_token`, `::header_authorization_tem_prioridade_sobre_o_cookie` |
+| Tokens em cookie `HttpOnly`/`SameSite=Strict`, além do corpo | `ResponseTest::with_cookie_devolve_uma_nova_instancia_sem_mutar_a_original`, `::with_cookie_aceita_httponly_e_secure_configuraveis`; `AuthenticateMiddlewareTest::sem_header_cai_pro_cookie`, `::header_tem_prioridade_sobre_o_cookie`, `::token_invalido_guarda_a_falha_e_segue_o_pipeline` (o token é decodificado uma vez só, e o erro é guardado em vez de lançado, pro rate limit contar a tentativa antes) |
 | CSRF double-submit em mutação autenticada por cookie; Bearer explícito pula a checagem | `CsrfMiddlewareTest` (7 casos, cobre cookie sem header, header divergente, header correto, Bearer explícito) |
 | Registro público: `role` só `seller`/`customer`, nunca `admin` | Validação declarada em `UserController::register()` (`in:seller,customer`); E2E: `auth.spec.ts > registro > cria conta seller e loga automaticamente`, `> cria conta customer e loga automaticamente`, `> e-mail duplicado mostra erro` |
 | Logout revoga a família do refresh token e limpa os cookies | `OAuthFlowsTest::logout_revoga_o_refresh_token_e_o_reuso_subsequente_falha`, `::logout_com_token_inexistente_nao_lanca_excecao`; E2E: `auth.spec.ts > logout limpa a sessão e redireciona pro login` |
@@ -55,7 +58,7 @@ Domínio ainda não implementado (`Worklist.md`, Dia 2/3/4) -- nenhum teste exis
 
 | Regra | Testes |
 |---|---|
-| Autorização aplicada no backend, papel vem da rota (`roles` declarado no registro) | `RoleMiddlewareTest` (4 casos), `RouterTest::required_roles_devolve_os_roles_declarados_no_registro_da_rota` |
+| Autorização aplicada no backend, papel vem da rota (`roles` declarado no registro) | `RoleMiddlewareTest` (4 casos), `RouterTest::group_aplica_os_roles_a_toda_rota_registrada_dentro` |
 | RLS: `customer` só enxerga a própria linha; `admin`/contexto de serviço enxergam qualquer uma; sem contexto, nenhuma linha; contexto de leitura pública só enxerga seller dono de concessionária `active` | `RlsPolicyTest` (7 casos, inclui INSERT com/sem contexto de serviço) |
 | Validação do frontend não é mecanismo de segurança | Garantido pela dupla-checagem: toda regra acima já é testada no backend, independente do frontend |
 
@@ -65,13 +68,13 @@ Domínio ainda não implementado (`Worklist.md`, Dia 2/3/4) -- nenhum teste exis
 |---|---|
 | Eventos gravam `actor_id`/`target_user_id` separados, contexto, IP, user agent | `PostgresAuditLoggerTest::grava_o_evento_com_ip_user_agent_e_contexto`, `::grava_actor_e_target_separados_quando_um_admin_age_sobre_outro_usuario` |
 | Falha ao gravar auditoria não derruba a request | `PostgresAuditLoggerTest::falha_ao_gravar_nao_propaga_excecao` |
-| `auth.service_token.issued` sem actor/target (client, não usuário) | `OAuthFlowsTest::client_credentials_com_secret_correto_emite_token_sem_refresh` (assert `actorId`/`targetUserId` nulos) |
+| `auth.service_token.issued` sem actor/target (client, não usuário) | `OAuthFlowsTest::client_credentials_com_secret_correto_emite_token_sem_refresh` (assert `actorId`/`auditableId` nulos na `AuditEntry`) |
 
 ## Rate limiting
 
 | Regra | Testes |
 |---|---|
-| Sliding window, por usuário autenticado ou IP; `429` com `Retry-After` | `RedisRateLimiterTest` (3 casos), `RateLimitMiddlewareTest` (7 casos, inclui chave por Bearer/cookie/IP) |
+| Sliding window, por usuário autenticado ou IP; `429` com `Retry-After` | `RedisRateLimiterTest` (3 casos), `RateLimitMiddlewareTest` (6 casos, inclui chave por usuário autenticado e por IP) |
 | Fail-open quando o Redis falha | `RateLimitMiddlewareTest::falha_aberta_quando_o_limiter_lanca_excecao` |
 | Política `auth` cobre login/registro/reset, não só `/oauth/token` | `RateLimitMiddlewareTest::usa_a_policy_da_rota_quando_declarada_em_vez_da_geral` |
 
@@ -88,7 +91,8 @@ Domínio ainda não implementado (`Worklist.md`, Dia 2/3/4) -- nenhum teste exis
 | Tarefa periódica só roda de novo depois do próprio intervalo passar; "último run" sobrevive restart (guardado no Redis, não em memória) | `SchedulerTest` (3 casos: nunca rodou, intervalo não passou, intervalo passou) |
 | Envio de e-mail é assíncrono (enfileira, não manda na hora) | `RedisQueueTest::push_e_pop_entregam_o_mesmo_job`; reset de senha via fila: E2E `password-reset.spec.ts` roda contra o worker real, e-mail chega no Mailpit de verdade (não mock) |
 | Falha reenfileira com `attempts` incrementado; passadas 3 tentativas vira dead-letter | `RedisQueueTest::retry_or_fail_reenfileira_com_attempts_incrementado`, `::retry_or_fail_manda_pra_lista_de_falhas_apos_o_maximo_de_tentativas` |
-| Job resolve suas dependências (`MailProvider`, etc.) via container, sem registro manual por classe | `SendEmailJobTest::handle_repassa_os_dados_do_payload_pro_mail_provider` |
+| Escrita múltipla dependente é atômica também fora do request (worker e scheduler não têm a transação que o RLS abre) | `PurgeTrashedUsersTaskTest` e `PurgeTrashedDealershipsTaskTest` rodam a tarefa contra o Postgres real com `PdoTransaction`; a reentrância é exercida por todo teste de caso de uso que roda dentro da transação do teste |
+| Job resolve suas dependências (`MailProvider`, etc.) via container, sem registro manual por classe | `SendEmailJobTest::handle_traduz_o_payload_da_fila_em_argumentos_do_caso_de_uso` |
 
 ### Busca, Imagens, Integridade
 
@@ -102,7 +106,7 @@ Domínio ainda não implementado -- mesma situação de Veículos/Agendamento ac
 | Conta `trashed` ainda bloqueia reuso do e-mail (ninguém mais se registra com ele até a purge rodar) | `PostgresUserRepositoryTest::trashed_ainda_e_encontrado_por_email_e_bloqueia_reuso_do_email` |
 | Login com sucesso restaura a conta `trashed` automaticamente (senha ou Google), antes de emitir o token | `OAuthFlowsTest::login_with_password_restaura_conta_trashed_e_audita_antes_do_login`, `::login_with_google_restaura_conta_trashed_da_identidade_ja_linkada`; E2E: `account-trash.spec.ts` (fluxo completo, sem passo extra do usuário) |
 | Restore só funciona antes da anonimização definitiva (`isEligibleForRestore`) | `UserTest::is_eligible_for_restore_permite_so_trashed_ainda_nao_anonimizado`; `PostgresUserRepositoryTest::restore_volta_status_active_e_limpa_deleted_at` |
-| Purge (`POST /me/purge` ou rotina agendada) anonimiza PII (nome, e-mail, telefone) e marca `deleted` -- nunca hard-delete, nunca antes dos 30 dias sem ação explícita | `UserTest::anonymized_remove_pii_mas_preserva_id_role_e_timestamps`; `PostgresUserRepositoryTest::anonymize_and_soft_delete_escruba_a_pii_na_linha_persistida`, `::anonymize_and_soft_delete_some_das_buscas`, `::anonymize_and_soft_delete_e_um_no_op_quando_usuario_nao_existe` |
+| Purge (`POST /me/purge` ou rotina agendada) anonimiza PII (nome, e-mail, telefone) e marca `deleted` -- nunca hard-delete, nunca antes dos 30 dias sem ação explícita | `UserTest::anonymized_remove_pii_mas_preserva_id_role_e_timestamps`; `PostgresUserRepositoryTest::purge_escruba_a_pii_na_linha_persistida`, `::purge_some_das_buscas` |
 | Elegibilidade de purge exige `trashed` há mais de 30 dias e ainda não anonimizado | `UserTest::is_eligible_for_purge_exige_trashed_ha_mais_de_grace_days_e_ainda_nao_anonimizado`; `PostgresUserRepositoryTest::find_purge_eligible_so_traz_trashed_ha_mais_de_grace_days_e_ainda_nao_anonimizado` |
 | Rotina agendada (`PurgeTrashedUsersTask`) só purga quem é elegível, audita cada purge, não é no-op quando não há ninguém | `PurgeTrashedUsersTaskTest` (3 casos) |
 | Registro de auditoria (`audit_logs`) preserva histórico mesmo após a conta ser purgada (id/role/timestamps mantidos) | `UserTest::anonymized_remove_pii_mas_preserva_id_role_e_timestamps` (id/role/createdAt sobrevivem à anonimização, permitindo que `audit_logs` continue referenciando a linha) |
@@ -122,7 +126,32 @@ Não é seção de `business-rules.md` (é requisito não-funcional, não regra 
 
 ## Lacunas conhecidas
 
-Revisão desta sessão encontrou pontos sem teste automatizado direto -- documentados aqui em vez de silenciosamente ignorados:
+Pontos sem teste automatizado direto, documentados aqui em vez de silenciosamente ignorados.
 
-- `UserController` (e `OAuthController`) não tem suíte de teste própria -- toda regra de negócio que vive puramente no controller (ex: a trava do último admin em `assertNotLastAdmin()`, o dispatch por corpo em `updatePassword()`, `destroy()`/`restore()`/`purge()`) só é coberta indiretamente (pelos testes de domínio/repositório que ele orquestra) ou por verificação manual via curl, documentada nas sessões de implementação. Corrigir isso é trabalho de teste novo, não de catálogo -- fica registrado aqui como próximo passo.
-- `DealershipController` também não tem suíte própria -- mesma situação: orquestração (dono automático na criação por seller vs `owner_user_id` obrigatório por admin, reassociação de dono via `PATCH`, validação de MIME no upload de foto) só é coberta indiretamente pelos testes de domínio/repositório/RLS, mais verificação manual via curl (create/list/show/update/upload/remove/trash/restore/purge, isolamento entre sellers). Mesmo próximo passo do item acima.
+- **`UserController` e `OAuthController` não têm suíte própria.** A regra que vive puramente no
+  controller -- a trava do último admin, o dispatch por formato de corpo em `updatePassword()`, o
+  ramo de `destroy()`/`restore()`/`purge()` -- é coberta indiretamente pelos testes de domínio e
+  repositório que ele orquestra, mais verificação manual via curl.
+- **`DealershipController` na mesma situação:** dono automático na criação por seller contra
+  `owner_user_id` obrigatório por admin, reassociação de dono no `PATCH`, e o limite de 20MB mais a
+  validação de MIME real no upload de foto.
+- **Indicador visual de foco (WCAG 2.4.7).** É visual; não há asserção confiável sem
+  screenshot-diff. Revisão manual.
+- **Uso sem JavaScript.** Não aplicável hoje: a SPA é 100% client-rendered, sem SSR. O `<noscript>`
+  avisa, mas não há conteúdo funcional sem JS.
+
+Duas coisas que **deixaram** de ser lacuna nesta rodada e ficam registradas para não voltarem
+como surpresa:
+
+- A regra de purga tinha duas implementações, e a do domínio **nunca rodava em produção** -- o SQL
+  fazia a aritmética de data por conta própria. Hoje é uma só, e `TrashState::allowsPurge()` é
+  chamada no caminho real, não só em teste.
+- Violação de `UNIQUE` subia crua e virava 500. Agora tem teste
+  (`PostgresUserRepositoryTest::email_duplicado_vira_conflito_de_dominio_e_nao_erro_interno`).
+
+### Fora de escopo, de propósito
+
+O catálogo mapeia **regra de negócio → teste**, então teste de infraestrutura não aparece aqui:
+`ContainerTest`, `PipelineTest`, `RequestTest`, `ConfigTest`, `PostgresArrayTest`, `UuidTest` e
+companhia existem e rodam, mas não validam regra de `docs/business-rules.md`. A ausência deles
+nesta lista é escolha, não esquecimento.

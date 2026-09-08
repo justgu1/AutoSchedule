@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Support;
 
-use App\Infrastructure\Database\PostgresConnection;
+use App\Infrastructure\Persistence\PostgresConnection;
 
 final class TestDatabase
 {

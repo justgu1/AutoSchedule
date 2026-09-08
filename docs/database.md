@@ -67,9 +67,6 @@ Table dealerships {
   neighborhood varchar(120) [not null]
   city varchar(120) [not null]
   state varchar(2) [not null]
-  latitude decimal(10,7)
-  longitude decimal(10,7)
-  google_place_id varchar(255)
   phone varchar(20)
   email varchar(190)
   photo_file_id uuid
@@ -312,9 +309,13 @@ ON vehicles USING GIN (version gin_trgm_ops);
 
 ## Geolocalização
 
-A concessionária mantém latitude, longitude e Google Place ID.
+Não há coluna de geolocalização. `dealerships` teve `latitude`, `longitude` e `google_place_id`
+desde a criação da tabela, nunca gravou valor em nenhuma das três, e elas foram removidas por
+migration -- o geocoder que as justificaria nunca foi escrito.
 
-PostGIS pode ser adicionado posteriormente caso seja necessário.
+O endereço textual (CEP, rua, cidade, UF) é o que existe hoje, e é o suficiente pro Google Maps
+Embed em modo `place`. Busca por proximidade exige coluna nova, e aí vale decidir entre
+`decimal` + cálculo no Postgres ou PostGIS.
 
 ## Integridade
 

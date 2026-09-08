@@ -6,7 +6,7 @@ declare(strict_types=1);
 require dirname(__DIR__) . '/vendor/autoload.php';
 
 use App\Bootstrap\CliKernel;
-use App\Infrastructure\Database\MigrationRunner;
+use App\Infrastructure\Persistence\Schema\MigrationRunner;
 
 $runner = new MigrationRunner(
     CliKernel::boot()->maintenanceConnection()->pdo(),

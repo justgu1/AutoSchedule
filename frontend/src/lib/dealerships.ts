@@ -14,9 +14,6 @@ export interface Dealership {
     neighborhood: string;
     city: string;
     state: string;
-    latitude: number | null;
-    longitude: number | null;
-    google_place_id: string | null;
     phone: string | null;
     email: string | null;
     photo_url: string | null;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Infrastructure\Database\Seeder;
+use App\Infrastructure\Persistence\Schema\Seeder;
 
 return new class () implements Seeder {
     public function run(\PDO $pdo): void

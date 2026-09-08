@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Http\Controllers;
 
-use App\Application\Address\LookupZipCode;
-use App\Domain\Address\ZipCodeAddress;
+use App\Application\ZipCode\LookupZipCode;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
+use App\Domain\ZipCode\ZipCodeAddress;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
 

@@ -23,7 +23,7 @@ final readonly class TrashDealership
     {
         $dealership = $this->finder->findOrFail($identifier);
 
-        $this->dealerships->trash($dealership->id, byOwnerDeactivation: false);
-        $this->audit->record(AuditEvent::DealershipTrashed, $context->actorId, 'Dealership', $dealership->id, [], $context->ipAddress, $context->userAgent);
+        $this->dealerships->trash($dealership->id);
+        $this->audit->record($context->audits(AuditEvent::DealershipTrashed, $dealership->id));
     }
 }

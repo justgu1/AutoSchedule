@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\User;
 
+use App\Application\Ports\Transaction;
 use App\Application\Shared\ActorContext;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
@@ -20,6 +21,7 @@ final readonly class RestoreAccount
         private UserRepository $users,
         private DealershipRepository $dealerships,
         private AuditLogger $audit,
+        private Transaction $transaction,
     ) {
     }
 
@@ -27,12 +29,15 @@ final readonly class RestoreAccount
     {
         $user = $this->finder->findOrFail($userId);
 
-        if (!$user->isEligibleForRestore()) {
+        if (!$user->trash->allowsRestore()) {
             throw new DomainException('This account is not in the trash (or was already permanently deleted).', DomainErrorType::Conflict);
         }
 
-        $this->users->restore($user->id);
-        $this->dealerships->restoreAutoTrashedOwnedBy($user->id);
-        $this->audit->record(AuditEvent::AccountRestored, $context->actorId, 'User', $user->id, [], $context->ipAddress, $context->userAgent);
+        $this->transaction->run(function () use ($user): void {
+            $this->users->restore($user->id);
+            $this->dealerships->restoreAutoTrashedOwnedBy($user->id);
+        });
+
+        $this->audit->record($context->audits(AuditEvent::AccountRestored, $user->id));
     }
 }

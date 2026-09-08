@@ -6,8 +6,8 @@ namespace App\Bootstrap;
 
 use App\Config;
 use App\Infrastructure\Container\Container;
-use App\Infrastructure\Database\DatabaseConnection;
-use App\Infrastructure\Database\PostgresConnection;
+use App\Infrastructure\Persistence\DatabaseConnection;
+use App\Infrastructure\Persistence\PostgresConnection;
 
 final readonly class CliKernel
 {

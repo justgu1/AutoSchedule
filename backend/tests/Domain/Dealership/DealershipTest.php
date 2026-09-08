@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace Tests\Domain\Dealership;
 
 use App\Domain\Dealership\Dealership;
+use App\Domain\Shared\Address;
+use App\Domain\Shared\Email;
 use App\Domain\Shared\TrashableStatus;
+use App\Domain\Shared\TrashState;
+use App\Domain\Shared\Uf;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -19,26 +23,20 @@ final class DealershipTest extends TestCase
         $this->assertNotSame('', $dealership->id);
         $this->assertSame('owner-1', $dealership->ownerUserId);
         $this->assertSame('Auto Center', $dealership->name);
-        $this->assertSame(TrashableStatus::Active, $dealership->status);
+        $this->assertSame(TrashableStatus::Active, $dealership->trash->status);
         $this->assertFalse($dealership->trashedByOwnerDeactivation);
-        $this->assertNull($dealership->trashedAt);
-        $this->assertNull($dealership->anonymizedAt);
+        $this->assertNull($dealership->trash->trashedAt);
+        $this->assertNull($dealership->trash->anonymizedAt);
     }
 
-    /** Slug é URL amigável (`/concessionarias/{slug}`), nunca o id -- formato: nome normalizado + 6 caracteres do próprio id, sempre único por natureza. */
+    /** Slug é URL amigável, nunca o id -- formato: nome normalizado + 6 caracteres do próprio id, sempre único por natureza. */
     #[Test]
     public function register_gera_um_slug_a_partir_do_nome_sem_expor_o_id_inteiro(): void
     {
         $dealership = Dealership::register(
             ownerUserId: 'owner-1',
             name: 'Auto Center Prime!',
-            zipCode: '01000-000',
-            address: 'Rua Antiga',
-            number: '10',
-            complement: null,
-            neighborhood: 'Bairro',
-            city: 'Cidade',
-            state: 'SP',
+            address: $this->addressFixture(),
             phone: null,
         );
 
@@ -53,24 +51,17 @@ final class DealershipTest extends TestCase
 
         $updated = $dealership->withProfile(
             name: 'Novo Nome',
-            zipCode: '99999-999',
-            address: 'Rua Nova',
-            number: '42',
-            complement: 'Fundos',
-            neighborhood: 'Centro',
-            city: 'Nova Cidade',
-            state: 'SP',
+            address: new Address('99999-999', 'Rua Nova', '42', 'Fundos', 'Centro', 'Nova Cidade', Uf::RJ),
             phone: '11999999999',
-            email: 'novo@example.com',
-            latitude: null,
-            longitude: null,
-            googlePlaceId: null,
+            email: new Email('novo@example.com'),
         );
 
         $this->assertSame('Novo Nome', $updated->name);
+        $this->assertSame('Rua Nova', $updated->address->street);
+        $this->assertSame(Uf::RJ, $updated->address->state);
         $this->assertSame($dealership->id, $updated->id);
         $this->assertSame($dealership->ownerUserId, $updated->ownerUserId);
-        $this->assertSame($dealership->status, $updated->status);
+        $this->assertSame($dealership->trash->status, $updated->trash->status);
         $this->assertSame($dealership->slug, $updated->slug);
     }
 
@@ -108,9 +99,9 @@ final class DealershipTest extends TestCase
         $trashed = $this->trashedFixture();
         $alreadyAnonymized = $this->trashedFixture(anonymizedAt: new \DateTimeImmutable());
 
-        $this->assertFalse($active->isEligibleForRestore());
-        $this->assertTrue($trashed->isEligibleForRestore());
-        $this->assertFalse($alreadyAnonymized->isEligibleForRestore());
+        $this->assertFalse($active->trash->allowsRestore());
+        $this->assertTrue($trashed->trash->allowsRestore());
+        $this->assertFalse($alreadyAnonymized->trash->allowsRestore());
     }
 
     #[Test]
@@ -122,14 +113,14 @@ final class DealershipTest extends TestCase
         $longTrashed = $this->trashedFixture(trashedAt: $now->modify('-31 days'));
         $alreadyAnonymized = $this->trashedFixture(trashedAt: $now->modify('-31 days'), anonymizedAt: $now);
 
-        $this->assertFalse($active->isEligibleForPurge(30, $now));
-        $this->assertFalse($recentlyTrashed->isEligibleForPurge(30, $now));
-        $this->assertTrue($longTrashed->isEligibleForPurge(30, $now));
-        $this->assertFalse($alreadyAnonymized->isEligibleForPurge(30, $now));
+        $this->assertFalse($active->trash->allowsPurge($now));
+        $this->assertFalse($recentlyTrashed->trash->allowsPurge($now));
+        $this->assertTrue($longTrashed->trash->allowsPurge($now));
+        $this->assertFalse($alreadyAnonymized->trash->allowsPurge($now));
     }
 
     #[Test]
-    public function anonymized_escruba_identificador_direto_mas_preserva_geolocalizacao(): void
+    public function anonymized_escruba_identificador_direto_mas_preserva_localidade_agregada(): void
     {
         $dealership = $this->registerFixture()->withPhoto('file-1');
 
@@ -139,18 +130,22 @@ final class DealershipTest extends TestCase
         $this->assertSame($dealership->ownerUserId, $anonymized->ownerUserId);
         $this->assertNotSame('Auto Center', $anonymized->name);
         $this->assertNotSame($dealership->slug, $anonymized->slug);
-        $this->assertSame('', $anonymized->address);
-        $this->assertSame('', $anonymized->number);
-        $this->assertNull($anonymized->complement);
+        $this->assertSame('', $anonymized->address->street);
+        $this->assertSame('', $anonymized->address->number);
+        $this->assertNull($anonymized->address->complement);
         $this->assertNull($anonymized->phone);
         $this->assertNull($anonymized->email);
-        $this->assertNull($anonymized->googlePlaceId);
-        $this->assertSame($dealership->zipCode, $anonymized->zipCode);
-        $this->assertSame($dealership->city, $anonymized->city);
-        $this->assertSame($dealership->state, $anonymized->state);
-        $this->assertSame(TrashableStatus::Deleted, $anonymized->status);
-        $this->assertNotNull($anonymized->anonymizedAt);
+        $this->assertSame($dealership->address->zipCode, $anonymized->address->zipCode);
+        $this->assertSame($dealership->address->city, $anonymized->address->city);
+        $this->assertSame($dealership->address->state, $anonymized->address->state);
+        $this->assertSame(TrashableStatus::Deleted, $anonymized->trash->status);
+        $this->assertNotNull($anonymized->trash->anonymizedAt);
         $this->assertNull($anonymized->photoFileId);
+    }
+
+    private function addressFixture(): Address
+    {
+        return new Address('01000-000', 'Rua Antiga', '10', null, 'Bairro', 'Cidade', Uf::SP);
     }
 
     private function registerFixture(): Dealership
@@ -158,13 +153,7 @@ final class DealershipTest extends TestCase
         return Dealership::register(
             ownerUserId: 'owner-1',
             name: 'Auto Center',
-            zipCode: '01000-000',
-            address: 'Rua Antiga',
-            number: '10',
-            complement: null,
-            neighborhood: 'Bairro',
-            city: 'Cidade',
-            state: 'SP',
+            address: $this->addressFixture(),
             phone: '11988888888',
         );
     }
@@ -178,23 +167,12 @@ final class DealershipTest extends TestCase
             ownerUserId: $dealership->ownerUserId,
             name: $dealership->name,
             slug: $dealership->slug,
-            zipCode: $dealership->zipCode,
             address: $dealership->address,
-            number: $dealership->number,
-            complement: $dealership->complement,
-            neighborhood: $dealership->neighborhood,
-            city: $dealership->city,
-            state: $dealership->state,
-            latitude: $dealership->latitude,
-            longitude: $dealership->longitude,
-            googlePlaceId: $dealership->googlePlaceId,
             phone: $dealership->phone,
             email: $dealership->email,
             photoFileId: $dealership->photoFileId,
-            status: TrashableStatus::Trashed,
+            trash: new TrashState(TrashableStatus::Trashed, $trashedAt ?? new \DateTimeImmutable(), $anonymizedAt),
             trashedByOwnerDeactivation: false,
-            trashedAt: $trashedAt ?? new \DateTimeImmutable(),
-            anonymizedAt: $anonymizedAt,
             createdAt: $dealership->createdAt,
             updatedAt: $dealership->updatedAt,
         );

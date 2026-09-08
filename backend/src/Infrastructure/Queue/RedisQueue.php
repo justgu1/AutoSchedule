@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Infrastructure\Queue;
 
 use App\Application\Ports\Queue;
+use App\Application\Ports\QueuedJob;
 use App\Infrastructure\Redis\RedisConnection;
 
 final readonly class RedisQueue implements Queue
@@ -17,36 +18,23 @@ final readonly class RedisQueue implements Queue
     {
     }
 
-    public function push(string $jobClass, array $payload): void
+    public function push(QueuedJob $job, array $payload): void
     {
-        $this->redis->client()->rpush(self::QUEUE_KEY, [$this->encode($jobClass, $payload, attempts: 0)]);
+        $this->redis->client()->rpush(self::QUEUE_KEY, [new QueueMessage($job, $payload)->toJson()]);
     }
 
-    /** @return array{job_class: string, payload: array<string, mixed>, attempts: int}|null */
-    public function pop(int $timeoutSeconds): ?array
+    public function pop(int $timeoutSeconds): ?QueueMessage
     {
         $result = $this->redis->client()->blpop([self::QUEUE_KEY], $timeoutSeconds);
 
-        if ($result === null) {
-            return null;
-        }
-
-        /** @var array{job_class: string, payload: array<string, mixed>, attempts: int} */
-        return json_decode($result[1], true);
+        return is_array($result) && is_string($result[1]) ? QueueMessage::fromJson($result[1]) : null;
     }
 
-    /** @param array{job_class: string, payload: array<string, mixed>, attempts: int} $envelope */
-    public function retryOrFail(array $envelope): void
+    public function retryOrFail(QueueMessage $message): void
     {
-        $envelope['attempts']++;
-        $key = $envelope['attempts'] >= self::MAX_ATTEMPTS ? self::FAILED_KEY : self::QUEUE_KEY;
+        $retried = $message->retried();
+        $key = $retried->attempts >= self::MAX_ATTEMPTS ? self::FAILED_KEY : self::QUEUE_KEY;
 
-        $this->redis->client()->rpush($key, [$this->encode($envelope['job_class'], $envelope['payload'], $envelope['attempts'])]);
-    }
-
-    /** @param array<string, mixed> $payload */
-    private function encode(string $jobClass, array $payload, int $attempts): string
-    {
-        return json_encode(['job_class' => $jobClass, 'payload' => $payload, 'attempts' => $attempts], JSON_THROW_ON_ERROR);
+        $this->redis->client()->rpush($key, [$retried->toJson()]);
     }
 }

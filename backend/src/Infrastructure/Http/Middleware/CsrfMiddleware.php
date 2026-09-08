@@ -6,6 +6,7 @@ namespace App\Infrastructure\Http\Middleware;
 
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
+use App\Infrastructure\Http\Cookie;
 use App\Infrastructure\Http\Middleware;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
@@ -24,7 +25,7 @@ final readonly class CsrfMiddleware implements Middleware
         $usingCookieAuth = $request->usesCookieAuth();
 
         if ($usingCookieAuth && !in_array($request->method(), self::SAFE_METHODS, true)) {
-            $cookie = $request->cookie('XSRF-TOKEN');
+            $cookie = $request->cookie(Cookie::CSRF);
             $header = $request->header('x-csrf-token');
 
             if ($cookie === null || $header === null || !hash_equals($cookie, $header)) {
@@ -36,9 +37,9 @@ final readonly class CsrfMiddleware implements Middleware
 
         // Sem o cookie ainda (primeira visita, ou acabou de logar nesse mesmo
         // request) -- emite um novo, pronto pra próxima mutação já ter o quê comparar.
-        if ($request->cookie('XSRF-TOKEN') === null) {
+        if ($request->cookie(Cookie::CSRF) === null) {
             return $response->withCookie(
-                'XSRF-TOKEN',
+                Cookie::CSRF,
                 bin2hex(random_bytes(32)),
                 httpOnly: false,
                 secure: $this->cookieSecure,

@@ -6,6 +6,7 @@ namespace App\Application\Dealership;
 
 use App\Application\Dealership\DTO\DealershipProfile;
 use App\Application\Shared\ActorContext;
+use App\Application\Shared\AddressFields;
 use App\Application\Shared\ValidatedInput;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
@@ -13,6 +14,7 @@ use App\Domain\Dealership\Dealership;
 use App\Domain\Dealership\Ports\DealershipRepository;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
+use App\Domain\Shared\Email;
 
 /** Seller sempre vira dono do que cria; só admin escolhe o dono (`owner_user_id`). */
 final readonly class CreateDealership
@@ -35,19 +37,13 @@ final readonly class CreateDealership
         $dealership = Dealership::register(
             ownerUserId: $ownerUserId,
             name: $data->string('name'),
-            zipCode: $data->string('zip_code'),
-            address: $data->string('address'),
-            number: $data->string('number'),
-            complement: $data->stringOrNull('complement'),
-            neighborhood: $data->string('neighborhood'),
-            city: $data->string('city'),
-            state: $data->string('state'),
+            address: AddressFields::from($data),
             phone: $data->stringOrNull('phone'),
-            email: $data->stringOrNull('email'),
+            email: Email::fromNullable($data->stringOrNull('email')),
         );
 
         $this->dealerships->insert($dealership);
-        $this->audit->record(AuditEvent::DealershipCreated, $context->actorId, 'Dealership', $dealership->id, [], $context->ipAddress, $context->userAgent);
+        $this->audit->record($context->audits(AuditEvent::DealershipCreated, $dealership->id));
 
         return DealershipProfile::fromDealership($dealership, $this->photos->urlFor($dealership));
     }

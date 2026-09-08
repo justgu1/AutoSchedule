@@ -13,6 +13,7 @@ use App\Application\Auth\LoginWithPassword;
 use App\Application\Auth\Logout;
 use App\Application\Auth\RefreshAccessToken;
 use App\Application\Auth\TokenPairIssuer;
+use App\Application\Auth\TokenTtl;
 use App\Application\Shared\ActorContext;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Auth\ClientType;
@@ -31,12 +32,16 @@ use App\Domain\Dealership\Dealership;
 use App\Domain\Dealership\Ports\DealershipRepository;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
+use App\Domain\Shared\Email;
+use App\Domain\Shared\Trashable;
 use App\Domain\Shared\TrashableStatus;
+use App\Domain\Shared\TrashState;
 use App\Domain\User\Ports\UserRepository;
 use App\Domain\User\User;
 use App\Domain\User\UserRole;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\DirectTransaction;
 use Tests\Support\FakeAuditLogger;
 
 /** Os quatro fluxos de `POST /oauth/token` mais o logout, cada um no seu caso de uso, sobre os mesmos dublês. */
@@ -60,7 +65,7 @@ final class OAuthFlowsTest extends TestCase
             redirectUris: [],
             allowedScopes: ['profile:read'],
         );
-        $this->customer = User::register('Ada', 'ada@example.com', null, 'correct-password', UserRole::Customer);
+        $this->customer = User::register('Ada', new Email('ada@example.com'), null, 'correct-password', UserRole::Customer);
 
         $this->users = new InMemoryUserRepository($this->customer);
         $this->refreshTokens = new InMemoryRefreshTokenRepository();
@@ -79,8 +84,8 @@ final class OAuthFlowsTest extends TestCase
         $this->assertFalse($tokenPair->accountRestored);
         $this->assertSame([AuditEvent::LoginSucceeded], $this->audit->events);
         // Actor e target são a mesma pessoa: quem logou é quem "sofreu" o evento.
-        $this->assertSame($this->customer->id, $this->audit->calls[0]['actorId']);
-        $this->assertSame($this->customer->id, $this->audit->calls[0]['targetUserId']);
+        $this->assertSame($this->customer->id, $this->audit->entries[0]->actorId);
+        $this->assertSame($this->customer->id, $this->audit->entries[0]->auditableId);
     }
 
     #[Test]
@@ -92,7 +97,7 @@ final class OAuthFlowsTest extends TestCase
 
         $restored = $this->users->findById($this->customer->id);
         assert($restored instanceof User);
-        $this->assertSame(TrashableStatus::Active, $restored->status);
+        $this->assertSame(TrashableStatus::Active, $restored->trash->status);
         $this->assertTrue($tokenPair->accountRestored);
         $this->assertSame([AuditEvent::AccountRestored, AuditEvent::LoginSucceeded], $this->audit->events);
     }
@@ -109,8 +114,8 @@ final class OAuthFlowsTest extends TestCase
             $this->assertSame([AuditEvent::LoginFailed], $this->audit->events);
             // Identidade não provada (senha errada) -- sem actor, mas o alvo é
             // conhecido porque o email existe.
-            $this->assertNull($this->audit->calls[0]['actorId']);
-            $this->assertSame($this->customer->id, $this->audit->calls[0]['targetUserId']);
+            $this->assertNull($this->audit->entries[0]->actorId);
+            $this->assertSame($this->customer->id, $this->audit->entries[0]->auditableId);
         }
     }
 
@@ -123,8 +128,8 @@ final class OAuthFlowsTest extends TestCase
         } catch (DomainException $exception) {
             $this->assertSame('Invalid credentials.', $exception->getMessage());
             // Nem o email existe -- nem actor nem target pra apontar.
-            $this->assertNull($this->audit->calls[0]['actorId']);
-            $this->assertNull($this->audit->calls[0]['targetUserId']);
+            $this->assertNull($this->audit->entries[0]->actorId);
+            $this->assertNull($this->audit->entries[0]->auditableId);
         }
     }
 
@@ -176,11 +181,10 @@ final class OAuthFlowsTest extends TestCase
             self::fail('Expected a RefreshTokenReused audit event.');
         }
 
-        $reuseCall = $this->audit->calls[$reuseIndex];
-        // Quem reusou o token não provou identidade nenhuma -- sem actor. O
-        // alvo é o dono da família de tokens, não quem reusou.
-        $this->assertNull($reuseCall['actorId']);
-        $this->assertSame($this->customer->id, $reuseCall['targetUserId']);
+        // Quem reusou o token não provou identidade nenhuma: sem ator, e o alvo é o dono da família.
+        $reuse = $this->audit->entries[$reuseIndex];
+        $this->assertNull($reuse->actorId);
+        $this->assertSame($this->customer->id, $reuse->auditableId);
 
         $this->expectException(DomainException::class);
         ($this->refreshAccessToken())('autoschedule-web', $rotated, $this->context());
@@ -208,20 +212,20 @@ final class OAuthFlowsTest extends TestCase
     #[Test]
     public function login_with_google_com_identidade_ja_linkada_loga_na_conta_existente(): void
     {
-        $this->identities->insert(UserIdentity::link($this->customer->id, 'google', 'google-sub-1', 'ada@example.com'));
+        $this->identities->insert(UserIdentity::link($this->customer->id, 'google', 'google-sub-1', new Email('ada@example.com')));
         $this->googleVerifier->nextClaims = new GoogleIdentityClaims('google-sub-1', 'ada@example.com', true, 'Ada');
 
         $tokenPair = ($this->loginWithGoogle())('autoschedule-web', 'fake-id-token', $this->context());
 
         $this->assertNotSame('', $tokenPair->accessToken);
         $this->assertSame([AuditEvent::LoginSucceeded], $this->audit->events);
-        $this->assertSame($this->customer->id, $this->audit->calls[0]['actorId']);
+        $this->assertSame($this->customer->id, $this->audit->entries[0]->actorId);
     }
 
     #[Test]
     public function login_with_google_restaura_conta_trashed_da_identidade_ja_linkada(): void
     {
-        $this->identities->insert(UserIdentity::link($this->customer->id, 'google', 'google-sub-1', 'ada@example.com'));
+        $this->identities->insert(UserIdentity::link($this->customer->id, 'google', 'google-sub-1', new Email('ada@example.com')));
         $this->googleVerifier->nextClaims = new GoogleIdentityClaims('google-sub-1', 'ada@example.com', true, 'Ada');
         $this->users->trash($this->customer->id);
 
@@ -229,7 +233,7 @@ final class OAuthFlowsTest extends TestCase
 
         $restored = $this->users->findById($this->customer->id);
         assert($restored instanceof User);
-        $this->assertSame(TrashableStatus::Active, $restored->status);
+        $this->assertSame(TrashableStatus::Active, $restored->trash->status);
         $this->assertTrue($tokenPair->accountRestored);
         $this->assertSame([AuditEvent::AccountRestored, AuditEvent::LoginSucceeded], $this->audit->events);
     }
@@ -257,7 +261,7 @@ final class OAuthFlowsTest extends TestCase
 
         ($this->loginWithGoogle())('autoschedule-web', 'fake-id-token', $this->context());
 
-        $created = $this->users->findByEmail('nova@example.com');
+        $created = $this->users->findByEmail(new Email('nova@example.com'));
         $this->assertNotNull($created);
         $this->assertSame(UserRole::Customer, $created->role);
         $this->assertSame([AuditEvent::UserCreated], $this->audit->events);
@@ -274,7 +278,7 @@ final class OAuthFlowsTest extends TestCase
             $this->fail('Expected a DomainException to be thrown.');
         } catch (DomainException $exception) {
             $this->assertSame(DomainErrorType::Unauthorized, $exception->type());
-            $this->assertNull($this->users->findByEmail('naoverificado@example.com'));
+            $this->assertNull($this->users->findByEmail(new Email('naoverificado@example.com')));
         }
     }
 
@@ -308,8 +312,8 @@ final class OAuthFlowsTest extends TestCase
         $this->assertSame(['service:internal'], $tokenPair->scopes);
         $this->assertSame([AuditEvent::ServiceTokenIssued], $this->audit->events);
         // Não é um usuário se autenticando -- sem actor nem target.
-        $this->assertNull($this->audit->calls[0]['actorId']);
-        $this->assertNull($this->audit->calls[0]['targetUserId']);
+        $this->assertNull($this->audit->entries[0]->actorId);
+        $this->assertNull($this->audit->entries[0]->auditableId);
     }
 
     #[Test]
@@ -385,14 +389,19 @@ final class OAuthFlowsTest extends TestCase
         return new ClientAuthenticator(new InMemoryOAuthClientRepository(array_values($clients)));
     }
 
+    private function ttl(): TokenTtl
+    {
+        return new TokenTtl(accessSeconds: 900, refreshSeconds: 1_209_600);
+    }
+
     private function tokenPairs(): TokenPairIssuer
     {
-        return new TokenPairIssuer(new FakeTokenIssuer(), $this->refreshTokens, 900, 1_209_600);
+        return new TokenPairIssuer(new FakeTokenIssuer(), $this->refreshTokens, $this->ttl());
     }
 
     private function accountRestorer(): AccountRestorer
     {
-        return new AccountRestorer($this->users, new InMemoryDealershipRepository(), $this->audit);
+        return new AccountRestorer($this->users, new InMemoryDealershipRepository(), $this->audit, new DirectTransaction());
     }
 
     private function loginWithPassword(?ClientAuthenticator $clients = null): LoginWithPassword
@@ -414,8 +423,7 @@ final class OAuthFlowsTest extends TestCase
             $this->users,
             new FakeTokenIssuer(),
             $this->audit,
-            900,
-            1_209_600,
+            $this->ttl(),
         );
     }
 
@@ -434,7 +442,7 @@ final class OAuthFlowsTest extends TestCase
 
     private function issueServiceToken(ClientAuthenticator $clients): IssueServiceToken
     {
-        return new IssueServiceToken($clients, new FakeTokenIssuer(), $this->audit, 900);
+        return new IssueServiceToken($clients, new FakeTokenIssuer(), $this->audit, $this->ttl());
     }
 
     private function logout(): Logout
@@ -479,10 +487,10 @@ final class InMemoryUserRepository implements UserRepository
         return $this->byId[$id] ?? null;
     }
 
-    public function findByEmail(string $email): ?User
+    public function findByEmail(Email $email): ?User
     {
         foreach ($this->byId as $user) {
-            if ($user->email === $email) {
+            if ($user->email->value === $email->value) {
                 return $user;
             }
         }
@@ -490,7 +498,7 @@ final class InMemoryUserRepository implements UserRepository
         return null;
     }
 
-    public function existsByEmail(string $email): bool
+    public function existsByEmail(Email $email): bool
     {
         return $this->findByEmail($email) instanceof \App\Domain\User\User;
     }
@@ -505,10 +513,6 @@ final class InMemoryUserRepository implements UserRepository
         $this->byId[$user->id] = $user;
     }
 
-    public function anonymizeAndSoftDelete(string $id): void
-    {
-        unset($this->byId[$id]);
-    }
 
     public function trash(string $id): void
     {
@@ -524,12 +528,14 @@ final class InMemoryUserRepository implements UserRepository
         }
     }
 
-    public function findPurgeEligible(int $graceDays, \DateTimeImmutable $now): array
+    public function findTrashed(): array
     {
-        return array_values(array_filter(
-            $this->byId,
-            static fn (User $user): bool => $user->isEligibleForPurge($graceDays, $now),
-        ));
+        return array_values(array_filter($this->byId, static fn (User $user): bool => $user->trash->isTrashed()));
+    }
+
+    public function purge(Trashable $entity): void
+    {
+        unset($this->byId[$entity->id]);
     }
 
     private function withStatus(User $user, TrashableStatus $status, ?\DateTimeImmutable $deletedAt): User
@@ -545,9 +551,7 @@ final class InMemoryUserRepository implements UserRepository
             emailVerifiedAt: $user->emailVerifiedAt,
             createdAt: $user->createdAt,
             updatedAt: new \DateTimeImmutable(),
-            deletedAt: $deletedAt,
-            status: $status,
-            anonymizedAt: $user->anonymizedAt,
+            trash: new TrashState($status, $deletedAt, $user->trash->anonymizedAt),
         );
     }
 
@@ -730,7 +734,7 @@ final class InMemoryDealershipRepository implements DealershipRepository
         return 0;
     }
 
-    public function trash(string $id, bool $byOwnerDeactivation): void
+    public function trash(string $id): void
     {
     }
 
@@ -738,9 +742,13 @@ final class InMemoryDealershipRepository implements DealershipRepository
     {
     }
 
-    public function findPurgeEligible(int $graceDays, \DateTimeImmutable $now): array
+    public function findTrashed(): array
     {
         return [];
+    }
+
+    public function purge(Trashable $entity): void
+    {
     }
 
     public function trashAllOwnedBy(string $ownerUserId): void

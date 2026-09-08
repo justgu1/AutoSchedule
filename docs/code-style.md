@@ -51,6 +51,15 @@ caminho é **nomear o tipo** (foi o que `Cookie` fez com o array de cookie).
 `php tools/check-comments.php` roda no CI e reprova bloco de prosa com mais de 2 linhas, e
 comentário que nomeia rota, role de banco ou posição em pipeline.
 
+## Erro de banco: quem traduz o quê
+
+`Statement::execute()` é o único lugar que conhece SQLSTATE. Ele traduz violação de `UNIQUE` em
+`DomainException(Conflict)` porque isso não depende de quem chamou: o valor já existe, ponto.
+
+Qualquer outra falha o repositório **descreve**, sem decidir o status: `rotate()` lança
+`RefreshTokenAlreadyRotated`, e é `RefreshAccessToken` que resolve que aquilo é 401 — o significado
+vem do fluxo, não do banco. Repositório não escolhe `DomainErrorType`.
+
 ## Decisões conscientes que parecem esquecimento
 
 Registradas aqui pra ninguém "corrigir" achando que é bug:

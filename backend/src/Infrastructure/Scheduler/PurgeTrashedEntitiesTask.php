@@ -4,32 +4,22 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Scheduler;
 
+use App\Application\Ports\Transaction;
+use App\Domain\Audit\AuditEntry;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
+use App\Domain\Shared\Ports\TrashableRepository;
 
-/**
- * Uma instância por domínio com lixeira reversível, em vez de uma ScheduledTask por domínio.
- * As closures existem porque cada domínio persiste a anonimização de um jeito diferente.
- *
- * @template T of object
- */
+/** Uma instância por domínio com lixeira reversível, em vez de uma ScheduledTask por domínio. */
 final readonly class PurgeTrashedEntitiesTask implements ScheduledTask
 {
-    /**
-     * @param \Closure(int, \DateTimeImmutable): list<T> $findEligible retorna as entidades elegíveis pra purga
-     * @param \Closure(T): void $purge persiste a anonimização de uma entidade
-     * @param \Closure(T): string $identify extrai o id da entidade, só pra auditoria
-     */
     public function __construct(
         private string $name,
-        private int $graceDays,
         private int $dueIntervalSeconds,
-        private \Closure $findEligible,
-        private \Closure $purge,
-        private \Closure $identify,
+        private TrashableRepository $repository,
         private AuditLogger $audit,
         private AuditEvent $event,
-        private string $auditableType,
+        private Transaction $transaction,
     ) {
     }
 
@@ -45,9 +35,16 @@ final readonly class PurgeTrashedEntitiesTask implements ScheduledTask
 
     public function run(): void
     {
-        foreach (($this->findEligible)($this->graceDays, new \DateTimeImmutable()) as $entity) {
-            ($this->purge)($entity);
-            $this->audit->record($this->event, null, $this->auditableType, ($this->identify)($entity), [], null, null);
+        $now = new \DateTimeImmutable();
+
+        foreach ($this->repository->findTrashed() as $entity) {
+            if (!$entity->trash->allowsPurge($now)) {
+                continue;
+            }
+
+            // Uma transação por entidade: uma linha problemática não desfaz as que já foram anonimizadas.
+            $this->transaction->run(fn (): null => $this->repository->purge($entity->anonymized()));
+            $this->audit->record(new AuditEntry($this->event, auditableId: $entity->id));
         }
     }
 }

@@ -17,6 +17,7 @@ use App\Application\User\UpdateUserProfile;
 use App\Application\User\UserFinder;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
+use App\Domain\Shared\TrashState;
 use App\Domain\User\UserRole;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\RequestActor;
@@ -129,7 +130,10 @@ final readonly class UserController
     {
         ($this->trashAccount)($this->targetUserId($request), RequestActor::fromRequest($request));
 
-        return Response::success(['message' => 'Account moved to trash. Log in again within 30 days to restore it, or it will be permanently anonymized.']);
+        return Response::success(['message' => sprintf(
+            'Account moved to trash. Log in again within %d days to restore it, or it will be permanently anonymized.',
+            TrashState::GRACE_DAYS,
+        )]);
     }
 
     public function restore(Request $request): Response

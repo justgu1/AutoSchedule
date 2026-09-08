@@ -17,8 +17,7 @@ final readonly class TokenPairIssuer
     public function __construct(
         private TokenIssuer $tokens,
         private RefreshTokenRepository $refreshTokens,
-        private int $accessTokenTtl,
-        private int $refreshTokenTtl,
+        private TokenTtl $ttl,
     ) {
     }
 
@@ -30,12 +29,12 @@ final readonly class TokenPairIssuer
             clientId: $client->clientId,
             role: $role,
             scopes: $scopes,
-            ttlSeconds: $this->accessTokenTtl,
+            ttlSeconds: $this->ttl->accessSeconds,
         ));
 
-        [$rawRefreshToken, $refreshToken] = RefreshToken::issue($client->id, $userId, $scopes, $this->refreshTokenTtl);
+        [$rawRefreshToken, $refreshToken] = RefreshToken::issue($client->id, $userId, $scopes, $this->ttl->refreshSeconds);
         $this->refreshTokens->insert($refreshToken);
 
-        return new TokenPair($accessToken, $this->accessTokenTtl, $scopes, $rawRefreshToken, $accountRestored);
+        return new TokenPair($accessToken, $this->ttl->accessSeconds, $scopes, $rawRefreshToken, $accountRestored);
     }
 }

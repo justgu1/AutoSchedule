@@ -4,22 +4,20 @@ declare(strict_types=1);
 
 namespace App\Bootstrap;
 
-use App\Application\Auth\ClientAuthenticator;
 use App\Application\Auth\IssueServiceToken;
 use App\Application\Auth\LoginWithGoogle;
 use App\Application\Auth\LoginWithPassword;
 use App\Application\Auth\Logout;
 use App\Application\Auth\RefreshAccessToken;
-use App\Application\Auth\TokenPairIssuer;
-use App\Application\Notification\SendEmailJob;
+use App\Application\Auth\TokenTtl;
+use App\Application\Notification\SendEmail;
 use App\Application\Ports\JobProgress;
 use App\Application\Ports\MailTemplateRenderer;
 use App\Application\Ports\Queue;
 use App\Application\Ports\TempFileStore;
+use App\Application\Ports\Transaction;
 use App\Application\User\RequestPasswordReset;
 use App\Config;
-use App\Domain\Address\Ports\ZipCodeCacheRepository;
-use App\Domain\Address\Ports\ZipCodeProvider;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
 use App\Domain\Auth\Ports\GoogleIdTokenVerifier;
@@ -28,30 +26,19 @@ use App\Domain\Auth\Ports\PasswordResetTokenRepository;
 use App\Domain\Auth\Ports\RefreshTokenRepository;
 use App\Domain\Auth\Ports\TokenIssuer;
 use App\Domain\Auth\Ports\UserIdentityRepository;
-use App\Domain\Dealership\Dealership;
 use App\Domain\Dealership\Ports\DealershipRepository;
 use App\Domain\File\Ports\FileRepository;
 use App\Domain\File\Ports\ImageOptimizer;
 use App\Domain\File\Ports\StorageProvider;
 use App\Domain\Notification\Ports\MailProvider;
 use App\Domain\User\Ports\UserRepository;
-use App\Domain\User\User;
-use App\Infrastructure\Address\PostgresZipCodeCacheRepository;
-use App\Infrastructure\Address\ViaCepZipCodeProvider;
-use App\Infrastructure\Audit\PostgresAuditLogger;
+use App\Domain\ZipCode\Ports\ZipCodeCacheRepository;
+use App\Domain\ZipCode\Ports\ZipCodeProvider;
 use App\Infrastructure\Auth\Google\GoogleJwksIdTokenVerifier;
 use App\Infrastructure\Auth\Jwt\JwtTokenIssuer;
-use App\Infrastructure\Auth\Postgres\PostgresOAuthClientRepository;
-use App\Infrastructure\Auth\Postgres\PostgresPasswordResetTokenRepository;
-use App\Infrastructure\Auth\Postgres\PostgresRefreshTokenRepository;
-use App\Infrastructure\Auth\Postgres\PostgresUserIdentityRepository;
 use App\Infrastructure\Container\Container;
-use App\Infrastructure\Database\DatabaseConnection;
-use App\Infrastructure\Database\PostgresConnection;
-use App\Infrastructure\Dealership\PostgresDealershipRepository;
 use App\Infrastructure\File\GdImageOptimizer;
 use App\Infrastructure\File\LocalTempFileStore;
-use App\Infrastructure\File\PostgresFileRepository;
 use App\Infrastructure\Http\Controllers\OAuthController;
 use App\Infrastructure\Http\ExceptionHandler;
 use App\Infrastructure\Http\Router;
@@ -60,6 +47,18 @@ use App\Infrastructure\Logging\Logger;
 use App\Infrastructure\Mail\MailTemplate;
 use App\Infrastructure\Mail\SymfonyMailProvider;
 use App\Infrastructure\Pagination\PaginationPolicy;
+use App\Infrastructure\Persistence\DatabaseConnection;
+use App\Infrastructure\Persistence\PdoTransaction;
+use App\Infrastructure\Persistence\PostgresAuditLogger;
+use App\Infrastructure\Persistence\PostgresConnection;
+use App\Infrastructure\Persistence\PostgresDealershipRepository;
+use App\Infrastructure\Persistence\PostgresFileRepository;
+use App\Infrastructure\Persistence\PostgresOAuthClientRepository;
+use App\Infrastructure\Persistence\PostgresPasswordResetTokenRepository;
+use App\Infrastructure\Persistence\PostgresRefreshTokenRepository;
+use App\Infrastructure\Persistence\PostgresUserIdentityRepository;
+use App\Infrastructure\Persistence\PostgresUserRepository;
+use App\Infrastructure\Persistence\PostgresZipCodeCacheRepository;
 use App\Infrastructure\Queue\RedisQueue;
 use App\Infrastructure\RateLimit\RateLimiter;
 use App\Infrastructure\RateLimit\RedisRateLimiter;
@@ -67,7 +66,7 @@ use App\Infrastructure\Redis\RedisConnection;
 use App\Infrastructure\Scheduler\PurgeTrashedEntitiesTask;
 use App\Infrastructure\Scheduler\Scheduler;
 use App\Infrastructure\Storage\MinioAdapter;
-use App\Infrastructure\User\PostgresUserRepository;
+use App\Infrastructure\ZipCode\ViaCepZipCodeProvider;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -104,6 +103,7 @@ final class ContainerFactory
         $container->bind(RateLimiter::class, RedisRateLimiter::class);
         $container->bind(Queue::class, RedisQueue::class);
         $container->bind(JobProgress::class, JobStatusStore::class);
+        $container->bind(Transaction::class, PdoTransaction::class);
     }
 
     private static function bindConfigured(Container $container, Config $config): void
@@ -167,28 +167,9 @@ final class ContainerFactory
             $config->int('pagination.max_per_page'),
         ));
 
-        $container->singleton(TokenPairIssuer::class, static fn (Container $c): TokenPairIssuer => new TokenPairIssuer(
-            tokens: $c->get(TokenIssuer::class),
-            refreshTokens: $c->get(RefreshTokenRepository::class),
-            accessTokenTtl: $config->int('auth.access_token_ttl'),
-            refreshTokenTtl: $config->int('auth.refresh_token_ttl'),
-        ));
-
-        $container->singleton(RefreshAccessToken::class, static fn (Container $c): RefreshAccessToken => new RefreshAccessToken(
-            clients: $c->get(ClientAuthenticator::class),
-            refreshTokens: $c->get(RefreshTokenRepository::class),
-            users: $c->get(UserRepository::class),
-            tokens: $c->get(TokenIssuer::class),
-            audit: $c->get(AuditLogger::class),
-            accessTokenTtl: $config->int('auth.access_token_ttl'),
-            refreshTokenTtl: $config->int('auth.refresh_token_ttl'),
-        ));
-
-        $container->singleton(IssueServiceToken::class, static fn (Container $c): IssueServiceToken => new IssueServiceToken(
-            clients: $c->get(ClientAuthenticator::class),
-            tokens: $c->get(TokenIssuer::class),
-            audit: $c->get(AuditLogger::class),
-            accessTokenTtl: $config->int('auth.access_token_ttl'),
+        $container->singleton(TokenTtl::class, static fn (): TokenTtl => new TokenTtl(
+            accessSeconds: $config->int('auth.access_token_ttl'),
+            refreshSeconds: $config->int('auth.refresh_token_ttl'),
         ));
 
         $container->singleton(RequestPasswordReset::class, static fn (Container $c): RequestPasswordReset => new RequestPasswordReset(
@@ -207,51 +188,39 @@ final class ContainerFactory
             loginWithGoogle: $c->get(LoginWithGoogle::class),
             issueServiceToken: $c->get(IssueServiceToken::class),
             revokeSession: $c->get(Logout::class),
-            refreshTokenTtl: $config->int('auth.refresh_token_ttl'),
+            ttl: $c->get(TokenTtl::class),
             cookieSecure: $config->bool('security.cookie_secure'),
         ));
 
         // O worker resolve o job pelo nome que veio no envelope, então registrar explícito é o que
         // garante que a fila não dependa de um autowire nunca exercitado.
-        $container->singleton(SendEmailJob::class, static fn (Container $c): SendEmailJob => new SendEmailJob($c->get(MailProvider::class)));
+        $container->singleton(SendEmail::class, static fn (Container $c): SendEmail => new SendEmail($c->get(MailProvider::class)));
     }
 
     /** Cada domínio com lixeira reversível registra a própria purga sobre a mesma ScheduledTask. */
     private static function bindScheduler(Container $container): void
     {
-        $container->singleton(Scheduler::class, static function (Container $c): Scheduler {
-            $users = $c->get(UserRepository::class);
-            $dealerships = $c->get(DealershipRepository::class);
-            $audit = $c->get(AuditLogger::class);
-
-            return new Scheduler(
-                redis: $c->get(RedisConnection::class),
-                tasks: [
-                    new PurgeTrashedEntitiesTask(
-                        name: 'purge-trashed-users',
-                        graceDays: 30,
-                        dueIntervalSeconds: 86400,
-                        findEligible: $users->findPurgeEligible(...),
-                        purge: static fn (User $user) => $users->anonymizeAndSoftDelete($user->id),
-                        identify: static fn (User $user): string => $user->id,
-                        audit: $audit,
-                        event: AuditEvent::AccountPurged,
-                        auditableType: 'User',
-                    ),
-                    new PurgeTrashedEntitiesTask(
-                        name: 'purge-trashed-dealerships',
-                        graceDays: 30,
-                        dueIntervalSeconds: 86400,
-                        findEligible: $dealerships->findPurgeEligible(...),
-                        purge: static fn (Dealership $dealership) => $dealerships->update($dealership->anonymized()),
-                        identify: static fn (Dealership $dealership): string => $dealership->id,
-                        audit: $audit,
-                        event: AuditEvent::DealershipPurged,
-                        auditableType: 'Dealership',
-                    ),
-                ],
-            );
-        });
+        $container->singleton(Scheduler::class, static fn (Container $c): Scheduler => new Scheduler(
+            redis: $c->get(RedisConnection::class),
+            tasks: [
+                new PurgeTrashedEntitiesTask(
+                    name: 'purge-trashed-users',
+                    dueIntervalSeconds: 86400,
+                    repository: $c->get(UserRepository::class),
+                    audit: $c->get(AuditLogger::class),
+                    event: AuditEvent::AccountPurged,
+                    transaction: $c->get(Transaction::class),
+                ),
+                new PurgeTrashedEntitiesTask(
+                    name: 'purge-trashed-dealerships',
+                    dueIntervalSeconds: 86400,
+                    repository: $c->get(DealershipRepository::class),
+                    audit: $c->get(AuditLogger::class),
+                    event: AuditEvent::DealershipPurged,
+                    transaction: $c->get(Transaction::class),
+                ),
+            ],
+        ));
     }
 
     private static function readKey(string $path): string

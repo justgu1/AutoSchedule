@@ -57,6 +57,18 @@ final class ValidatorTest extends TestCase
         }
     }
 
+    /** Sigla fora das 27 tem que virar 422 aqui -- se passar, `Uf::from()` lança ValueError e o cliente recebe 500. */
+    #[Test]
+    public function rejeita_sigla_de_estado_que_nao_existe(): void
+    {
+        try {
+            Validator::validate(['state' => 'XX'], ['state' => 'required|uf']);
+            $this->fail('Expected a DomainException to be thrown.');
+        } catch (DomainException $exception) {
+            $this->assertSame(['state' => 'The state field must be a valid Brazilian state code.'], $exception->errors());
+        }
+    }
+
     #[Test]
     public function rejeita_valor_abaixo_do_minimo(): void
     {

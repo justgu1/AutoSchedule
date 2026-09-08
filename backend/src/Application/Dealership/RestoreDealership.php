@@ -24,11 +24,11 @@ final readonly class RestoreDealership
     {
         $dealership = $this->finder->findOrFail($identifier);
 
-        if (!$dealership->isEligibleForRestore()) {
+        if (!$dealership->trash->allowsRestore()) {
             throw new DomainException('This dealership is not in the trash (or was already permanently deleted).', DomainErrorType::Conflict);
         }
 
         $this->dealerships->restore($dealership->id);
-        $this->audit->record(AuditEvent::DealershipRestored, $context->actorId, 'Dealership', $dealership->id, [], $context->ipAddress, $context->userAgent);
+        $this->audit->record($context->audits(AuditEvent::DealershipRestored, $dealership->id));
     }
 }

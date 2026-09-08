@@ -22,7 +22,7 @@ final readonly class IssueServiceToken
         private ClientAuthenticator $clients,
         private TokenIssuer $tokens,
         private AuditLogger $audit,
-        private int $accessTokenTtl,
+        private TokenTtl $ttl,
     ) {
     }
 
@@ -39,12 +39,12 @@ final readonly class IssueServiceToken
             clientId: $client->clientId,
             role: null,
             scopes: $client->allowedScopes,
-            ttlSeconds: $this->accessTokenTtl,
+            ttlSeconds: $this->ttl->accessSeconds,
         ));
 
         // Sem actor nem alvo: quem se autenticou é o client, e ele vai no context.
-        $this->audit->record(AuditEvent::ServiceTokenIssued, null, 'User', null, ['client_id' => $client->clientId], $context->ipAddress, $context->userAgent);
+        $this->audit->record($context->audits(AuditEvent::ServiceTokenIssued, context: ['client_id' => $client->clientId]));
 
-        return new TokenPair($accessToken, $this->accessTokenTtl, $client->allowedScopes);
+        return new TokenPair($accessToken, $this->ttl->accessSeconds, $client->allowedScopes);
     }
 }

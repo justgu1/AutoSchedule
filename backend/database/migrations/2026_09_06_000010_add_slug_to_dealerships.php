@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Infrastructure\Database\Migration;
+use App\Infrastructure\Persistence\Schema\Migration;
 
 /** O slug existe pra a URL pública não expor o UUID, e é estável mesmo quando o nome muda. */
 return new class () implements Migration {

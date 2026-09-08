@@ -38,7 +38,7 @@ conta do dono desativada (DELETE /me)       -> lixeira em cascata, trashed_by_ow
 
 Só a lixeira em cascata é restaurada automaticamente quando o dono volta a logar -- a manual fica parada até o próprio seller (ou um admin) chamar `POST /dealerships/{id}/restore`. `POST /dealerships/{id}/purge` anonimiza na hora, sem esperar os 30 dias; a rotina agendada faz o mesmo pra quem não foi recuperado a tempo.
 
-Anonimização escruba identificador direto (nome vira "Concessionária removida", endereço/complemento/telefone/e-mail/`google_place_id` apagados, `slug` trocado por um neutro) mas preserva CEP/cidade/estado/geolocalização -- não são dado pessoal, e mantêm o histórico de agendamento localizável.
+Anonimização escruba o que localiza a porta (rua, número, complemento) e o que identifica direto (nome vira "Concessionária removida", telefone e e-mail apagados, `slug` trocado por um neutro), mas preserva CEP, cidade e UF -- não são dado pessoal, e mantêm o histórico de agendamento localizável no agregado. A regra mora em `Address::withoutStreetLevelDetail()`.
 
 ### Foto
 

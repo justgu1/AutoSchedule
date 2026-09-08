@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Auth;
 
+use App\Application\Ports\Transaction;
 use App\Application\Shared\ActorContext;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
@@ -21,18 +22,22 @@ final readonly class AccountRestorer
         private UserRepository $users,
         private DealershipRepository $dealerships,
         private AuditLogger $audit,
+        private Transaction $transaction,
     ) {
     }
 
     public function restoreIfTrashed(User $user, ActorContext $context): bool
     {
-        if (!$user->isEligibleForRestore()) {
+        if (!$user->trash->allowsRestore()) {
             return false;
         }
 
-        $this->users->restore($user->id);
-        $this->dealerships->restoreAutoTrashedOwnedBy($user->id);
-        $this->audit->record(AuditEvent::AccountRestored, $user->id, 'User', $user->id, [], $context->ipAddress, $context->userAgent);
+        $this->transaction->run(function () use ($user): void {
+            $this->users->restore($user->id);
+            $this->dealerships->restoreAutoTrashedOwnedBy($user->id);
+        });
+
+        $this->audit->record($context->actedBy($user->id)->audits(AuditEvent::AccountRestored, $user->id));
 
         return true;
     }

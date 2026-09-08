@@ -6,9 +6,6 @@ namespace App\Application\Ports;
 
 interface Queue
 {
-    /**
-     * @param class-string<Job> $jobClass
-     * @param array<string, mixed> $payload
-     */
-    public function push(string $jobClass, array $payload): void;
+    /** @param array<string, mixed> $payload */
+    public function push(QueuedJob $job, array $payload): void;
 }

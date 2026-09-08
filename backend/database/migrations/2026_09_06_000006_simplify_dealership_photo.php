@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Infrastructure\Database\Migration;
+use App\Infrastructure\Persistence\Schema\Migration;
 
 /**
  * Concessionária passa a ter só uma foto (substituível), não galeria -- dropa
