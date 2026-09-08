@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Http\Controllers;
 
+use App\Application\Shared\ActorContext;
 use App\Application\Vehicle\CreateVehicle;
+use App\Application\Vehicle\DTO\PublicVehicleSummary;
 use App\Application\Vehicle\DTO\VehicleProfile;
 use App\Application\Vehicle\EnqueueVehiclePhotos;
 use App\Application\Vehicle\ListVehicles;
@@ -17,6 +19,7 @@ use App\Application\Vehicle\UpdateVehicle;
 use App\Application\Vehicle\ViewVehicle;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
+use App\Domain\User\UserRole;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\RequestActor;
 use App\Infrastructure\Http\Response;
@@ -41,18 +44,31 @@ final readonly class VehicleController
     ) {
     }
 
+    /**
+     * Uma rota, dois usos: sem `scope`, é o catálogo público (todo mundo vê o mesmo estoque
+     * ativo, dono logado ou não); `scope=mine` é o painel de quem gerencia, e exige a role.
+     */
     public function index(Request $request): Response
     {
         [$page, $perPage] = $this->pagination->resolve($request->query('page'), $request->query('per_page'));
-        $result = ($this->listVehicles)(
-            RequestActor::fromRequest($request),
-            VehicleFilterQuery::fromRequest($request),
-            $perPage,
-            ($page - 1) * $perPage,
-        );
+        $offset = ($page - 1) * $perPage;
+        $filters = VehicleFilterQuery::fromRequest($request);
+
+        if ($request->query('scope') === 'mine') {
+            $result = ($this->listVehicles)($this->assertManager($request), $filters, $perPage, $offset);
+
+            return Response::paginated(
+                array_map(static fn (VehicleProfile $profile): array => $profile->toArray(), $result['items']),
+                $page,
+                $perPage,
+                $result['total'],
+            );
+        }
+
+        $result = $this->listVehicles->catalog($filters, $perPage, $offset);
 
         return Response::paginated(
-            array_map(static fn (VehicleProfile $profile): array => $profile->toArray(), $result['items']),
+            array_map(static fn (PublicVehicleSummary $summary): array => $summary->toArray(), $result['items']),
             $page,
             $perPage,
             $result['total'],
@@ -61,12 +77,16 @@ final readonly class VehicleController
 
     public function filters(Request $request): Response
     {
-        return Response::success($this->listVehicles->availableFilters(RequestActor::fromRequest($request)));
+        if ($request->query('scope') === 'mine') {
+            return Response::success($this->listVehicles->availableFilters($this->assertManager($request)));
+        }
+
+        return Response::success($this->listVehicles->availableFiltersPublic());
     }
 
     public function show(Request $request): Response
     {
-        return Response::success(($this->viewVehicle)($request->param('id'))->toArray());
+        return Response::success(($this->viewVehicle)($request->param('id'), RequestActor::fromRequest($request))->toArray());
     }
 
     public function store(Request $request): Response
@@ -163,5 +183,21 @@ final readonly class VehicleController
         ($this->reorderVehiclePhotos)($request->param('id'), array_values(array_map(static fn (mixed $id): string => is_string($id) ? $id : '', $order)), RequestActor::fromRequest($request));
 
         return Response::success(['message' => 'Images reordered.']);
+    }
+
+    /** `scope=mine` não tem role de rota que o barre -- a rota é pública, então a checagem mora aqui. */
+    private function assertManager(Request $request): ActorContext
+    {
+        $actor = RequestActor::fromRequest($request);
+
+        if (!$actor->role instanceof \App\Domain\User\UserRole) {
+            throw new DomainException('Authentication required.', DomainErrorType::Unauthorized);
+        }
+
+        if (!in_array($actor->role, [UserRole::Admin, UserRole::Seller], true)) {
+            throw new DomainException('Not allowed for this role.', DomainErrorType::Forbidden);
+        }
+
+        return $actor;
     }
 }

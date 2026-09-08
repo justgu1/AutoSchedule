@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Dealership\DTO;
 
 use App\Application\Shared\AddressFields;
+use App\Application\Vehicle\DTO\PublicVehicleSummary;
 use App\Domain\Dealership\Dealership;
 use App\Domain\Shared\Address;
 use App\Domain\Shared\Email;
@@ -15,6 +16,7 @@ use App\Domain\Shared\Email;
  */
 final readonly class PublicDealershipProfile
 {
+    /** @param list<PublicVehicleSummary> $vehicles */
     public function __construct(
         public string $slug,
         public string $name,
@@ -23,12 +25,24 @@ final readonly class PublicDealershipProfile
         public ?Email $email,
         public ?string $photoUrl,
         public ?string $sellerName,
+        public array $vehicles = [],
+        public int $vehiclesTotal = 0,
     ) {
     }
 
-    /** `$photoUrl`/`$sellerName` já resolvidos por quem chama -- o DTO não conhece storage nem `UserRepository`. */
-    public static function fromDealership(Dealership $dealership, ?string $photoUrl, ?string $sellerName): self
-    {
+    /**
+     * `$photoUrl`/`$sellerName`/`$vehicles` já resolvidos por quem chama -- o DTO não conhece
+     * storage, `UserRepository` nem `VehicleRepository`.
+     *
+     * @param list<PublicVehicleSummary> $vehicles
+     */
+    public static function fromDealership(
+        Dealership $dealership,
+        ?string $photoUrl,
+        ?string $sellerName,
+        array $vehicles = [],
+        int $vehiclesTotal = 0,
+    ): self {
         return new self(
             slug: $dealership->slug,
             name: $dealership->name,
@@ -37,6 +51,8 @@ final readonly class PublicDealershipProfile
             email: $dealership->email,
             photoUrl: $photoUrl,
             sellerName: $sellerName,
+            vehicles: $vehicles,
+            vehiclesTotal: $vehiclesTotal,
         );
     }
 
@@ -51,8 +67,8 @@ final readonly class PublicDealershipProfile
             'email' => $this->email?->value,
             'photo_url' => $this->photoUrl,
             'seller_name' => $this->sellerName,
-            // Reservado: o front já lê a chave, então a Epic Veículo não muda o contrato.
-            'vehicles' => [],
+            'vehicles' => array_map(static fn (PublicVehicleSummary $v): array => $v->toArray(), $this->vehicles),
+            'vehicles_total' => $this->vehiclesTotal,
         ];
     }
 }

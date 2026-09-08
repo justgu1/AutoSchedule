@@ -86,10 +86,51 @@ final readonly class PostgresVehicleRepository implements VehicleRepository
         )->fetchColumn();
     }
 
+    public function searchPublic(VehicleFilters $filters, int $limit, int $offset): array
+    {
+        [$where, $params] = $this->criteria($filters, null, publicOnly: true);
+        $params['limit'] = $limit;
+        $params['offset'] = $offset;
+
+        return $this->hydrateAll($this->connection->execute(sprintf(<<<'SQL'
+            SELECT %s
+            FROM vehicles v
+            WHERE %s
+            ORDER BY %sv.created_at DESC, v.id DESC
+            LIMIT :limit OFFSET :offset
+            SQL, self::PREFIXED_COLUMNS, $where, $this->relevance($filters)), $params));
+    }
+
+    public function countSearchPublic(VehicleFilters $filters): int
+    {
+        [$where, $params] = $this->criteria($filters, null, publicOnly: true);
+
+        return (int) $this->connection->execute(
+            sprintf('SELECT COUNT(*) FROM vehicles v WHERE %s', $where),
+            $params,
+        )->fetchColumn();
+    }
+
     public function availableFilters(?string $ownerUserId): array
     {
         [$where, $params] = $this->criteria(new VehicleFilters(), $ownerUserId);
 
+        return $this->facets($where, $params);
+    }
+
+    public function availableFiltersPublic(): array
+    {
+        [$where, $params] = $this->criteria(new VehicleFilters(), null, publicOnly: true);
+
+        return $this->facets($where, $params);
+    }
+
+    /**
+     * @param array<string, string|int|null> $params
+     * @return array{brands: list<string>, models: list<string>, years: list<int>}
+     */
+    private function facets(string $where, array $params): array
+    {
         $row = $this->connection->execute(sprintf(<<<'SQL'
             SELECT array_to_string(array_agg(DISTINCT v.brand ORDER BY v.brand), ',') AS brands,
                    array_to_string(array_agg(DISTINCT v.model ORDER BY v.model), ',') AS models,
@@ -187,7 +228,7 @@ final readonly class PostgresVehicleRepository implements VehicleRepository
      *
      * @return array{0: string, 1: array<string, string|int|null>}
      */
-    private function criteria(VehicleFilters $filters, ?string $ownerUserId): array
+    private function criteria(VehicleFilters $filters, ?string $ownerUserId, bool $publicOnly = false): array
     {
         $conditions = ["v.status <> 'deleted'"];
         $params = [];
@@ -195,6 +236,12 @@ final readonly class PostgresVehicleRepository implements VehicleRepository
         if ($ownerUserId !== null) {
             $conditions[] = 'EXISTS (SELECT 1 FROM dealerships d WHERE d.id = v.dealership_id AND d.owner_user_id = :owner_user_id::uuid)';
             $params['owner_user_id'] = $ownerUserId;
+        }
+
+        // Explícito mesmo com RLS por trás: o banco reforça o que a aplicação já valida, nunca é a única linha de defesa.
+        if ($publicOnly) {
+            $conditions[] = "v.status = 'active'";
+            $conditions[] = "EXISTS (SELECT 1 FROM dealerships d WHERE d.id = v.dealership_id AND d.status = 'active')";
         }
 
         // `websearch_to_tsquery` e não `to_tsquery`: a segunda lança erro de sintaxe com `&`, `|` ou `!`

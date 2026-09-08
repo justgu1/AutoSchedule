@@ -1,4 +1,6 @@
-import { apiFetch, apiFetchPage, apiUpload, ApiError, type PageMeta } from './apiClient';
+import { apiFetch, apiFetchPage, apiFetchPublic, apiUpload, type PageMeta } from './apiClient';
+import type { PhotoJob, PhotoJobStatus } from './jobs';
+import type { PublicVehicleSummary } from './vehicles';
 
 export type DealershipStatus = 'active' | 'trashed' | 'deleted';
 
@@ -35,12 +37,6 @@ export interface DealershipProfileInput {
     owner_user_id?: string;
 }
 
-export interface PhotoJob {
-    job_id: string;
-    status_url: string;
-    events_url: string;
-}
-
 export function listDealerships(page: number, perPage: number): Promise<{ data: Dealership[]; meta: PageMeta }> {
     return apiFetchPage<Dealership>(`/dealerships?page=${page}&per_page=${perPage}`);
 }
@@ -59,27 +55,13 @@ export interface PublicDealership {
     email: string | null;
     photo_url: string | null;
     seller_name: string | null;
-    // Sempre vazio até a Epic Veículo existir -- já tipado pra não mudar o contrato depois.
-    vehicles: unknown[];
+    vehicles: PublicVehicleSummary[];
+    vehicles_total: number;
 }
 
-/**
- * Mesma rota de `show` (`GET /dealerships/{id_ou_slug}`) que o gerenciamento
- * usa, só que devolve o perfil público -- o backend decide o formato pela
- * própria request. Sem `credentials`, de propósito: a página pública tem que
- * mostrar sempre a mesma coisa, mesmo se o dono/admin estiver logado no
- * mesmo navegador (`apiFetch` sempre manda cookie, por isso não reaproveita
- * daqui).
- */
-export async function getPublicDealership(slug: string): Promise<PublicDealership> {
-    const response = await fetch(`/api/dealerships/${slug}`);
-    const payload = (await response.json().catch(() => null)) as { data?: PublicDealership; message?: string } | null;
-
-    if (!response.ok) {
-        throw new ApiError(payload?.message ?? 'Request failed.', response.status);
-    }
-
-    return payload!.data as PublicDealership;
+/** Mesma rota de `show` (`GET /dealerships/{id_ou_slug}`) que o gerenciamento usa, só que devolve o perfil público -- o backend decide o formato pela própria request. */
+export function getPublicDealership(slug: string): Promise<PublicDealership> {
+    return apiFetchPublic<PublicDealership>(`/dealerships/${slug}`);
 }
 
 export function createDealership(input: DealershipProfileInput): Promise<Dealership> {
@@ -119,36 +101,4 @@ export function removeDealershipPhoto(id: string): Promise<{ message: string }> 
     return apiFetch(`/dealerships/${id}/photo`, { method: 'DELETE' });
 }
 
-export interface PhotoJobStatus {
-    status: 'queued' | 'processing' | 'done' | 'failed';
-    step: string;
-    progress: number;
-    result?: { photo_url: string };
-    error?: string;
-}
-
-/**
- * SSE -- `onUpdate` roda a cada evento (inclusive o final), `onUpdate` já
- * recebe o status terminal (`done`/`failed`); quem chama decide o que fazer.
- * Fecha a conexão sozinho assim que chega num status terminal.
- */
-export function subscribeToPhotoJob(eventsUrl: string, onUpdate: (status: PhotoJobStatus) => void): () => void {
-    // `eventsUrl` vem do backend sem o prefixo `/api` (mesmo formato que os
-    // outros paths deste arquivo) -- `EventSource` não passa por `apiFetch`,
-    // então o prefixo precisa ser somado aqui.
-    const source = new EventSource(`/api${eventsUrl}`, { withCredentials: true });
-
-    source.addEventListener('progress', (event) => {
-        const status = JSON.parse((event as MessageEvent<string>).data) as PhotoJobStatus;
-        onUpdate(status);
-
-        if (status.status === 'done' || status.status === 'failed') {
-            source.close();
-        }
-    });
-
-    // Erro de rede/reconexão do EventSource, não um evento "failed" do job em si -- só encerra, quem chama já tem o último status conhecido.
-    source.onerror = () => source.close();
-
-    return () => source.close();
-}
+export type DealershipPhotoJobStatus = PhotoJobStatus<{ photo_url: string }>;

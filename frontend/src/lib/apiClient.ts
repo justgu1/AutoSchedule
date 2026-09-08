@@ -97,3 +97,31 @@ export async function apiUpload<T>(path: string, formData: FormData): Promise<T>
 
     return envelope.data as T;
 }
+
+/**
+ * Sem `credentials` -- página pública tem que mostrar sempre a mesma coisa,
+ * mesmo se o dono/admin estiver logado no mesmo navegador. Não reaproveita
+ * `apiFetch` por isso: aquele sempre manda cookie.
+ */
+async function requestPublic(path: string): Promise<ApiEnvelope> {
+    const response = await fetch(`${BASE_URL}${path}`);
+    const payload = (await response.json().catch(() => null)) as ApiEnvelope | null;
+
+    if (!response.ok) {
+        throw new ApiError(payload?.message ?? 'Request failed.', response.status, payload?.errors);
+    }
+
+    return payload ?? {};
+}
+
+export async function apiFetchPublic<T>(path: string): Promise<T> {
+    const envelope = await requestPublic(path);
+
+    return envelope.data as T;
+}
+
+export async function apiFetchPublicPage<T>(path: string): Promise<{ data: T[]; meta: PageMeta }> {
+    const envelope = await requestPublic(path);
+
+    return { data: (envelope.data as T[]) ?? [], meta: envelope.meta as PageMeta };
+}

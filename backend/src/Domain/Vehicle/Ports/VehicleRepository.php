@@ -35,6 +35,19 @@ interface VehicleRepository extends TrashableRepository
      */
     public function availableFilters(?string $ownerUserId): array;
 
+    /**
+     * O catálogo público: só `active`, só concessionária `active`, explícito na query mesmo com
+     * o RLS por trás -- o banco reforça o que a aplicação já valida, nunca é a única linha de defesa.
+     *
+     * @return list<Vehicle>
+     */
+    public function searchPublic(VehicleFilters $filters, int $limit, int $offset): array;
+
+    public function countSearchPublic(VehicleFilters $filters): int;
+
+    /** @return array{brands: list<string>, models: list<string>, years: list<int>} */
+    public function availableFiltersPublic(): array;
+
     public function trash(string $id): void;
 
     public function restore(string $id): void;

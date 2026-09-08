@@ -4,69 +4,67 @@ declare(strict_types=1);
 
 namespace App\Application\Vehicle\DTO;
 
+use App\Domain\Dealership\Dealership;
 use App\Domain\Shared\Money;
 use App\Domain\Vehicle\Vehicle;
 
-final readonly class VehicleProfile
+/** Sem `dealership_id`/`status` -- quem visita não gerencia nada. Concessionária aninhada e enxuta. */
+final readonly class PublicVehicleProfile
 {
     /** @param list<array{id: string, position: int, url: string}> $images */
     public function __construct(
         public string $id,
-        public string $dealershipId,
         public string $brand,
         public string $model,
         public ?string $version,
         public ?int $year,
         public Money $price,
         public ?string $description,
-        public string $status,
-        public ?string $photoUrl = null,
-        public array $images = [],
+        public array $images,
+        public string $dealershipSlug,
+        public string $dealershipName,
+        public string $dealershipCity,
+        public string $dealershipState,
     ) {
     }
 
-    /**
-     * `$photoUrl`/`$images` já resolvidos por quem chama -- o DTO não conhece `VehicleGallery`.
-     *
-     * @param list<array{id: string, position: int, url: string}> $images
-     */
-    public static function fromVehicle(Vehicle $vehicle, ?string $photoUrl = null, array $images = []): self
+    /** @param list<array{id: string, position: int, url: string}> $images */
+    public static function fromVehicle(Vehicle $vehicle, array $images, Dealership $dealership): self
     {
         return new self(
             id: $vehicle->id,
-            dealershipId: $vehicle->dealershipId,
             brand: $vehicle->brand,
             model: $vehicle->model,
             version: $vehicle->version,
             year: $vehicle->year,
             price: $vehicle->price,
             description: $vehicle->description,
-            status: $vehicle->trash->status->value,
-            photoUrl: $photoUrl,
             images: $images,
+            dealershipSlug: $dealership->slug,
+            dealershipName: $dealership->name,
+            dealershipCity: $dealership->address->city,
+            dealershipState: $dealership->address->state->value,
         );
     }
 
-    /**
-     * `price` sai como string: número em JSON vira IEEE754 no cliente, que é o mesmo centavo
-     * perdido que `numeric(12,2)` evita no banco.
-     *
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function toArray(): array
     {
         return [
             'id' => $this->id,
-            'dealership_id' => $this->dealershipId,
             'brand' => $this->brand,
             'model' => $this->model,
             'version' => $this->version,
             'year' => $this->year,
             'price' => $this->price->toDecimal(),
             'description' => $this->description,
-            'status' => $this->status,
-            'photo_url' => $this->photoUrl,
             'images' => $this->images,
+            'dealership' => [
+                'slug' => $this->dealershipSlug,
+                'name' => $this->dealershipName,
+                'city' => $this->dealershipCity,
+                'state' => $this->dealershipState,
+            ],
         ];
     }
 }

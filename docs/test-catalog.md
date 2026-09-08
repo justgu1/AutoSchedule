@@ -29,6 +29,7 @@ Convenção: `Arquivo::método` para PHPUnit (backend); `arquivo.spec.ts > nome 
 | Formulário de concessionária autopreenche endereço/bairro/cidade/UF a partir do CEP, chamando o próprio backend (nunca o ViaCEP direto) | E2E: `dealerships.spec.ts > seller cria, edita...` e `> admin cria concessionária...` (`/api/zip-codes/*` mocado via `page.route`, resultado determinístico) |
 | UF é um Autocomplete com busca, selecionável independente do CEP | E2E: `dealerships.spec.ts > UF é um autocomplete com busca, selecionável mesmo sem preencher o CEP` |
 | Página pública (ver "Página pública" em `business-rules.md`): mesma rota do gerenciamento, perfil enxuto pra quem não é dono/admin, só concessionária `active` | `AuthContextMiddlewareTest::rota_de_leitura_publica_sem_claims_seta_a_flag_publica`, `::leitura_publica_com_claims_seta_os_dois_contextos_juntos`; `RlsPolicyTest::contexto_de_leitura_publica_enxerga_so_seller_com_concessionaria_ativa`; E2E: `dealerships.spec.ts > página pública da concessionária mostra nome, endereço e vendedor sem exigir conta` |
+| Perfil público traz a vitrine (até 12 veículos ativos, `vehicles_total` separado), resolvendo a capa de todos numa consulta só | `ViewDealershipPublicVehiclesTest::perfil_publico_lista_os_veiculos_ativos_da_concessionaria`, `::perfil_publico_limita_a_vitrine_e_devolve_o_total_separado`; E2E: `public-site.spec.ts > vitrine da página pública da concessionária mostra o veículo cadastrado` |
 | URL pública usa `slug` (nome + parte do id), nunca o `id` -- estável mesmo se o nome mudar, só troca na anonimização | `DealershipTest::register_gera_um_slug_a_partir_do_nome_sem_expor_o_id_inteiro`, `::with_profile_troca_os_dados_mas_preserva_dono_status_e_slug`, `::anonymized_escruba_identificador_direto_mas_preserva_localidade_agregada` (slug troca); `PostgresDealershipRepositoryTest::persiste_e_encontra_por_slug` |
 | UF é uma das 27 unidades federativas, validada na borda -- sigla inexistente é 422, nunca 500 | `ValidatorTest::rejeita_sigla_de_estado_que_nao_existe` |
 | Os sete campos de endereço andam juntos como um valor só (`Address`), e a anonimização é regra do próprio VO | `DealershipTest::anonymized_escruba_identificador_direto_mas_preserva_localidade_agregada`; `PostgresDealershipRepositoryTest::insere_e_encontra_por_id` (ida e volta do VO pelo banco) |
@@ -48,6 +49,7 @@ Convenção: `Arquivo::método` para PHPUnit (backend); `arquivo.spec.ts > nome 
 | Lixeira da concessionária arrasta o estoque, e o restore devolve só o que caiu por cascata | `VehicleTrashCascadeTest` (3 casos) |
 | Todo evento de auditoria tem tipo auditável -- prefixo novo sem braço no `match` seria 500 na primeira gravação | `AuditEventTest::todo_evento_tem_um_tipo_auditavel_correspondente` |
 | Ano e preço são validados como número e faixa na borda, não como tamanho de string | `ValidatorTest::rejeita_valor_que_nao_e_numero`, `::rejeita_valor_fora_da_faixa_do_between`, `::aceita_numero_como_string_ou_como_numero` |
+| `GET /vehicles`/`GET /vehicles/{id}` são públicas por padrão (catálogo, perfil enxuto); `scope=mine` exige `admin`/`seller` e devolve o próprio estoque completo -- dono/admin sempre recebem o perfil completo em `GET /vehicles/{id}`, mesmo sem `scope` | `ViewVehicleTest::dono_recebe_o_perfil_completo`, `::admin_recebe_o_perfil_completo_mesmo_sem_ser_dono`, `::visitante_sem_conta_recebe_o_perfil_publico_com_a_concessionaria_aninhada`, `::outro_seller_tambem_recebe_o_perfil_publico`; `VehicleSearchTest::catalogo_publico_traz_veiculo_de_qualquer_dono_mas_so_ativo`, `::catalogo_publico_esconde_veiculo_ativo_de_concessionaria_na_lixeira` |
 
 ## Galeria (veículo)
 
@@ -73,7 +75,10 @@ Convenção: `Arquivo::método` para PHPUnit (backend); `arquivo.spec.ts > nome 
 | `search_vector` é coluna gerada -- nenhum caminho de escrita precisa lembrar de recalcular | `VehicleSearchTest::search_vector_e_recalculado_quando_a_descricao_muda` |
 | Paginação da busca não repete nem pula linha entre páginas (rank empata, o desempate por id resolve) | `VehicleSearchTest::paginacao_da_busca_nao_repete_nem_pula_linha_entre_paginas` |
 | Busca respeita o escopo do seller e as facetas trazem só o que existe em estoque | `VehicleSearchTest::busca_nao_atravessa_a_concessionaria_de_outro_seller`, `::facetas_trazem_so_o_que_existe_em_estoque` |
+| Facetas públicas ignoram veículo trashed; o catálogo é o mesmo filtro empilhado, só sem escopo de dono | `VehicleSearchTest::facetas_publicas_ignoram_veiculo_trashed` |
 | Query string editável na barra de endereço vira filtro ausente, não 500 | `VehicleFilterQueryTest` (4 casos) |
+| Site público: index lista o catálogo filtrável e o card abre a página do veículo, sem exigir conta; header troca "Entrar/Criar conta" por "Entrar no painel" conforme a sessão | E2E: `public-site.spec.ts > index lista o catálogo público...`, `> header oferece entrar e criar conta...` |
+| Painel do vendedor: CRUD, galeria e lixeira do próprio estoque; filtro de marca encontra o veículo pelo painel; customer não acessa a rota | E2E: `vehicles.spec.ts` (3 casos) |
 
 ## Disponibilidade, Exemplo, Exceções, Agendamento, Status, Concorrência, Cliente
 
@@ -174,8 +179,8 @@ Pontos sem teste automatizado direto, documentados aqui em vez de silenciosament
   `owner_user_id` obrigatório por admin, reassociação de dono no `PATCH`, e o limite de 20MB mais a
   validação de MIME real no upload de foto.
 - **`VehicleController` na mesma situação:** as regras de validação declaradas nele (faixa de ano,
-  preço numérico, `dealership_id` fora do `PATCH`) são cobertas por `ValidatorTest` e pelos casos de
-  uso, mais verificação manual via curl -- mas não pelo endpoint em si.
+  preço numérico, `scope=mine` exigindo `admin`/`seller`) são cobertas por `ValidatorTest` e pelos
+  casos de uso, mais verificação manual via curl -- mas não pelo endpoint em si.
 - **Indicador visual de foco (WCAG 2.4.7).** É visual; não há asserção confiável sem
   screenshot-diff. Revisão manual.
 - **Uso sem JavaScript.** Não aplicável hoje: a SPA é 100% client-rendered, sem SSR. O `<noscript>`

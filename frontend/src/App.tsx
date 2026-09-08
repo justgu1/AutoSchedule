@@ -8,8 +8,10 @@ import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { MePage } from './pages/MePage';
 import { PublicDealershipPage } from './pages/PublicDealershipPage';
+import { PublicVehiclePage } from './pages/PublicVehiclePage';
 import { RegisterPage } from './pages/RegisterPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
+import { VehiclesPage } from './pages/VehiclesPage';
 
 export default function App() {
     return (
@@ -17,6 +19,7 @@ export default function App() {
             <Route element={<PublicLayout />}>
                 <Route path="/" element={<HomePage />} />
                 <Route path="/concessionarias/:slug" element={<PublicDealershipPage />} />
+                <Route path="/veiculos/:id" element={<PublicVehiclePage />} />
             </Route>
             <Route element={<AuthLayout />}>
                 <Route path="/login" element={<LoginPage />} />
@@ -27,6 +30,7 @@ export default function App() {
             <Route element={<AuthenticatedLayout />}>
                 <Route path="/me" element={<MePage />} />
                 <Route path="/dealerships" element={<DealershipsPage />} />
+                <Route path="/vehicles" element={<VehiclesPage />} />
             </Route>
         </Routes>
     );

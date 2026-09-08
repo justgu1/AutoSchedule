@@ -1,13 +1,18 @@
 import Alert from '@mui/material/Alert';
 import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import CardActionArea from '@mui/material/CardActionArea';
+import CardContent from '@mui/material/CardContent';
+import CardMedia from '@mui/material/CardMedia';
 import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
+import Grid from '@mui/material/Grid';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useQuery } from '@tanstack/react-query';
-import { useParams } from 'react-router-dom';
+import { Link as RouterLink, useParams } from 'react-router-dom';
 import { DealershipMap } from '../components/DealershipMap';
 import { ApiError } from '../lib/apiClient';
 import { getPublicDealership } from '../lib/dealerships';
@@ -87,8 +92,44 @@ export function PublicDealershipPage() {
                     <Typography variant="h6" component="h2">
                         Veículos
                     </Typography>
-                    {(data.vehicles?.length ?? 0) === 0 && (
+                    {data.vehicles.length === 0 && (
                         <Typography color="text.secondary">Em breve -- nenhum veículo cadastrado ainda.</Typography>
+                    )}
+                    {data.vehicles.length > 0 && (
+                        <Grid container spacing={2}>
+                            {data.vehicles.map((vehicle) => (
+                                <Grid key={vehicle.id} size={{ xs: 12, sm: 6, md: 4 }}>
+                                    <Card variant="outlined">
+                                        <CardActionArea component={RouterLink} to={`/veiculos/${vehicle.id}`}>
+                                            {vehicle.photo_url && (
+                                                <CardMedia
+                                                    component="img"
+                                                    height="140"
+                                                    image={vehicle.photo_url}
+                                                    alt=""
+                                                />
+                                            )}
+                                            <CardContent>
+                                                <Typography variant="subtitle2">
+                                                    {vehicle.brand} {vehicle.model}
+                                                </Typography>
+                                                <Typography variant="body2" color="text.secondary">
+                                                    {Number(vehicle.price).toLocaleString('pt-BR', {
+                                                        style: 'currency',
+                                                        currency: 'BRL',
+                                                    })}
+                                                </Typography>
+                                            </CardContent>
+                                        </CardActionArea>
+                                    </Card>
+                                </Grid>
+                            ))}
+                        </Grid>
+                    )}
+                    {data.vehicles_total > data.vehicles.length && (
+                        <Typography color="text.secondary">
+                            Mostrando {data.vehicles.length} de {data.vehicles_total} veículos.
+                        </Typography>
                     )}
                 </Stack>
             </Stack>
