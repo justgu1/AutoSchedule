@@ -52,7 +52,7 @@ make test        -> tudo (prepara o banco de teste antes)
 make test-unit   -> só os puros, sem depender de banco/Redis/MinIO no ar
 ```
 
-O critério não é a pasta, é a dependência: `ProcessDealershipPhotoJobTest` mora em `tests/Application/` e mesmo assim é integração, porque usa `JobStatusStore` contra o Redis de verdade.
+O critério não é a pasta, é a dependência: `ProcessDealershipPhotoTest` mora em `tests/Application/` e mesmo assim é integração, porque usa `JobStatusStore` contra o Redis de verdade.
 
 Nunca contra o banco de dev, nem local: `phpunit.xml` força `DB_DATABASE=autoschedule_test`, um banco irmão no mesmo servidor Postgres (`bin/setup_test_database.php` cria da primeira vez, `make test` migra/seeda de novo a cada rodada -- idempotente). Sessão manual/E2E contra o banco de dev deixa `oauth_refresh_tokens` reais que quebram teste algum dia (ex: `SeederRunnerTest` resetando o admin seedado) -- isolar o banco elimina essa classe de falha por completo, sem precisar resetar nada na mão. CI já era isolado por natureza (Postgres efêmero via `services:`), só o nome do banco (`autoschedule_test`) foi alinhado por consistência.
 

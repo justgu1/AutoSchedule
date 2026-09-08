@@ -56,6 +56,12 @@ src/
 └── Bootstrap/      composition root (ContainerFactory) + App\Config
 ```
 
+**Domain e Application são organizados por contexto de negócio; Infrastructure, por tecnologia.**
+Nas duas de dentro se procura por assunto ("concessionária") e regra e operação ficam lado a lado;
+na de fora se procura por meio, e tudo que fala com o Postgres está em `Infrastructure/Persistence/`
+(os repositórios, `Row`, `Statement`, `PdoTransaction`), com migration e seeder em
+`Persistence/Schema/`, que é ferramenta de esquema e não persistência de runtime.
+
 Regra de dependência, checada por Deptrac (`backend/deptrac.yaml`, `make arch`) e não só declarada aqui:
 
 ```text
@@ -73,10 +79,11 @@ Onde cada coisa mora, na prática:
 Application/Auth/LoginWithPassword         sequência login -> restore -> emite par -> audita
 Domain/Auth/RefreshToken::isExpired()      invariante do próprio token
 Application/User/LastAdminGuard            invariante do CONJUNTO (não cabe em User)
-Application/Dealership/ProcessDealership…  caso de uso disparado pela fila, não por HTTP
+Application/Dealership/ProcessDealership…  o trabalho: caso de uso disparado pela fila
+Infrastructure/Jobs/…PhotoJob             o mecanismo: traduz envelope em argumento
 ```
 
-Job é caso de uso com outro gatilho -- por isso mora em `Application/`, não em `Infrastructure/`.
+Job é dividido: o trabalho é um caso de uso comum em `Application/`, e o adapter que traduz o envelope da fila em argumento fica em `Infrastructure/Jobs/`. Application contém o que precisa ser feito; Infrastructure, o mecanismo que dispara.
 
 ## Domínio
 
@@ -104,15 +111,16 @@ Application/Ports/Queue                 -> RedisQueue
 Application/Ports/JobProgress           -> JobStatusStore (Redis)
 Application/Ports/TempFileStore         -> LocalTempFileStore (volume compartilhado com o worker)
 Application/Ports/MailTemplateRenderer  -> MailTemplate
+Application/Ports/Transaction           -> PdoTransaction (reentrante)
 ```
 
-`Queue` é da Application, não do Domain: a assinatura é `push(class-string<Job>, payload)`, e job é caso de uso -- regra de negócio nenhuma sabe que existe fila. Já `DatabaseConnection` e `ScheduledTask` nem são port de camada de dentro: são interfaces de Infrastructure, e é lá que moram.
+`Queue` é da Application, não do Domain: a assinatura é `push(QueuedJob, payload)` -- um enum com o nome do trabalho, não a classe que o executa, senão a Application apontaria pro adapter. Regra de negócio nenhuma sabe que existe fila. Já `DatabaseConnection` e `ScheduledTask` nem são port de camada de dentro: são interfaces de Infrastructure, e é lá que moram.
 
 Google Maps Embed não virou port -- é só exibição por string de endereço (sem geocoding, sem Places autocomplete), chamado direto do browser (`DealershipMap`). ViaCEP é diferente: o backend proxeia (`GET /zip-codes/{cep}` → `LookupZipCode`, cache-aside sobre `zip_code_cache`) porque cachear a resposta é o próprio motivo de existir dessa camada -- ali sim vale um port (`ZipCodeProvider`, adapter `ViaCepZipCodeProvider`), já que trocar de provedor de CEP é um cenário real, diferente do mapa.
 
 ## PostgreSQL
 
-Persistência, foreign keys, constraints, índices, transações, busca textual e (mais adiante) geolocalização. Regra de negócio mora na aplicação; a integridade que o banco consegue garantir sozinho (unicidade, referência, concorrência) fica reforçada lá também -- validar só na aplicação e confiar que ninguém burla é o tipo de garantia que quebra na primeira migration mal aplicada ou acesso direto ao banco.
+Persistência, foreign keys, constraints, índices, transações e busca textual. Todo SQL passa por `DatabaseConnection::execute()`, que é onde o bind ganha tipo e onde violação de `UNIQUE` vira `DomainException(Conflict)` em vez de subir crua; a leitura passa por `Row`, que converte o `mixed` do PDO com verificação. Atomicidade é explícita via `Application/Ports/Transaction` onde há escrita múltipla dependente -- no HTTP ela vinha de graça da transação do RLS, mas worker e scheduler não têm request. Regra de negócio mora na aplicação; a integridade que o banco consegue garantir sozinho (unicidade, referência, concorrência) fica reforçada lá também -- validar só na aplicação e confiar que ninguém burla é o tipo de garantia que quebra na primeira migration mal aplicada ou acesso direto ao banco.
 
 ## Redis
 
@@ -155,7 +163,8 @@ Scheduler e worker rodam fora de qualquer request HTTP -- sem `current_user_id`/
 ## Processamento assíncrono
 
 ```text
-Controller -> Caso de uso -> Queue (RedisQueue) -> PHP Worker (bin/worker.php) -> Job -> MailProvider/StorageProvider/etc.
+Controller -> Caso de uso -> Queue (RedisQueue, enum QueuedJob)
+           -> PHP Worker (bin/worker.php) -> adapter em Infrastructure/Jobs -> Caso de uso -> MailProvider/StorageProvider/etc.
 ```
 
 Falha reenfileira com `attempts` incrementado; passadas 3 tentativas vira dead-letter em vez de tentar pra sempre. Scheduler e worker são processos PHP CLI, mesma imagem Docker do backend com outro comando -- cada um escala e reinicia sozinho via Deployment próprio no k8s, sem precisar de supervisor porque o orquestrador já cuida disso.
@@ -164,7 +173,7 @@ Job que o cliente precisa acompanhar (hoje: processar foto) grava progresso num 
 
 ## Busca e geolocalização
 
-PostgreSQL Full Text Search + `pg_trgm` cobrem a busca inicial, sem depender de Elasticsearch. Concessionária guarda `latitude`/`longitude`/`google_place_id`; busca por proximidade sai do próprio Postgres, PostGIS entra depois se um dia fizer falta de verdade.
+PostgreSQL Full Text Search + `pg_trgm` cobrem a busca inicial, sem depender de Elasticsearch. Busca por proximidade ainda não existe: `dealerships` teve `latitude`/`longitude`/`google_place_id` desde a criação e nunca gravou valor em nenhuma, então as três foram removidas por migration. Quando a proximidade for real, a coluna volta com o geocoder que a preenche -- e aí vale decidir entre cálculo no Postgres puro ou PostGIS.
 
 CEP autopreenche o resto do endereço no formulário via `GET /zip-codes/{cep}` (proxy cacheado do ViaCEP, ver "Ports & Adapters"), e a página pública da concessionária (`/concessionarias/{slug}` -- `slug`, nunca o `id`) mostra a localização com Google Maps Embed em modo `place` -- só exibição por string de endereço, sem geocoding nem Places autocomplete. `VITE_GOOGLE_MAPS_API_KEY` ausente não quebra a página, só omite o mapa (mesmo padrão do `VITE_GOOGLE_CLIENT_ID` do login social).
 
