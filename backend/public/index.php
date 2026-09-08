@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
-use App\Application;
+use App\Config;
 use App\Bootstrap\ContainerFactory;
 use App\Domain\Auth\Ports\TokenIssuer;
-use App\Domain\Ports\DatabaseConnection;
+use App\Infrastructure\Database\DatabaseConnection;
 use App\Infrastructure\Http\ExceptionHandler;
 use App\Infrastructure\Http\Middleware\AuthContextMiddleware;
 use App\Infrastructure\Http\Middleware\CorsMiddleware;
@@ -24,7 +24,7 @@ use App\Infrastructure\Logging\Logger;
 use App\Infrastructure\RateLimit\RateLimiter;
 use App\Infrastructure\RateLimit\RateLimitPolicy;
 
-$app = new Application();
+$app = new Config();
 $logger = new Logger();
 $container = ContainerFactory::build($app);
 

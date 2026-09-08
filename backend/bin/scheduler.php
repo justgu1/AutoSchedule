@@ -5,12 +5,12 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
-use App\Application;
+use App\Config;
 use App\Bootstrap\ContainerFactory;
-use App\Domain\Ports\DatabaseConnection;
+use App\Infrastructure\Database\DatabaseConnection;
 use App\Infrastructure\Scheduler\Scheduler;
 
-$app = new Application();
+$app = new Config();
 $container = ContainerFactory::build($app);
 
 // Mesma razão do bin/worker.php: sem request HTTP, sem `current_user_id`/role

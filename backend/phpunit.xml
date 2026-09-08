@@ -11,6 +11,13 @@
         </testsuite>
     </testsuites>
 
+    <!--
+        Teste que abre conexão real (Postgres/Redis/MinIO) carrega #[Group('integration')]
+        na classe; o resto é puro e roda em milissegundos, sem nada de pé. A suíte padrão
+        continua rodando tudo (é o que o CI usa): "composer test:unit" roda só os puros e
+        "composer test:integration" só os que precisam do compose no ar.
+    -->
+
     <!-- Nunca o banco de dev: "force" sobrescreve o DB_DATABASE do container/CI mesmo quando já setado. Ver bin/setup_test_database.php. -->
     <php>
         <env name="DB_DATABASE" value="autoschedule_test" force="true"/>

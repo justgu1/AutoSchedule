@@ -85,6 +85,25 @@ final class Request
         return json_decode($this->body, associative: true, flags: JSON_THROW_ON_ERROR);
     }
 
+    /**
+     * Corpo JSON como mapa de campos -- o que não for objeto JSON (lista,
+     * escalar, corpo vazio) vira "nenhum campo enviado".
+     *
+     * @return array<string, mixed>
+     *
+     * @throws \JsonException quando o corpo não é um JSON válido
+     */
+    public function jsonFields(): array
+    {
+        $decoded = $this->json();
+
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        return array_filter($decoded, is_string(...), ARRAY_FILTER_USE_KEY);
+    }
+
     public function param(string $name, ?string $default = null): ?string
     {
         return $this->params[$name] ?? $default;

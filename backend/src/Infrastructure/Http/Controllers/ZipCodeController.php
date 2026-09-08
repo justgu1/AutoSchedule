@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Http\Controllers;
 
+use App\Application\Address\LookupZipCode;
+use App\Domain\Address\ZipCodeAddress;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
-use App\Infrastructure\Address\ZipCodeLookupService;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
 
@@ -17,7 +18,7 @@ use App\Infrastructure\Http\Response;
  */
 final readonly class ZipCodeController
 {
-    public function __construct(private ZipCodeLookupService $lookup)
+    public function __construct(private LookupZipCode $lookup)
     {
     }
 
@@ -29,9 +30,9 @@ final readonly class ZipCodeController
             throw new DomainException('Invalid data.', DomainErrorType::Validation, ['zip_code' => 'CEP must have 8 digits.']);
         }
 
-        $address = $this->lookup->resolve($zipCode);
+        $address = ($this->lookup)($zipCode);
 
-        if (!$address instanceof \App\Domain\Address\ZipCodeAddress) {
+        if (!$address instanceof ZipCodeAddress) {
             throw new DomainException('CEP not found.', DomainErrorType::NotFound);
         }
 

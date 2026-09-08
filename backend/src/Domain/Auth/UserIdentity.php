@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Auth;
 
-use App\Domain\Support\Uuid;
+use App\Domain\Shared\Uuid;
 
 /** Vincula uma conta a um provedor externo (hoje só Google) -- um usuário pode ter mais de uma identidade linkada. */
 final readonly class UserIdentity

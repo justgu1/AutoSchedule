@@ -8,6 +8,7 @@ use App\Domain\Auth\ClientType;
 use App\Domain\Auth\GrantType;
 use App\Infrastructure\Auth\Postgres\PostgresOAuthClientRepository;
 use App\Infrastructure\Database\PostgresConnection;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -15,6 +16,7 @@ use PHPUnit\Framework\TestCase;
  * Teste de integração: conecta no Postgres real do docker-compose. Isolado
  * por transação (rollback no tearDown), igual o PostgresUserRepositoryTest.
  */
+#[Group('integration')]
 final class PostgresOAuthClientRepositoryTest extends TestCase
 {
     private \PDO $pdo;

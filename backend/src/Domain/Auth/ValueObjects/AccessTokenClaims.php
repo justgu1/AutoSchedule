@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domain\Auth\ValueObjects;
 
-use App\Domain\Support\Uuid;
-use App\Domain\Users\UserRole;
+use App\Domain\Shared\Uuid;
+use App\Domain\User\UserRole;
 
 final readonly class AccessTokenClaims
 {

@@ -15,25 +15,33 @@ final class Container
     /** @var list<class-string> */
     private array $resolving = [];
 
-    /** @param \Closure(self): object $factory */
+    /**
+     * @template T of object
+     * @param class-string<T> $id
+     * @param \Closure(self): T $factory
+     */
     public function set(string $id, \Closure $factory): void
     {
         $this->bindings[$id] = $factory;
         unset($this->instances[$id]);
     }
 
+    /**
+     * @template T of object
+     * @param class-string<T> $id
+     * @return T
+     */
     public function get(string $id): object
     {
-        if (isset($this->instances[$id])) {
-            return $this->instances[$id];
-        }
+        $this->instances[$id] ??= $this->build($id);
 
-        $instance = $this->build($id);
-        $this->instances[$id] = $instance;
+        /** @var T $instance */
+        $instance = $this->instances[$id];
 
         return $instance;
     }
 
+    /** @param class-string $id */
     private function build(string $id): object
     {
         if (in_array($id, $this->resolving, true)) {

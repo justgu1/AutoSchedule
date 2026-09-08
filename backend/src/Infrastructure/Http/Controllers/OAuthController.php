@@ -4,18 +4,27 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Http\Controllers;
 
-use App\Domain\Auth\DTO\TokenPair;
-use App\Domain\Auth\OAuthService;
+use App\Application\Auth\DTO\TokenPair;
+use App\Application\Auth\IssueServiceToken;
+use App\Application\Auth\LoginWithGoogle;
+use App\Application\Auth\LoginWithPassword;
+use App\Application\Auth\Logout;
+use App\Application\Auth\RefreshAccessToken;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
 use App\Infrastructure\Http\Request;
+use App\Infrastructure\Http\RequestActor;
 use App\Infrastructure\Http\Response;
 use App\Infrastructure\Validation\Validator;
 
 final readonly class OAuthController
 {
     public function __construct(
-        private OAuthService $oauth,
+        private LoginWithPassword $loginWithPassword,
+        private RefreshAccessToken $refreshAccessToken,
+        private LoginWithGoogle $loginWithGoogle,
+        private IssueServiceToken $issueServiceToken,
+        private Logout $revokeSession,
         private int $refreshTokenTtl,
         private bool $cookieSecure,
     ) {
@@ -30,7 +39,7 @@ final readonly class OAuthController
      */
     public function token(Request $request): Response
     {
-        $body = $request->json();
+        $body = $request->jsonFields();
 
         if (array_key_exists('refresh_token', $body)) {
             return $this->refresh($request, $body);
@@ -41,7 +50,7 @@ final readonly class OAuthController
         }
 
         if (array_key_exists('id_token', $body)) {
-            return $this->loginWithGoogle($request, $body);
+            return $this->google($request, $body);
         }
 
         if (array_key_exists('client_secret', $body)) {
@@ -64,12 +73,11 @@ final readonly class OAuthController
             'password' => 'required',
         ]);
 
-        return $this->tokenResponse($this->oauth->loginWithPassword(
-            $data['client_id'],
-            $data['email'],
-            $data['password'],
-            $request->ip(),
-            $request->header('user-agent'),
+        return $this->tokenResponse(($this->loginWithPassword)(
+            $data->string('client_id'),
+            $data->string('email'),
+            $data->string('password'),
+            RequestActor::fromRequest($request),
         ));
     }
 
@@ -81,27 +89,25 @@ final readonly class OAuthController
             'refresh_token' => 'required',
         ]);
 
-        return $this->tokenResponse($this->oauth->refresh(
-            $data['client_id'],
-            $data['refresh_token'],
-            $request->ip(),
-            $request->header('user-agent'),
+        return $this->tokenResponse(($this->refreshAccessToken)(
+            $data->string('client_id'),
+            $data->string('refresh_token'),
+            RequestActor::fromRequest($request),
         ));
     }
 
     /** @param array<string, mixed> $body */
-    private function loginWithGoogle(Request $request, array $body): Response
+    private function google(Request $request, array $body): Response
     {
         $data = Validator::validate($body, [
             'client_id' => 'required',
             'id_token' => 'required',
         ]);
 
-        return $this->tokenResponse($this->oauth->loginWithGoogle(
-            $data['client_id'],
-            $data['id_token'],
-            $request->ip(),
-            $request->header('user-agent'),
+        return $this->tokenResponse(($this->loginWithGoogle)(
+            $data->string('client_id'),
+            $data->string('id_token'),
+            RequestActor::fromRequest($request),
         ));
     }
 
@@ -113,11 +119,10 @@ final readonly class OAuthController
             'client_secret' => 'required',
         ]);
 
-        $tokenPair = $this->oauth->clientCredentials(
-            $data['client_id'],
-            $data['client_secret'],
-            $request->ip(),
-            $request->header('user-agent'),
+        $tokenPair = ($this->issueServiceToken)(
+            $data->string('client_id'),
+            $data->string('client_secret'),
+            RequestActor::fromRequest($request),
         );
 
         // M2M: sem browser no meio, sem sessão pra manter em cookie -- só o JSON de sempre.
@@ -135,7 +140,7 @@ final readonly class OAuthController
         $rawRefreshToken = $request->cookie('refresh_token');
 
         if ($rawRefreshToken !== null) {
-            $this->oauth->logout($rawRefreshToken);
+            ($this->revokeSession)($rawRefreshToken);
         }
 
         return Response::success(['message' => 'Logged out.'])

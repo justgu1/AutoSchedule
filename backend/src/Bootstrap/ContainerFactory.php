@@ -4,31 +4,40 @@ declare(strict_types=1);
 
 namespace App\Bootstrap;
 
-use App\Application;
+use App\Application\Auth\ClientAuthenticator;
+use App\Application\Auth\IssueServiceToken;
+use App\Application\Auth\LoginWithGoogle;
+use App\Application\Auth\LoginWithPassword;
+use App\Application\Auth\Logout;
+use App\Application\Auth\RefreshAccessToken;
+use App\Application\Auth\TokenPairIssuer;
+use App\Application\Notification\SendEmailJob;
+use App\Application\Ports\JobProgress;
+use App\Application\Ports\MailTemplateRenderer;
+use App\Application\Ports\Queue;
+use App\Application\Ports\TempFileStore;
+use App\Application\User\RequestPasswordReset;
+use App\Config;
 use App\Domain\Address\Ports\ZipCodeCacheRepository;
 use App\Domain\Address\Ports\ZipCodeProvider;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
-use App\Domain\Auth\OAuthService;
 use App\Domain\Auth\Ports\GoogleIdTokenVerifier;
 use App\Domain\Auth\Ports\OAuthClientRepository;
 use App\Domain\Auth\Ports\PasswordResetTokenRepository;
 use App\Domain\Auth\Ports\RefreshTokenRepository;
 use App\Domain\Auth\Ports\TokenIssuer;
 use App\Domain\Auth\Ports\UserIdentityRepository;
-use App\Domain\Dealerships\Dealership;
-use App\Domain\Dealerships\Ports\DealershipRepository;
-use App\Domain\Files\Ports\FileRepository;
-use App\Domain\Files\Ports\ImageOptimizer;
-use App\Domain\Notifications\Ports\MailProvider;
-use App\Domain\Ports\DatabaseConnection;
-use App\Domain\Ports\Queue;
-use App\Domain\Ports\StorageProvider;
-use App\Domain\Users\Ports\UserRepository;
-use App\Domain\Users\User;
+use App\Domain\Dealership\Dealership;
+use App\Domain\Dealership\Ports\DealershipRepository;
+use App\Domain\File\Ports\FileRepository;
+use App\Domain\File\Ports\ImageOptimizer;
+use App\Domain\File\Ports\StorageProvider;
+use App\Domain\Notification\Ports\MailProvider;
+use App\Domain\User\Ports\UserRepository;
+use App\Domain\User\User;
 use App\Infrastructure\Address\PostgresZipCodeCacheRepository;
 use App\Infrastructure\Address\ViaCepZipCodeProvider;
-use App\Infrastructure\Address\ZipCodeLookupService;
 use App\Infrastructure\Audit\PostgresAuditLogger;
 use App\Infrastructure\Auth\Google\GoogleJwksIdTokenVerifier;
 use App\Infrastructure\Auth\Jwt\JwtTokenIssuer;
@@ -37,18 +46,16 @@ use App\Infrastructure\Auth\Postgres\PostgresPasswordResetTokenRepository;
 use App\Infrastructure\Auth\Postgres\PostgresRefreshTokenRepository;
 use App\Infrastructure\Auth\Postgres\PostgresUserIdentityRepository;
 use App\Infrastructure\Container\Container;
+use App\Infrastructure\Database\DatabaseConnection;
 use App\Infrastructure\Database\PostgresConnection;
-use App\Infrastructure\Dealerships\PostgresDealershipRepository;
-use App\Infrastructure\Files\FileUploadService;
-use App\Infrastructure\Files\GdImageOptimizer;
-use App\Infrastructure\Files\PostgresFileRepository;
-use App\Infrastructure\Http\Controllers\DealershipController;
-use App\Infrastructure\Http\Controllers\JobController;
+use App\Infrastructure\Dealership\PostgresDealershipRepository;
+use App\Infrastructure\File\GdImageOptimizer;
+use App\Infrastructure\File\LocalTempFileStore;
+use App\Infrastructure\File\PostgresFileRepository;
 use App\Infrastructure\Http\Controllers\OAuthController;
-use App\Infrastructure\Http\Controllers\UserController;
-use App\Infrastructure\Http\Controllers\ZipCodeController;
 use App\Infrastructure\Jobs\JobStatusStore;
 use App\Infrastructure\Logging\Logger;
+use App\Infrastructure\Mail\MailTemplate;
 use App\Infrastructure\Mail\SymfonyMailProvider;
 use App\Infrastructure\Pagination\PaginationPolicy;
 use App\Infrastructure\Queue\RedisQueue;
@@ -58,45 +65,43 @@ use App\Infrastructure\Redis\RedisConnection;
 use App\Infrastructure\Scheduler\PurgeTrashedEntitiesTask;
 use App\Infrastructure\Scheduler\Scheduler;
 use App\Infrastructure\Storage\MinioAdapter;
-use App\Infrastructure\Users\PostgresUserRepository;
+use App\Infrastructure\User\PostgresUserRepository;
 
 /**
- * Monta o Container com todos os bindings da aplicação -- único lugar que
- * sabe COMO construir cada dependência. Separado de routes/api.php, que só
- * sabe QUAIS rotas existem.
+ * Composition root: liga cada port à implementação concreta e monta o que
+ * depende de config. Separado de routes/api.php, que só sabe QUAIS rotas
+ * existem.
+ *
+ * O que NÃO aparece aqui é resolvido por autowiring (`Container::autowire`):
+ * caso de uso e controller cujas dependências são todas ports/classes já
+ * registrados abaixo não precisam de binding próprio -- o construtor deles já
+ * diz tudo. Só entra nesta lista quem depende de config, de escalar, ou de uma
+ * escolha que o typehint sozinho não resolve.
  */
 final class ContainerFactory
 {
-    public static function build(Application $app): Container
+    public static function build(Config $app): Container
     {
         $container = new Container();
 
         // Conecta como autoschedule_app (não a role admin/superuser usada por
         // bin/migrate.php e bin/seed.php) -- é a role restrita (NOSUPERUSER
         // NOBYPASSRLS) que faz o RLS de users valer a pena em runtime.
-        $container->set(DatabaseConnection::class, static function () use ($app): DatabaseConnection {
-            $config = $app->config('database');
+        $container->set(DatabaseConnection::class, static fn (): DatabaseConnection => new PostgresConnection(
+            driver: $app->string('database.driver'),
+            host: $app->string('database.host'),
+            port: $app->int('database.port'),
+            database: $app->string('database.database'),
+            username: $app->string('database.app_username'),
+            password: $app->string('database.app_password'),
+        ));
 
-            return new PostgresConnection(
-                driver: $config['driver'],
-                host: $config['host'],
-                port: $config['port'],
-                database: $config['database'],
-                username: $config['app_username'],
-                password: $config['app_password'],
-            );
-        });
-
-        $container->set(TokenIssuer::class, static function () use ($app): TokenIssuer {
-            $jwt = $app->config('auth')['jwt'];
-
-            return new JwtTokenIssuer(
-                privateKeyPem: file_get_contents($jwt['private_key_path']),
-                publicKeyPem: file_get_contents($jwt['public_key_path']),
-                issuer: $jwt['issuer'],
-                audience: $jwt['audience'],
-            );
-        });
+        $container->set(TokenIssuer::class, static fn (): TokenIssuer => new JwtTokenIssuer(
+            privateKeyPem: self::readKey($app->string('auth.jwt.private_key_path')),
+            publicKeyPem: self::readKey($app->string('auth.jwt.public_key_path')),
+            issuer: $app->string('auth.jwt.issuer'),
+            audience: $app->string('auth.jwt.audience'),
+        ));
 
         $container->set(
             UserRepository::class,
@@ -123,55 +128,42 @@ final class ContainerFactory
             static fn (Container $c): UserIdentityRepository => new PostgresUserIdentityRepository($c->get(DatabaseConnection::class)->pdo()),
         );
         $container->set(GoogleIdTokenVerifier::class, static fn (Container $c): GoogleIdTokenVerifier => new GoogleJwksIdTokenVerifier(
-            clientId: $app->config('google')['client_id'],
+            clientId: $app->string('google.client_id'),
             redis: $c->get(RedisConnection::class),
         ));
-        $container->set(MailProvider::class, static function () use ($app): MailProvider {
-            $mail = $app->config('mail');
-
-            return new SymfonyMailProvider($mail['dsn'], $mail['from']);
-        });
-        $container->set(StorageProvider::class, static function () use ($app): StorageProvider {
-            $storage = $app->config('storage');
-
-            return new MinioAdapter(
-                endpoint: $storage['endpoint'],
-                bucket: $storage['bucket'],
-                region: $storage['region'],
-                accessKey: $storage['access_key'],
-                secretKey: $storage['secret_key'],
-                publicUrl: $storage['public_url'],
-            );
-        });
+        $container->set(MailProvider::class, static fn (): MailProvider => new SymfonyMailProvider($app->string('mail.dsn'), $app->string('mail.from')));
+        $container->set(MailTemplateRenderer::class, static fn (): MailTemplateRenderer => new MailTemplate());
+        $container->set(StorageProvider::class, static fn (): StorageProvider => new MinioAdapter(
+            endpoint: $app->string('storage.endpoint'),
+            bucket: $app->string('storage.bucket'),
+            region: $app->string('storage.region'),
+            accessKey: $app->string('storage.access_key'),
+            secretKey: $app->string('storage.secret_key'),
+            publicUrl: $app->string('storage.public_url'),
+        ));
         $container->set(
             FileRepository::class,
             static fn (Container $c): FileRepository => new PostgresFileRepository($c->get(DatabaseConnection::class)->pdo()),
         );
         $container->set(
             ImageOptimizer::class,
-            static fn (): ImageOptimizer => new GdImageOptimizer($app->config('storage')['temp_path']),
+            static fn (): ImageOptimizer => new GdImageOptimizer($app->string('storage.temp_path')),
         );
-        $container->set(FileUploadService::class, static fn (Container $c): FileUploadService => new FileUploadService(
-            storage: $c->get(StorageProvider::class),
-            files: $c->get(FileRepository::class),
-            imageOptimizer: $c->get(ImageOptimizer::class),
-            tempPath: $app->config('storage')['temp_path'],
-        ));
+        $container->set(
+            TempFileStore::class,
+            static fn (): TempFileStore => new LocalTempFileStore($app->string('storage.temp_path')),
+        );
         $container->set(
             DealershipRepository::class,
             static fn (Container $c): DealershipRepository => new PostgresDealershipRepository($c->get(DatabaseConnection::class)->pdo()),
         );
-        $container->set(RedisConnection::class, static function () use ($app): RedisConnection {
-            $config = $app->config('redis');
-
-            return new RedisConnection(
-                host: $config['host'],
-                port: $config['port'],
-                prefix: $config['prefix'],
-                username: $config['username'],
-                password: $config['password'],
-            );
-        });
+        $container->set(RedisConnection::class, static fn (): RedisConnection => new RedisConnection(
+            host: $app->string('redis.host'),
+            port: $app->int('redis.port'),
+            prefix: $app->string('redis.prefix'),
+            username: $app->stringOrNull('redis.username'),
+            password: $app->stringOrNull('redis.password'),
+        ));
         $container->set(
             RateLimiter::class,
             static fn (Container $c): RateLimiter => new RedisRateLimiter($c->get(RedisConnection::class)),
@@ -182,6 +174,11 @@ final class ContainerFactory
         );
         // Alias pro port -- mesmo singleton de RedisQueue::class.
         $container->set(Queue::class, static fn (Container $c): Queue => $c->get(RedisQueue::class));
+        $container->set(
+            JobStatusStore::class,
+            static fn (Container $c): JobStatusStore => new JobStatusStore($c->get(RedisConnection::class)),
+        );
+        $container->set(JobProgress::class, static fn (Container $c): JobProgress => $c->get(JobStatusStore::class));
         // Cada domínio com lixeira reversível registra aqui sua própria purga,
         // reaproveitando a mesma ScheduledTask genérica (App\Infrastructure\Scheduler\PurgeTrashedEntitiesTask).
         $container->set(Scheduler::class, static function (Container $c): Scheduler {
@@ -217,82 +214,72 @@ final class ContainerFactory
                 ],
             );
         });
-        $container->set(PaginationPolicy::class, static function () use ($app): PaginationPolicy {
-            $config = $app->config('pagination');
-
-            return new PaginationPolicy($config['default_per_page'], $config['max_per_page']);
-        });
-
-        $container->set(OAuthService::class, static function (Container $c) use ($app): OAuthService {
-            $auth = $app->config('auth');
-
-            return new OAuthService(
-                clients: $c->get(OAuthClientRepository::class),
-                users: $c->get(UserRepository::class),
-                refreshTokens: $c->get(RefreshTokenRepository::class),
-                identities: $c->get(UserIdentityRepository::class),
-                dealerships: $c->get(DealershipRepository::class),
-                tokens: $c->get(TokenIssuer::class),
-                googleVerifier: $c->get(GoogleIdTokenVerifier::class),
-                audit: $c->get(AuditLogger::class),
-                accessTokenTtl: $auth['access_token_ttl'],
-                refreshTokenTtl: $auth['refresh_token_ttl'],
-            );
-        });
-        $container->set(OAuthController::class, static fn (Container $c): OAuthController => new OAuthController(
-            oauth: $c->get(OAuthService::class),
-            refreshTokenTtl: $app->config('auth')['refresh_token_ttl'],
-            cookieSecure: $app->config('security')['cookie_secure'],
+        $container->set(PaginationPolicy::class, static fn (): PaginationPolicy => new PaginationPolicy(
+            $app->int('pagination.default_per_page'),
+            $app->int('pagination.max_per_page'),
         ));
-        $container->set(UserController::class, static function (Container $c) use ($app): UserController {
-            $mail = $app->config('mail');
 
-            return new UserController(
-                users: $c->get(UserRepository::class),
-                refreshTokens: $c->get(RefreshTokenRepository::class),
-                dealerships: $c->get(DealershipRepository::class),
-                audit: $c->get(AuditLogger::class),
-                pagination: $c->get(PaginationPolicy::class),
-                passwordResetTokens: $c->get(PasswordResetTokenRepository::class),
-                queue: $c->get(Queue::class),
-                passwordResetTtl: $app->config('auth')['password_reset_ttl'],
-                frontendUrl: $mail['frontend_url'],
-                passwordResetTemplatePath: dirname(__DIR__, 2) . '/resources/mail/password-reset.html',
-            );
-        });
-        $container->set(
-            JobStatusStore::class,
-            static fn (Container $c): JobStatusStore => new JobStatusStore($c->get(RedisConnection::class)),
-        );
-        $container->set(DealershipController::class, static fn (Container $c): DealershipController => new DealershipController(
-            dealerships: $c->get(DealershipRepository::class),
-            files: $c->get(FileRepository::class),
-            storage: $c->get(StorageProvider::class),
-            queue: $c->get(Queue::class),
-            jobStatus: $c->get(JobStatusStore::class),
-            audit: $c->get(AuditLogger::class),
-            pagination: $c->get(PaginationPolicy::class),
+        // Casos de uso que dependem de config -- o resto o autowire resolve.
+        $container->set(TokenPairIssuer::class, static fn (Container $c): TokenPairIssuer => new TokenPairIssuer(
+            tokens: $c->get(TokenIssuer::class),
+            refreshTokens: $c->get(RefreshTokenRepository::class),
+            accessTokenTtl: $app->int('auth.access_token_ttl'),
+            refreshTokenTtl: $app->int('auth.refresh_token_ttl'),
+        ));
+        $container->set(RefreshAccessToken::class, static fn (Container $c): RefreshAccessToken => new RefreshAccessToken(
+            clients: $c->get(ClientAuthenticator::class),
+            refreshTokens: $c->get(RefreshTokenRepository::class),
             users: $c->get(UserRepository::class),
-            tempPath: $app->config('storage')['temp_path'],
+            tokens: $c->get(TokenIssuer::class),
+            audit: $c->get(AuditLogger::class),
+            accessTokenTtl: $app->int('auth.access_token_ttl'),
+            refreshTokenTtl: $app->int('auth.refresh_token_ttl'),
         ));
-        $container->set(
-            JobController::class,
-            static fn (Container $c): JobController => new JobController($c->get(JobStatusStore::class)),
-        );
+        $container->set(IssueServiceToken::class, static fn (Container $c): IssueServiceToken => new IssueServiceToken(
+            clients: $c->get(ClientAuthenticator::class),
+            tokens: $c->get(TokenIssuer::class),
+            audit: $c->get(AuditLogger::class),
+            accessTokenTtl: $app->int('auth.access_token_ttl'),
+        ));
+        $container->set(RequestPasswordReset::class, static fn (Container $c): RequestPasswordReset => new RequestPasswordReset(
+            users: $c->get(UserRepository::class),
+            passwordResetTokens: $c->get(PasswordResetTokenRepository::class),
+            mailTemplates: $c->get(MailTemplateRenderer::class),
+            queue: $c->get(Queue::class),
+            passwordResetTtl: $app->int('auth.password_reset_ttl'),
+            frontendUrl: $app->string('mail.frontend_url'),
+            templatePath: dirname(__DIR__, 2) . '/resources/mail/password-reset.html',
+        ));
+
+        // O worker resolve o job pelo nome da classe que veio no envelope --
+        // registrar explícito é o que garante que a fila não dependa de um
+        // autowire que ninguém exercitou até o job falhar em produção.
+        $container->set(SendEmailJob::class, static fn (Container $c): SendEmailJob => new SendEmailJob($c->get(MailProvider::class)));
+
+        $container->set(OAuthController::class, static fn (Container $c): OAuthController => new OAuthController(
+            loginWithPassword: $c->get(LoginWithPassword::class),
+            refreshAccessToken: $c->get(RefreshAccessToken::class),
+            loginWithGoogle: $c->get(LoginWithGoogle::class),
+            issueServiceToken: $c->get(IssueServiceToken::class),
+            revokeSession: $c->get(Logout::class),
+            refreshTokenTtl: $app->int('auth.refresh_token_ttl'),
+            cookieSecure: $app->bool('security.cookie_secure'),
+        ));
+
         $container->set(ZipCodeCacheRepository::class, static fn (Container $c): ZipCodeCacheRepository => new PostgresZipCodeCacheRepository($c->get(DatabaseConnection::class)));
         $container->set(ZipCodeProvider::class, static fn (): ZipCodeProvider => new ViaCepZipCodeProvider());
-        $container->set(
-            ZipCodeLookupService::class,
-            static fn (Container $c): ZipCodeLookupService => new ZipCodeLookupService(
-                cache: $c->get(ZipCodeCacheRepository::class),
-                provider: $c->get(ZipCodeProvider::class),
-            ),
-        );
-        $container->set(
-            ZipCodeController::class,
-            static fn (Container $c): ZipCodeController => new ZipCodeController($c->get(ZipCodeLookupService::class)),
-        );
 
         return $container;
+    }
+
+    private static function readKey(string $path): string
+    {
+        $pem = file_get_contents($path);
+
+        if ($pem === false) {
+            throw new \RuntimeException(sprintf('Could not read the JWT key at "%s".', $path));
+        }
+
+        return $pem;
     }
 }

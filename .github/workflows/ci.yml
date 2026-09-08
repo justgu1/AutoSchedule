@@ -34,6 +34,10 @@ jobs:
         working-directory: backend
         run: vendor/bin/php-cs-fixer fix --dry-run --diff
 
+      - name: Deptrac
+        working-directory: backend
+        run: vendor/bin/deptrac analyse --config-file=deptrac.yaml --no-progress
+
       - name: Build
         run: docker build -f infra/docker/backend/Dockerfile -t autoschedule-backend:ci .
 

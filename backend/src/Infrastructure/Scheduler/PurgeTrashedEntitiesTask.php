@@ -6,7 +6,6 @@ namespace App\Infrastructure\Scheduler;
 
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
-use App\Domain\Ports\ScheduledTask;
 
 /**
  * Rotina de purga genérica -- todo domínio com lixeira reversível (User,

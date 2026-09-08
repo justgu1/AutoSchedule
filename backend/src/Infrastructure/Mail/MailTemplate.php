@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Mail;
 
-final class MailTemplate
+use App\Application\Ports\MailTemplateRenderer;
+
+final class MailTemplate implements MailTemplateRenderer
 {
     /**
      * Placeholder simples (`str_replace` em `{{CHAVE}}`) -- sem motor de
@@ -12,7 +14,7 @@ final class MailTemplate
      *
      * @param array<string, string> $placeholders
      */
-    public static function render(string $templatePath, array $placeholders): string
+    public function render(string $templatePath, array $placeholders): string
     {
         $template = file_get_contents($templatePath);
 

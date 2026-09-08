@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Infrastructure\Redis;
 
 use App\Infrastructure\Redis\RedisConnection;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -14,6 +15,7 @@ use PHPUnit\Framework\TestCase;
  * `docker compose exec backend vendor/bin/phpunit`) — não alcança o
  * hostname `redis` a partir de um container avulso fora do compose.
  */
+#[Group('integration')]
 final class RedisConnectionTest extends TestCase
 {
     #[Test]

@@ -8,7 +8,7 @@ use App\Domain\Auth\Ports\TokenIssuer;
 use App\Domain\Auth\ValueObjects\AccessTokenClaims;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
-use App\Domain\Users\UserRole;
+use App\Domain\User\UserRole;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 
@@ -35,7 +35,7 @@ final readonly class JwtTokenIssuer implements TokenIssuer
             'exp' => $claims->expiresAt->getTimestamp(),
         ];
 
-        if ($claims->role instanceof \App\Domain\Users\UserRole) {
+        if ($claims->role instanceof \App\Domain\User\UserRole) {
             $payload['role'] = $claims->role->value;
         }
 

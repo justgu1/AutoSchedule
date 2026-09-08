@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Storage;
 
-use App\Domain\Ports\StorageProvider;
+use App\Domain\File\Ports\StorageProvider;
 use Aws\S3\S3Client;
 use League\Flysystem\AwsS3V3\AwsS3V3Adapter;
 use League\Flysystem\Filesystem;

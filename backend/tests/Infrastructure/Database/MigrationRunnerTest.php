@@ -6,6 +6,7 @@ namespace Tests\Infrastructure\Database;
 
 use App\Infrastructure\Database\MigrationRunner;
 use App\Infrastructure\Database\PostgresConnection;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -16,6 +17,7 @@ use PHPUnit\Framework\TestCase;
  * desfeita no tearDown — Postgres suporta DDL transacional, então as
  * tabelas/tipos/registros criados somem sem sujar o banco de dev.
  */
+#[Group('integration')]
 final class MigrationRunnerTest extends TestCase
 {
     private \PDO $pdo;

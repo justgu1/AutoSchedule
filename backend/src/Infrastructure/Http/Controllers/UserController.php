@@ -4,31 +4,30 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Http\Controllers;
 
-use App\Domain\Audit\AuditEvent;
-use App\Domain\Audit\Ports\AuditLogger;
-use App\Domain\Auth\PasswordResetToken;
-use App\Domain\Auth\Ports\PasswordResetTokenRepository;
-use App\Domain\Auth\Ports\RefreshTokenRepository;
-use App\Domain\Dealerships\Ports\DealershipRepository;
+use App\Application\User\ChangeOwnPassword;
+use App\Application\User\DTO\UserProfile;
+use App\Application\User\ListUsers;
+use App\Application\User\PurgeAccount;
+use App\Application\User\RegisterUser;
+use App\Application\User\RequestPasswordReset;
+use App\Application\User\ResetPassword;
+use App\Application\User\RestoreAccount;
+use App\Application\User\TrashAccount;
+use App\Application\User\UpdateUserProfile;
+use App\Application\User\UserFinder;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
-use App\Domain\Ports\Queue;
-use App\Domain\Shared\TrashableStatus;
-use App\Domain\Users\DTO\UserProfile;
-use App\Domain\Users\Ports\UserRepository;
-use App\Domain\Users\User;
-use App\Domain\Users\UserRole;
+use App\Domain\User\UserRole;
 use App\Infrastructure\Http\Request;
+use App\Infrastructure\Http\RequestActor;
 use App\Infrastructure\Http\Response;
-use App\Infrastructure\Mail\MailTemplate;
-use App\Infrastructure\Mail\SendEmailJob;
 use App\Infrastructure\Pagination\PaginationPolicy;
 use App\Infrastructure\Validation\Validator;
 
 /**
  * Cobre tanto o self-service (`/me`) quanto o CRUD admin (`/users`) -- é o
  * mesmo recurso (`User`), a diferença entre as duas é autorização (`roles`
- * da rota), não domínio, então não justifica duas classes. `requireUser()`
+ * da rota), não domínio, então não justifica duas classes. `targetUserId()`
  * resolve o alvo pelo `{id}` da rota quando existe (admin) ou pelo próprio
  * JWT quando não (self) -- o resto do método não precisa saber qual dos
  * dois é.
@@ -36,16 +35,17 @@ use App\Infrastructure\Validation\Validator;
 final readonly class UserController
 {
     public function __construct(
-        private UserRepository $users,
-        private RefreshTokenRepository $refreshTokens,
-        private DealershipRepository $dealerships,
-        private AuditLogger $audit,
+        private ListUsers $listUsers,
+        private UserFinder $finder,
+        private RegisterUser $registerUser,
+        private UpdateUserProfile $updateUserProfile,
+        private RequestPasswordReset $requestPasswordReset,
+        private ResetPassword $resetPassword,
+        private ChangeOwnPassword $changeOwnPassword,
+        private TrashAccount $trashAccount,
+        private RestoreAccount $restoreAccount,
+        private PurgeAccount $purgeAccount,
         private PaginationPolicy $pagination,
-        private PasswordResetTokenRepository $passwordResetTokens,
-        private Queue $queue,
-        private int $passwordResetTtl,
-        private string $frontendUrl,
-        private string $passwordResetTemplatePath,
     ) {
     }
 
@@ -53,99 +53,47 @@ final readonly class UserController
     public function index(Request $request): Response
     {
         [$page, $perPage] = $this->pagination->resolve($request->query('page'), $request->query('per_page'));
+        $result = ($this->listUsers)($perPage, ($page - 1) * $perPage);
 
-        $profiles = array_map(
-            static fn (User $user): array => UserProfile::fromUser($user)->toArray(),
-            $this->users->findPage($perPage, ($page - 1) * $perPage),
+        return Response::paginated(
+            array_map(static fn (UserProfile $profile): array => $profile->toArray(), $result['items']),
+            $page,
+            $perPage,
+            $result['total'],
         );
-
-        return Response::paginated($profiles, $page, $perPage, $this->users->count());
     }
 
-    /** Cadastro público -- só seller/customer, nunca admin (isso só via store(), admin-only). Sem autenticação, o alvo criado é o próprio actor. */
+    /** Cadastro público -- só seller/customer, nunca admin (isso só via store(), admin-only). */
     public function register(Request $request): Response
     {
-        $data = Validator::validate($request->json(), [
-            'name' => 'required|max:255',
-            'email' => 'required|email',
-            'phone' => 'max:20',
-            'password' => 'required|min:8',
-            'role' => 'required|in:seller,customer',
-        ]);
-
-        $user = $this->createUser($data, UserRole::from($data['role']));
-        $this->audit->record(AuditEvent::UserCreated, $user->id, 'User', $user->id, ['role' => $user->role->value], $request->ip(), $request->header('user-agent'));
-
-        return Response::success(UserProfile::fromUser($user)->toArray(), 201);
+        return $this->create($request, 'required|in:seller,customer');
     }
 
     /** Admin cria qualquer role, inclusive outro admin. */
     public function store(Request $request): Response
     {
-        $data = Validator::validate($request->json(), [
-            'name' => 'required|max:255',
-            'email' => 'required|email',
-            'phone' => 'max:20',
-            'password' => 'required|min:8',
-            'role' => 'required|in:admin,seller,customer',
-        ]);
-
-        $user = $this->createUser($data, UserRole::from($data['role']));
-        $this->audit->record(AuditEvent::UserCreated, $request->attribute('auth')->subject, 'User', $user->id, ['role' => $user->role->value], $request->ip(), $request->header('user-agent'));
-
-        return Response::success(UserProfile::fromUser($user)->toArray(), 201);
+        return $this->create($request, 'required|in:admin,seller,customer');
     }
 
     public function show(Request $request): Response
     {
-        return Response::success(UserProfile::fromUser($this->requireUser($request))->toArray());
+        return Response::success(UserProfile::fromUser($this->finder->findOrFail($this->targetUserId($request)))->toArray());
     }
 
-    /**
-     * Self troca name/phone e, no máximo, escala a própria role de `customer`
-     * pra `seller` (`User::isEligibleForSelfServiceRoleChange`) -- qualquer
-     * outra transição no caminho self é rejeitada. Admin mexendo em outro id
-     * troca pra qualquer role (com a trava do último admin).
-     */
     public function update(Request $request): Response
     {
-        $user = $this->requireUser($request);
-        $managingAnotherUser = $request->param('id') !== null;
+        $data = Validator::validate($request->json(), [
+            'name' => 'max:255',
+            'phone' => 'max:20',
+            'role' => 'in:admin,seller,customer',
+        ]);
 
-        $rules = ['name' => 'max:255', 'phone' => 'max:20', 'role' => 'in:admin,seller,customer'];
-
-        $data = Validator::validate($request->json(), $rules);
-        $previousRole = $user->role;
-        $user = $user->withProfile($data['name'] ?? $user->name, $data['phone'] ?? $user->phone);
-
-        if ($managingAnotherUser && array_key_exists('role', $data)) {
-            $newRole = UserRole::from($data['role']);
-
-            if ($previousRole === UserRole::Admin && $newRole !== UserRole::Admin) {
-                $this->assertNotLastAdmin();
-            }
-
-            $user = $user->withRole($newRole);
-        } elseif (!$managingAnotherUser && array_key_exists('role', $data)) {
-            $newRole = UserRole::from($data['role']);
-
-            if (!$user->isEligibleForSelfServiceRoleChange($newRole)) {
-                throw new DomainException('Only customer accounts can self-upgrade to seller.', DomainErrorType::Forbidden);
-            }
-
-            $user = $user->withRole($newRole);
-        }
-
-        $this->users->update($user);
-        // Só o nome dos campos de perfil alterados (sem valor -- não duplica PII),
-        // mas role muda quem pode fazer o quê no sistema, então guarda de/para inteiro.
-        $context = ['fields' => array_keys($data)];
-
-        if ($user->role !== $previousRole) {
-            $context['role'] = ['from' => $previousRole->value, 'to' => $user->role->value];
-        }
-
-        $this->audit->record(AuditEvent::ProfileUpdated, $request->attribute('auth')->subject, 'User', $user->id, $context, $request->ip(), $request->header('user-agent'));
+        $user = ($this->updateUserProfile)(
+            $this->targetUserId($request),
+            $data,
+            $request->param('id') !== null,
+            RequestActor::fromRequest($request),
+        );
 
         return Response::success(UserProfile::fromUser($user)->toArray());
     }
@@ -157,23 +105,7 @@ final readonly class UserController
     public function requestPasswordReset(Request $request): Response
     {
         $data = Validator::validate($request->json(), ['email' => 'required|email']);
-        $user = $this->users->findByEmail($data['email']);
-
-        if ($user instanceof \App\Domain\Users\User) {
-            [$rawToken, $token] = PasswordResetToken::issue($user->id, $this->passwordResetTtl);
-            $this->passwordResetTokens->insert($token);
-
-            $html = MailTemplate::render($this->passwordResetTemplatePath, [
-                'RESET_LINK' => sprintf('%s/reset-password?token=%s', $this->frontendUrl, $rawToken),
-                'EXPIRES_MINUTES' => (string) intdiv($this->passwordResetTtl, 60),
-            ]);
-
-            $this->queue->push(SendEmailJob::class, [
-                'to' => $user->email,
-                'subject' => 'Redefinir senha -- AutoSchedule',
-                'html_body' => $html,
-            ]);
-        }
+        ($this->requestPasswordReset)($data->string('email'));
 
         return Response::success(['message' => 'If the email exists, a reset link was sent.']);
     }
@@ -186,84 +118,35 @@ final readonly class UserController
      */
     public function updatePassword(Request $request): Response
     {
-        $body = $request->json();
+        $body = $request->jsonFields();
 
         if (array_key_exists('reset_token', $body)) {
-            return $this->resetPassword($request, $body);
+            $data = Validator::validate($body, [
+                'reset_token' => 'required',
+                'password' => 'required|min:8',
+            ]);
+
+            ($this->resetPassword)($data->string('reset_token'), $data->string('password'), RequestActor::fromRequest($request));
+        } else {
+            $data = Validator::validate($body, [
+                'current_password' => 'required',
+                'password' => 'required|min:8',
+            ]);
+
+            ($this->changeOwnPassword)(
+                $this->targetUserId($request),
+                $data->string('current_password'),
+                $data->string('password'),
+                RequestActor::fromRequest($request),
+            );
         }
-
-        return $this->changeOwnPassword($request, $body);
-    }
-
-    /** @param array<string, mixed> $body */
-    private function resetPassword(Request $request, array $body): Response
-    {
-        $data = Validator::validate($body, [
-            'reset_token' => 'required',
-            'password' => 'required|min:8',
-        ]);
-
-        $token = $this->passwordResetTokens->findByRawToken($data['reset_token']);
-        $user = $token instanceof \App\Domain\Auth\PasswordResetToken ? $this->users->findById($token->userId) : null;
-
-        if (!$token instanceof \App\Domain\Auth\PasswordResetToken || $token->isUsed() || $token->isExpired() || !$user instanceof \App\Domain\Users\User) {
-            throw new DomainException('Invalid or expired reset token.', DomainErrorType::Unauthorized);
-        }
-
-        $this->applyNewPassword($user, $data['password'], 'reset', $request);
-        $this->passwordResetTokens->markUsed($token->id);
-        // Um reset bem-sucedido invalida qualquer outro link ainda pendente do
-        // mesmo usuário -- não deixa um link antigo ainda funcionando depois.
-        $this->passwordResetTokens->invalidateAllForUser($user->id);
-        $this->refreshTokens->revokeAllForUser($user->id);
 
         return Response::success(['message' => 'Password updated.']);
     }
 
-    /** @param array<string, mixed> $body */
-    private function changeOwnPassword(Request $request, array $body): Response
-    {
-        $user = $this->requireUser($request);
-        $data = Validator::validate($body, [
-            'current_password' => 'required',
-            'password' => 'required|min:8',
-        ]);
-
-        if (!$user->verifyPassword($data['current_password'])) {
-            throw new DomainException('Current password is incorrect.', DomainErrorType::Unauthorized);
-        }
-
-        $this->applyNewPassword($user, $data['password'], 'self', $request);
-
-        return Response::success(['message' => 'Password updated.']);
-    }
-
-    private function applyNewPassword(User $user, string $password, string $via, Request $request): void
-    {
-        $this->users->update($user->withNewPassword($password));
-        $this->audit->record(AuditEvent::PasswordChanged, $user->id, 'User', $user->id, ['via' => $via], $request->ip(), $request->header('user-agent'));
-    }
-
-    /**
-     * Move pra lixeira (reversível por 30 dias -- login de novo restaura, ou
-     * `restore()`/`purge()` abaixo) e revoga todo refresh token, ninguém
-     * continua logado depois disso. Roda dentro da transação já aberta pelo
-     * AuthContextMiddleware.
-     */
     public function destroy(Request $request): Response
     {
-        $user = $this->requireUser($request);
-
-        if ($user->role === UserRole::Admin) {
-            $this->assertNotLastAdmin();
-        }
-
-        $this->users->trash($user->id);
-        $this->refreshTokens->revokeAllForUser($user->id);
-        // Cascata: concessionária ativa desse seller vai junto pra lixeira (marcada como "por causa da desativação",
-        // pra restaurar seletivo depois -- a que ele já tinha trashed manualmente antes fica quieta).
-        $this->dealerships->trashAllOwnedBy($user->id);
-        $this->audit->record(AuditEvent::AccountTrashed, $request->attribute('auth')->subject, 'User', $user->id, [], $request->ip(), $request->header('user-agent'));
+        ($this->trashAccount)($this->targetUserId($request), RequestActor::fromRequest($request));
 
         return Response::success(['message' => 'Account moved to trash. Log in again within 30 days to restore it, or it will be permanently anonymized.']);
     }
@@ -271,15 +154,7 @@ final readonly class UserController
     /** Admin-only -- recupera uma conta na lixeira sem esperar o dono logar de novo. */
     public function restore(Request $request): Response
     {
-        $user = $this->requireUser($request);
-
-        if (!$user->isEligibleForRestore()) {
-            throw new DomainException('This account is not in the trash (or was already permanently deleted).', DomainErrorType::Conflict);
-        }
-
-        $this->users->restore($user->id);
-        $this->dealerships->restoreAutoTrashedOwnedBy($user->id);
-        $this->audit->record(AuditEvent::AccountRestored, $request->attribute('auth')->subject, 'User', $user->id, [], $request->ip(), $request->header('user-agent'));
+        ($this->restoreAccount)($this->targetUserId($request), RequestActor::fromRequest($request));
 
         return Response::success(['message' => 'Account restored.']);
     }
@@ -287,29 +162,31 @@ final readonly class UserController
     /** Apaga em definitivo agora, sem esperar os 30 dias -- self (`/me/purge`) ou admin (`/users/{id}/purge`). */
     public function purge(Request $request): Response
     {
-        $user = $this->requireUser($request);
-
-        if ($user->status !== TrashableStatus::Trashed) {
-            throw new DomainException('This account is not in the trash.', DomainErrorType::Conflict);
-        }
-
-        $this->users->anonymizeAndSoftDelete($user->id);
-        $this->audit->record(AuditEvent::AccountPurged, $request->attribute('auth')->subject, 'User', $user->id, [], $request->ip(), $request->header('user-agent'));
+        ($this->purgeAccount)($this->targetUserId($request), RequestActor::fromRequest($request));
 
         return Response::success(['message' => 'Account permanently deleted.']);
     }
 
-    /** @param array<string, mixed> $data */
-    private function createUser(array $data, UserRole $role): User
+    private function create(Request $request, string $roleRule): Response
     {
-        if ($this->users->existsByEmail($data['email'])) {
-            throw new DomainException('Email already in use.', DomainErrorType::Conflict, ['email' => 'Email already in use.']);
-        }
+        $data = Validator::validate($request->json(), [
+            'name' => 'required|max:255',
+            'email' => 'required|email',
+            'phone' => 'max:20',
+            'password' => 'required|min:8',
+            'role' => $roleRule,
+        ]);
 
-        $user = User::register($data['name'], $data['email'], $data['phone'] ?? null, $data['password'], $role);
-        $this->users->insert($user);
+        $user = ($this->registerUser)(
+            $data->string('name'),
+            $data->string('email'),
+            $data->stringOrNull('phone'),
+            $data->string('password'),
+            UserRole::from($data->string('role')),
+            RequestActor::fromRequest($request),
+        );
 
-        return $user;
+        return Response::success(UserProfile::fromUser($user)->toArray(), 201);
     }
 
     /**
@@ -318,34 +195,14 @@ final readonly class UserController
      * (aceita o caminho de reset sem Bearer nenhum), então aqui não dá mais
      * pra assumir que sempre existe claims -- vira 401 limpo, não erro solto.
      */
-    private function requireUser(Request $request): User
+    private function targetUserId(Request $request): string
     {
-        $id = $request->param('id');
+        $id = $request->param('id') ?? RequestActor::fromRequest($request)->actorId;
 
         if ($id === null) {
-            $claims = $request->attribute('auth');
-
-            if ($claims === null) {
-                throw new DomainException('Authentication required.', DomainErrorType::Unauthorized);
-            }
-
-            $id = $claims->subject;
+            throw new DomainException('Authentication required.', DomainErrorType::Unauthorized);
         }
 
-        $user = $this->users->findById($id);
-
-        if (!$user instanceof \App\Domain\Users\User) {
-            throw new DomainException('User not found.', DomainErrorType::NotFound);
-        }
-
-        return $user;
-    }
-
-    /** Chamado só quando o usuário já é admin -- barra o passo que o tiraria do papel (delete ou troca de role) se ele for o único. */
-    private function assertNotLastAdmin(): void
-    {
-        if ($this->users->countByRole(UserRole::Admin) <= 1) {
-            throw new DomainException('Cannot remove the last remaining admin.', DomainErrorType::Conflict);
-        }
+        return $id;
     }
 }

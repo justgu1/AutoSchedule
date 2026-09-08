@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Http\Controllers;
 
+use App\Application\Ports\JobProgress;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
 use App\Infrastructure\Http\StreamedResponse;
-use App\Infrastructure\Jobs\JobStatusStore;
 
 /**
  * Genérico de propósito -- não sabe o que o job faz, só expõe o progresso que
@@ -25,7 +25,7 @@ final readonly class JobController
     private const int MAX_STREAM_SECONDS = 55;
     private const int POLL_INTERVAL_MICROSECONDS = 400_000;
 
-    public function __construct(private JobStatusStore $jobStatus)
+    public function __construct(private JobProgress $jobStatus)
     {
     }
 

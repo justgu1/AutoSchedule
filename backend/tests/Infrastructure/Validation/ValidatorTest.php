@@ -20,7 +20,7 @@ final class ValidatorTest extends TestCase
             ['name' => 'required', 'email' => 'required|email'],
         );
 
-        $this->assertSame(['name' => 'Ada', 'email' => 'ada@example.com'], $validated);
+        $this->assertSame(['name' => 'Ada', 'email' => 'ada@example.com'], $validated->all());
     }
 
     #[Test]
@@ -73,7 +73,7 @@ final class ValidatorTest extends TestCase
     {
         $validated = Validator::validate(['password' => 'a-long-enough-password'], ['password' => 'min:8|max:64']);
 
-        $this->assertSame(['password' => 'a-long-enough-password'], $validated);
+        $this->assertSame(['password' => 'a-long-enough-password'], $validated->all());
     }
 
     #[Test]
@@ -81,7 +81,7 @@ final class ValidatorTest extends TestCase
     {
         $validated = Validator::validate(['role' => 'admin'], ['role' => 'required|in:admin,seller,customer']);
 
-        $this->assertSame(['role' => 'admin'], $validated);
+        $this->assertSame(['role' => 'admin'], $validated->all());
     }
 
     #[Test]
@@ -100,7 +100,7 @@ final class ValidatorTest extends TestCase
     {
         $validated = Validator::validate([], ['nickname' => 'email|min:3']);
 
-        $this->assertSame([], $validated);
+        $this->assertSame([], $validated->all());
     }
 
     #[Test]

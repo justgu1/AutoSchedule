@@ -5,11 +5,11 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
-use App\Application;
+use App\Config;
 use App\Infrastructure\Database\PostgresConnection;
 use App\Infrastructure\Database\SeederRunner;
 
-$app = new Application();
+$app = new Config();
 $config = $app->config('database');
 
 $connection = new PostgresConnection(

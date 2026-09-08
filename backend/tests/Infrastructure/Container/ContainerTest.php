@@ -70,7 +70,10 @@ final class ContainerTest extends TestCase
 
         $this->expectException(ContainerException::class);
 
-        $container->get('App\\Does\\Not\\Exist');
+        // Montado em runtime de propósito: o nome não existe, é o caso sob teste.
+        /** @var class-string $missing */
+        $missing = implode('\\', ['App', 'Does', 'Not', 'Exist']);
+        $container->get($missing);
     }
 
     #[Test]

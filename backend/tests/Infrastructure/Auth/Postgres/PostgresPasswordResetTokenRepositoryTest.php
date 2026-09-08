@@ -7,6 +7,7 @@ namespace Tests\Infrastructure\Auth\Postgres;
 use App\Domain\Auth\PasswordResetToken;
 use App\Infrastructure\Auth\Postgres\PostgresPasswordResetTokenRepository;
 use App\Infrastructure\Database\PostgresConnection;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -14,6 +15,7 @@ use PHPUnit\Framework\TestCase;
  * Teste de integração: conecta no Postgres real do docker-compose. Isolado
  * por transação (rollback no tearDown), igual o PostgresRefreshTokenRepositoryTest.
  */
+#[Group('integration')]
 final class PostgresPasswordResetTokenRepositoryTest extends TestCase
 {
     private \PDO $pdo;

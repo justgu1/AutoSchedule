@@ -6,6 +6,7 @@ namespace Tests\Infrastructure\Database;
 
 use App\Infrastructure\Database\PostgresConnection;
 use App\Infrastructure\Database\SeederRunner;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -15,6 +16,7 @@ use PHPUnit\Framework\TestCase;
  * (migration da PR anterior) já existir. Isolado por transação (rollback no
  * tearDown), igual o MigrationRunnerTest.
  */
+#[Group('integration')]
 final class SeederRunnerTest extends TestCase
 {
     private const string ADMIN_EMAIL = 'admin@autoschedule.local';

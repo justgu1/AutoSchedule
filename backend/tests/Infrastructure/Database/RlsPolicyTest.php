@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Infrastructure\Database;
 
-use App\Domain\Users\User;
-use App\Domain\Users\UserRole;
+use App\Domain\User\User;
+use App\Domain\User\UserRole;
 use App\Infrastructure\Database\PostgresConnection;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -18,6 +19,7 @@ use PHPUnit\Framework\TestCase;
  * conexão admin (senão a sessão autoschedule_app nunca os enxerga) --
  * limpeza no tearDown é um DELETE, não rollback de transação.
  */
+#[Group('integration')]
 final class RlsPolicyTest extends TestCase
 {
     private \PDO $admin;

@@ -16,7 +16,7 @@ final class MailTemplateTest extends TestCase
         $path = tempnam(sys_get_temp_dir(), 'mail-template');
         file_put_contents($path, '<p>Olá, {{NAME}}! Seu link: {{LINK}}</p>');
 
-        $rendered = MailTemplate::render($path, ['NAME' => 'Ada', 'LINK' => 'https://example.com']);
+        $rendered = new MailTemplate()->render($path, ['NAME' => 'Ada', 'LINK' => 'https://example.com']);
 
         unlink($path);
 
@@ -29,7 +29,7 @@ final class MailTemplateTest extends TestCase
         $path = tempnam(sys_get_temp_dir(), 'mail-template');
         file_put_contents($path, '<p>Sem placeholder nenhum aqui.</p>');
 
-        $rendered = MailTemplate::render($path, ['NAME' => 'Ada']);
+        $rendered = new MailTemplate()->render($path, ['NAME' => 'Ada']);
 
         unlink($path);
 

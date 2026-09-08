@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Tests\Infrastructure\Storage;
 
 use App\Infrastructure\Storage\MinioAdapter;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 /** Teste de integração: grava/lê/apaga um objeto real no MinIO do docker-compose. */
+#[Group('integration')]
 final class MinioAdapterTest extends TestCase
 {
     private MinioAdapter $adapter;

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Infrastructure\Queue;
 
+use App\Application\Notification\SendEmailJob;
 use App\Infrastructure\Queue\RedisQueue;
 use App\Infrastructure\Redis\RedisConnection;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -13,6 +15,7 @@ use PHPUnit\Framework\TestCase;
  * Teste de integração: conecta no Redis real do docker-compose, igual
  * RedisConnectionTest/RedisRateLimiterTest.
  */
+#[Group('integration')]
 final class RedisQueueTest extends TestCase
 {
     private RedisConnection $connection;
@@ -35,12 +38,12 @@ final class RedisQueueTest extends TestCase
     #[Test]
     public function push_e_pop_entregam_o_mesmo_job(): void
     {
-        $this->queue->push('SomeJob', ['a' => 1]);
+        $this->queue->push(SendEmailJob::class, ['a' => 1]);
 
         $envelope = $this->queue->pop(timeoutSeconds: 2);
         assert($envelope !== null);
 
-        $this->assertSame('SomeJob', $envelope['job_class']);
+        $this->assertSame(SendEmailJob::class, $envelope['job_class']);
         $this->assertSame(['a' => 1], $envelope['payload']);
         $this->assertSame(0, $envelope['attempts']);
     }
@@ -54,7 +57,7 @@ final class RedisQueueTest extends TestCase
     #[Test]
     public function retry_or_fail_reenfileira_com_attempts_incrementado(): void
     {
-        $this->queue->push('SomeJob', []);
+        $this->queue->push(SendEmailJob::class, []);
         $envelope = $this->queue->pop(timeoutSeconds: 2);
         assert($envelope !== null);
 
@@ -68,7 +71,7 @@ final class RedisQueueTest extends TestCase
     #[Test]
     public function retry_or_fail_manda_pra_lista_de_falhas_apos_o_maximo_de_tentativas(): void
     {
-        $this->queue->push('SomeJob', []);
+        $this->queue->push(SendEmailJob::class, []);
         $envelope = $this->queue->pop(timeoutSeconds: 2);
         assert($envelope !== null);
 

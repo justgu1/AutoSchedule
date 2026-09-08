@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Infrastructure\Http\Middleware;
 
 use App\Domain\Auth\Ports\TokenIssuer;
-use App\Domain\Ports\DatabaseConnection;
+use App\Infrastructure\Database\DatabaseConnection;
 use App\Infrastructure\Http\Middleware;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;

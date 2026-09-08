@@ -5,7 +5,7 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
-use App\Application;
+use App\Config;
 
 /**
  * `phpunit` nunca pode rodar contra o banco de dev de verdade -- sessão
@@ -21,7 +21,7 @@ use App\Application;
  */
 const TEST_DATABASE = 'autoschedule_test';
 
-$app = new Application();
+$app = new Config();
 $config = $app->config('database');
 
 $pdo = new \PDO(

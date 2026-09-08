@@ -24,10 +24,14 @@
         "phpunit/phpunit": "^11.0",
         "phpstan/phpstan": "^2.2",
         "friendsofphp/php-cs-fixer": "^3.95",
-        "rector/rector": "^2.6"
+        "rector/rector": "^2.6",
+        "deptrac/deptrac": "^4.0"
     },
     "scripts": {
-        "test": "phpunit"
+        "test": "phpunit",
+        "test:unit": "phpunit --exclude-group integration",
+        "test:integration": "phpunit --group integration",
+        "arch": "deptrac analyse --config-file=deptrac.yaml"
     },
     "minimum-stability": "stable",
     "prefer-stable": true

@@ -5,13 +5,13 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
-use App\Application;
+use App\Config;
 use App\Bootstrap\ContainerFactory;
-use App\Domain\Ports\DatabaseConnection;
-use App\Domain\Ports\Job;
+use App\Infrastructure\Database\DatabaseConnection;
+use App\Application\Ports\Job;
 use App\Infrastructure\Queue\RedisQueue;
 
-$app = new Application();
+$app = new Config();
 $container = ContainerFactory::build($app);
 /** @var RedisQueue $queue */
 $queue = $container->get(RedisQueue::class);

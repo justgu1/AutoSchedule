@@ -6,6 +6,7 @@ namespace Tests\Infrastructure\Database;
 
 use App\Infrastructure\Database\PostgresConnection;
 use App\Infrastructure\Database\SeederRunner;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -22,6 +23,7 @@ use PHPUnit\Framework\TestCase;
  * provar que o SeederRunner cobre o próprio contexto -- sem o `SET LOCAL`
  * isso derruba com "new row violates row-level security policy".
  */
+#[Group('integration')]
 final class SeederRunnerRlsTest extends TestCase
 {
     #[Test]

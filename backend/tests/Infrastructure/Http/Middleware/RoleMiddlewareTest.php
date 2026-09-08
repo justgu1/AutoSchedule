@@ -7,7 +7,7 @@ namespace Tests\Infrastructure\Http\Middleware;
 use App\Domain\Auth\ValueObjects\AccessTokenClaims;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
-use App\Domain\Users\UserRole;
+use App\Domain\User\UserRole;
 use App\Infrastructure\Http\JsonResponse;
 use App\Infrastructure\Http\Middleware\RoleMiddleware;
 use App\Infrastructure\Http\Request;

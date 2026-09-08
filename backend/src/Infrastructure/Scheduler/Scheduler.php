@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Scheduler;
 
-use App\Domain\Ports\ScheduledTask;
 use App\Infrastructure\Redis\RedisConnection;
 
 final readonly class Scheduler
