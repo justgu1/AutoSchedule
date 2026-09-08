@@ -7,6 +7,7 @@ namespace Tests\Infrastructure\Persistence;
 use App\Domain\Shared\Money;
 use App\Domain\Shared\TrashableStatus;
 use App\Domain\Vehicle\Vehicle;
+use App\Domain\Vehicle\VehicleFilters;
 use App\Infrastructure\Persistence\PostgresVehicleRepository;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
@@ -82,7 +83,7 @@ final class PostgresVehicleRepositoryTest extends TestCase
     }
 
     #[Test]
-    public function find_by_owner_traz_so_os_veiculos_das_concessionarias_daquele_dono(): void
+    public function busca_sem_filtro_traz_so_os_veiculos_das_concessionarias_daquele_dono(): void
     {
         $owner = $this->insertSellerUser();
         $otherOwner = $this->insertSellerUser();
@@ -91,30 +92,31 @@ final class PostgresVehicleRepositoryTest extends TestCase
         $this->repository->insert($mine);
         $this->repository->insert($notMine);
 
-        $found = $this->repository->findByOwner($owner, 10, 0);
+        $found = $this->repository->search(new VehicleFilters(), $owner, 10, 0);
 
         $this->assertSame([$mine->id], array_map(static fn (Vehicle $v): string => $v->id, $found));
-        $this->assertSame(1, $this->repository->countByOwner($owner));
+        $this->assertSame(1, $this->repository->countSearch(new VehicleFilters(), $owner));
     }
 
+    /** `created_at` explícito: sem isso, dois registros no mesmo segundo empatam e o desempate por `id` (UUIDv7 aleatório) não segue a ordem de inserção. */
     #[Test]
-    public function find_by_owner_respeita_limit_e_offset(): void
+    public function busca_respeita_limit_e_offset(): void
     {
         $owner = $this->insertSellerUser();
         $dealership = $this->insertDealership($owner);
-        $first = $this->registerFixture($dealership, brand: 'Chevrolet');
-        $second = $this->registerFixture($dealership, brand: 'Fiat');
+        $first = $this->registerFixture($dealership, brand: 'Chevrolet', createdAt: new \DateTimeImmutable('-1 minute'));
+        $second = $this->registerFixture($dealership, brand: 'Fiat', createdAt: new \DateTimeImmutable());
         $this->repository->insert($first);
         $this->repository->insert($second);
 
-        $page = $this->repository->findByOwner($owner, 1, 1);
+        $page = $this->repository->search(new VehicleFilters(), $owner, 1, 1);
 
         $this->assertCount(1, $page);
-        $this->assertSame($second->id, $page[0]->id);
+        $this->assertSame($first->id, $page[0]->id);
     }
 
     #[Test]
-    public function find_by_dealership_traz_so_os_daquela_concessionaria(): void
+    public function filtro_por_concessionaria_traz_so_os_daquela_concessionaria(): void
     {
         $owner = $this->insertSellerUser();
         $dealership = $this->insertDealership($owner);
@@ -124,10 +126,11 @@ final class PostgresVehicleRepositoryTest extends TestCase
         $this->repository->insert($here);
         $this->repository->insert($there);
 
-        $found = $this->repository->findByDealership($dealership, 10, 0);
+        $filters = new VehicleFilters(dealershipId: $dealership);
+        $found = $this->repository->search($filters, null, 10, 0);
 
         $this->assertSame([$here->id], array_map(static fn (Vehicle $v): string => $v->id, $found));
-        $this->assertSame(1, $this->repository->countByDealership($dealership));
+        $this->assertSame(1, $this->repository->countSearch($filters, null));
     }
 
     #[Test]
@@ -138,8 +141,8 @@ final class PostgresVehicleRepositoryTest extends TestCase
         $this->repository->insert($vehicle);
         $this->repository->purge($vehicle->anonymized());
 
-        $this->assertSame([], $this->repository->findByOwner($owner, 10, 0));
-        $this->assertSame(0, $this->repository->countByOwner($owner));
+        $this->assertSame([], $this->repository->search(new VehicleFilters(), $owner, 10, 0));
+        $this->assertSame(0, $this->repository->countSearch(new VehicleFilters(), $owner));
     }
 
     #[Test]
@@ -254,9 +257,9 @@ final class PostgresVehicleRepositoryTest extends TestCase
         $this->assertSame(TrashableStatus::Active, $this->repository->findById($second->id)?->trash->status);
     }
 
-    private function registerFixture(string $dealershipId, string $brand = 'Chevrolet', ?Money $price = null): Vehicle
+    private function registerFixture(string $dealershipId, string $brand = 'Chevrolet', ?Money $price = null, ?\DateTimeImmutable $createdAt = null): Vehicle
     {
-        return Vehicle::register(
+        $vehicle = Vehicle::register(
             dealershipId: $dealershipId,
             brand: $brand,
             model: 'Onix',
@@ -264,6 +267,21 @@ final class PostgresVehicleRepositoryTest extends TestCase
             year: 2023,
             price: $price ?? new Money(8990000),
         );
+
+        return $createdAt instanceof \DateTimeImmutable ? new Vehicle(
+            id: $vehicle->id,
+            dealershipId: $vehicle->dealershipId,
+            brand: $vehicle->brand,
+            model: $vehicle->model,
+            version: $vehicle->version,
+            year: $vehicle->year,
+            price: $vehicle->price,
+            description: $vehicle->description,
+            trash: $vehicle->trash,
+            trashedByDealershipTrash: $vehicle->trashedByDealershipTrash,
+            createdAt: $createdAt,
+            updatedAt: $createdAt,
+        ) : $vehicle;
     }
 
     private function insertSellerUser(): string

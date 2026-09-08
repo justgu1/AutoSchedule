@@ -129,7 +129,11 @@ return static function (Router $router): void {
             ->describes('Removes the dealership photo.');
 
         $router->get('/api/vehicles', [VehicleController::class, 'index'])
-            ->describes('Lists vehicles -- admin sees all, seller sees only the ones in their own dealerships (query: page, per_page).');
+            ->describes('Lists and searches vehicles -- admin sees all, seller sees only the ones in their own dealerships (query: q, brand, model, year_min, year_max, price_min, price_max, dealership_id, page, per_page). Brand and model go through the text index, so they also match a vehicle that only mentions them in the description.');
+
+        // Antes de `{id}`: o router devolve a primeira rota que casa, e o parâmetro engoliria "filters".
+        $router->get('/api/vehicles/filters', [VehicleController::class, 'filters'])
+            ->describes('Brands, models and years that exist in the caller stock, to fill the filter inputs.');
 
         $router->get('/api/vehicles/{id}', [VehicleController::class, 'show'])
             ->describes('Returns a vehicle owned by the caller (or any vehicle, for an admin).');

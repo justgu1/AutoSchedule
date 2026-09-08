@@ -24,11 +24,11 @@ Convenção: `Arquivo::método` para PHPUnit (backend); `arquivo.spec.ts > nome 
 | Purge escruba o que localiza a porta (rua, número, complemento) e o que identifica direto, mas preserva CEP/cidade/UF; rotina agendada reaproveita a mesma `ScheduledTask` genérica da conta de usuário | `DealershipTest::anonymized_escruba_identificador_direto_mas_preserva_localidade_agregada`; `PurgeTrashedDealershipsTaskTest` (3 casos) |
 | Foto: uma só, substituível, remove a anterior do storage ao trocar/remover | `PostgresDealershipRepositoryTest::persiste_a_foto_e_permite_substituir_por_outra_ou_remover`; `DealershipTest::with_photo_substitui_a_referencia_mas_preserva_o_resto`; `ProcessDealershipPhotoTest::substitui_a_foto_anterior_e_apaga_o_arquivo_velho_do_storage` |
 | Foto processada fora do request (job assíncrono): otimiza pro padrão do site (WebP, redimensionada), reporta progresso, falha vira status `failed` sem exceção escapar | `ProcessDealershipPhotoTest` (4 casos); `GdImageOptimizerTest` (4 casos, conversão real e redimensionamento); `JobStatusStoreTest` (3 casos) |
-| Limite de 20MB e validação de MIME real (`image/jpeg`/`image/png`/`image/webp`) no upload de foto | Validação declarada em `DealershipController::setPhoto()`; **sem teste automatizado direto do endpoint** -- verificado manualmente via curl (ver "Lacunas" no fim deste documento) |
+| Limite de 20MB e whitelist de MIME (`image/webp`, único formato que o otimizador produz) no upload de foto | Limite declarado em `EnqueueDealershipPhoto`, whitelist em `UploadFile::uploadImage()`; **sem teste automatizado direto do endpoint** -- verificado manualmente via curl (ver "Lacunas" no fim deste documento) |
 | `GET /zip-codes/{cep}` resolve CEP → endereço via ViaCEP e cacheia (`zip_code_cache`) -- só chama o terceiro na primeira vez que aquele CEP aparece | `LookupZipCodeTest` (3 casos: cache hit, cache miss grava, CEP inexistente devolve null sem gravar) |
 | Formulário de concessionária autopreenche endereço/bairro/cidade/UF a partir do CEP, chamando o próprio backend (nunca o ViaCEP direto) | E2E: `dealerships.spec.ts > seller cria, edita...` e `> admin cria concessionária...` (`/api/zip-codes/*` mocado via `page.route`, resultado determinístico) |
 | UF é um Autocomplete com busca, selecionável independente do CEP | E2E: `dealerships.spec.ts > UF é um autocomplete com busca, selecionável mesmo sem preencher o CEP` |
-| `GET /dealerships/{id}` é a mesma rota do gerenciamento -- dono/admin recebem o perfil completo, qualquer outro caso (outro seller, customer, sem conta) recebe o perfil público (nome, endereço, telefone/e-mail da concessionária, foto, só o **nome** do vendedor -- nenhum outro dado dele) e só se a concessionária estiver `active`; `vehicles` vazio até a Epic Veículo existir | `AuthContextMiddlewareTest::rota_de_leitura_publica_sem_claims_seta_a_flag_publica`, `::leitura_publica_com_claims_seta_os_dois_contextos_juntos`; `RlsPolicyTest::contexto_de_leitura_publica_enxerga_so_seller_com_concessionaria_ativa`; E2E: `dealerships.spec.ts > página pública da concessionária mostra nome, endereço e vendedor sem exigir conta` |
+| Página pública (ver "Página pública" em `business-rules.md`): mesma rota do gerenciamento, perfil enxuto pra quem não é dono/admin, só concessionária `active` | `AuthContextMiddlewareTest::rota_de_leitura_publica_sem_claims_seta_a_flag_publica`, `::leitura_publica_com_claims_seta_os_dois_contextos_juntos`; `RlsPolicyTest::contexto_de_leitura_publica_enxerga_so_seller_com_concessionaria_ativa`; E2E: `dealerships.spec.ts > página pública da concessionária mostra nome, endereço e vendedor sem exigir conta` |
 | URL pública usa `slug` (nome + parte do id), nunca o `id` -- estável mesmo se o nome mudar, só troca na anonimização | `DealershipTest::register_gera_um_slug_a_partir_do_nome_sem_expor_o_id_inteiro`, `::with_profile_troca_os_dados_mas_preserva_dono_status_e_slug`, `::anonymized_escruba_identificador_direto_mas_preserva_localidade_agregada` (slug troca); `PostgresDealershipRepositoryTest::persiste_e_encontra_por_slug` |
 | UF é uma das 27 unidades federativas, validada na borda -- sigla inexistente é 422, nunca 500 | `ValidatorTest::rejeita_sigla_de_estado_que_nao_existe` |
 | Os sete campos de endereço andam juntos como um valor só (`Address`), e a anonimização é regra do próprio VO | `DealershipTest::anonymized_escruba_identificador_direto_mas_preserva_localidade_agregada`; `PostgresDealershipRepositoryTest::insere_e_encontra_por_id` (ida e volta do VO pelo banco) |
@@ -37,11 +37,11 @@ Convenção: `Arquivo::método` para PHPUnit (backend); `arquivo.spec.ts > nome 
 
 | Regra | Testes |
 |---|---|
-| Veículo pertence a uma única concessionária, e o dono é transitivo (`dealerships.owner_user_id`), sem cópia no próprio veículo | `PostgresVehicleRepositoryTest::insere_e_encontra_por_id`, `::find_by_owner_traz_so_os_veiculos_das_concessionarias_daquele_dono`, `::find_by_dealership_traz_so_os_daquela_concessionaria` |
+| Veículo pertence a uma única concessionária, e o dono é transitivo (`dealerships.owner_user_id`), sem cópia no próprio veículo | `PostgresVehicleRepositoryTest::insere_e_encontra_por_id`, `::busca_sem_filtro_traz_so_os_veiculos_das_concessionarias_daquele_dono`, `::filtro_por_concessionaria_traz_so_os_daquela_concessionaria` |
 | Status é só a lixeira de 3 estados da conta e da concessionária (`active`/`trashed`/`deleted`), reversível 30 dias -- "vendido" e "agendado" não são estado guardado | `VehicleTest::register_monta_um_veiculo_novo_ativo_e_sem_anonimizacao`, `::allows_restore_permite_so_trashed_ainda_nao_anonimizado`, `::allows_purge_exige_trashed_ha_mais_de_grace_days`; `PostgresVehicleRepositoryTest::trash_move_pra_status_trashed_e_seta_trashed_at`, `::restore_volta_status_active_e_limpa_trashed_at`, `::find_trashed_so_traz_trashed_ainda_nao_anonimizado` |
 | Purge só encerra o ciclo de vida -- veículo não tem PII, então marca e modelo sobrevivem pro histórico de agendamento | `VehicleTest::anonymized_encerra_o_ciclo_de_vida_sem_mexer_nos_dados_do_anuncio`; `PostgresVehicleRepositoryTest::listagem_ignora_veiculo_deletado` |
 | Lixeira em cascata (concessionária ou conta do dono) só restaura automaticamente quem caiu por causa dela | `PostgresVehicleRepositoryTest::trash_all_in_dealership_so_afeta_os_ativos_e_marca_por_cascata`, `::restore_auto_trashed_in_dealership_so_restaura_quem_caiu_por_cascata`, `::cascata_por_dono_alcanca_todas_as_concessionarias_dele` |
-| RLS: seller só enxerga/altera veículo das próprias concessionárias e não consegue inserir na alheia (o dono vem do payload, então o INSERT também checa); admin enxerga qualquer um; sem contexto, nenhuma linha; contexto de serviço enxerga e atualiza; leitura pública enxerga só veículo `active` de concessionária `active` | `VehicleRlsPolicyTest` (9 casos) |
+| RLS: seller só enxerga/altera veículo das próprias concessionárias e não consegue inserir na alheia (o dono vem do payload, então o INSERT também checa); admin enxerga qualquer um; sem contexto, nenhuma linha; contexto de serviço enxerga e atualiza; leitura pública enxerga só veículo `active` de concessionária `active` | `VehicleRlsPolicyTest` (10 casos) |
 | Preço em centavos inteiros, nunca float -- ida e volta pelo banco preserva o centavo, e a API troca decimal como string | `MoneyTest` (5 casos); `PostgresVehicleRepositoryTest::preco_faz_a_ida_e_volta_pelo_banco_sem_perder_centavo`; `CreateVehicleTest::ano_e_preco_chegam_como_numero_do_json_sem_quebrar` |
 | Seller cria veículo só nas próprias concessionárias; admin, em qualquer uma -- concessionária alheia é 404, não 403 | `CreateVehicleTest` (4 casos) |
 | Mover de concessionária pelo mesmo `PATCH`: quem move precisa alcançar as duas pontas (seller só as próprias, admin qualquer uma), e a movimentação gera evento próprio | `UpdateVehicleTest` (4 casos); `VehicleRlsPolicyTest::seller_nao_consegue_mover_o_proprio_veiculo_pra_concessionaria_de_outro_seller` |
@@ -62,7 +62,20 @@ Convenção: `Arquivo::método` para PHPUnit (backend); `arquivo.spec.ts > nome 
 | RLS da galeria delega pro do veículo, inclusive pro contexto de serviço, que é quem grava a foto | `VehicleImageRlsPolicyTest` (6 casos) |
 | `images[]` vira uma lista de arquivos; campo simples continua sendo a lista de um | `RequestFilesTest` (4 casos) |
 
-### Disponibilidade, Exemplo, Exceções, Agendamento, Status, Concorrência, Cliente
+## Busca
+
+| Regra | Testes |
+|---|---|
+| Listar e buscar são a mesma consulta: sem filtro, a busca degenera na listagem inteira | `VehicleSearchTest::busca_vazia_devolve_a_listagem_inteira`; `PostgresVehicleRepositoryTest::busca_sem_filtro_traz_so_os_veiculos_das_concessionarias_daquele_dono`, `::busca_respeita_limit_e_offset` |
+| Filtro de marca e modelo passa pelo índice de texto, então alcança quem cita a marca só na descrição -- e não só recorta: quem é da marca aparece antes de quem só a cita | `VehicleSearchTest::filtro_de_marca_encontra_o_veiculo_que_so_cita_a_marca_na_descricao`, `::filtro_de_marca_tambem_ordena_pelo_campo_proprio`, `::campo_proprio_ranqueia_acima_da_descricao`, `::busca_por_marca_encontra_o_veiculo_pelo_indice_de_texto` |
+| Erro de digitação e caractere especial de query não quebram a busca | `VehicleSearchTest::busca_encontra_mesmo_com_erro_de_digitacao_na_marca`, `::busca_com_caractere_especial_nao_quebra` |
+| Filtros empilhados se combinam por AND; faixas de ano e preço recortam pelas duas pontas | `VehicleSearchTest::filtros_empilhados_se_combinam`, `::faixa_de_ano_recorta_o_resultado_pelas_duas_pontas`; `PostgresVehicleRepositoryTest::filtro_por_concessionaria_traz_so_os_daquela_concessionaria` |
+| `search_vector` é coluna gerada -- nenhum caminho de escrita precisa lembrar de recalcular | `VehicleSearchTest::search_vector_e_recalculado_quando_a_descricao_muda` |
+| Paginação da busca não repete nem pula linha entre páginas (rank empata, o desempate por id resolve) | `VehicleSearchTest::paginacao_da_busca_nao_repete_nem_pula_linha_entre_paginas` |
+| Busca respeita o escopo do seller e as facetas trazem só o que existe em estoque | `VehicleSearchTest::busca_nao_atravessa_a_concessionaria_de_outro_seller`, `::facetas_trazem_so_o_que_existe_em_estoque` |
+| Query string editável na barra de endereço vira filtro ausente, não 500 | `VehicleFilterQueryTest` (4 casos) |
+
+## Disponibilidade, Exemplo, Exceções, Agendamento, Status, Concorrência, Cliente
 
 Domínio ainda não implementado -- nenhum teste existe porque nenhum código existe. Não é lacuna de cobertura, é trabalho futuro (ver `Worklist.md`).
 
@@ -123,18 +136,14 @@ Domínio ainda não implementado -- nenhum teste existe porque nenhum código ex
 | Escrita múltipla dependente é atômica também fora do request (worker e scheduler não têm a transação que o RLS abre) | `PurgeTrashedUsersTaskTest` e `PurgeTrashedDealershipsTaskTest` rodam a tarefa contra o Postgres real com `PdoTransaction`; a reentrância é exercida por todo teste de caso de uso que roda dentro da transação do teste |
 | Job resolve suas dependências (`MailProvider`, etc.) via container, sem registro manual por classe | `SendEmailJobTest::handle_traduz_o_payload_da_fila_em_argumentos_do_caso_de_uso` |
 
-### Busca, Imagens, Integridade
-
-Domínio ainda não implementado -- mesma situação de Veículos/Agendamento acima.
-
 ## Ciclo de vida da conta (lixeira)
 
 | Regra | Testes |
 |---|---|
-| `DELETE /me` move pra `trashed` (não anonimiza na hora), revoga todo refresh token do usuário -- ninguém continua logado depois | `PostgresUserRepositoryTest::trash_move_pra_status_trashed_e_seta_deleted_at_sem_apagar_pii`; revogação garantida por `UserController::destroy()` chamar `revokeAllForUser`, coberta indiretamente por `PostgresRefreshTokenRepositoryTest::revoke_all_for_user_revoga_todo_token_ativo_do_usuario_em_qualquer_familia`; E2E: `account-trash.spec.ts > desativar a conta -> logar de novo -> conta restaurada` |
+| `DELETE /me` move pra `trashed` (não anonimiza na hora), revoga todo refresh token do usuário -- ninguém continua logado depois | `PostgresUserRepositoryTest::trash_move_pra_status_trashed_e_seta_deleted_at_sem_apagar_pii`; revogação garantida por `Application/User/TrashAccount` chamar `revokeAllForUser`, coberta indiretamente por `PostgresRefreshTokenRepositoryTest::revoke_all_for_user_revoga_todo_token_ativo_do_usuario_em_qualquer_familia`; E2E: `account-trash.spec.ts > desativar a conta -> logar de novo -> conta restaurada` |
 | Conta `trashed` ainda bloqueia reuso do e-mail (ninguém mais se registra com ele até a purge rodar) | `PostgresUserRepositoryTest::trashed_ainda_e_encontrado_por_email_e_bloqueia_reuso_do_email` |
 | Login com sucesso restaura a conta `trashed` automaticamente (senha ou Google), antes de emitir o token | `OAuthFlowsTest::login_with_password_restaura_conta_trashed_e_audita_antes_do_login`, `::login_with_google_restaura_conta_trashed_da_identidade_ja_linkada`; E2E: `account-trash.spec.ts` (fluxo completo, sem passo extra do usuário) |
-| Restore só funciona antes da anonimização definitiva (`isEligibleForRestore`) | `UserTest::is_eligible_for_restore_permite_so_trashed_ainda_nao_anonimizado`; `PostgresUserRepositoryTest::restore_volta_status_active_e_limpa_deleted_at` |
+| Restore só funciona antes da anonimização definitiva (`TrashState::allowsRestore()`) | `UserTest::is_eligible_for_restore_permite_so_trashed_ainda_nao_anonimizado`; `PostgresUserRepositoryTest::restore_volta_status_active_e_limpa_deleted_at` |
 | Purge (`POST /me/purge` ou rotina agendada) anonimiza PII (nome, e-mail, telefone) e marca `deleted` -- nunca hard-delete, nunca antes dos 30 dias sem ação explícita | `UserTest::anonymized_remove_pii_mas_preserva_id_role_e_timestamps`; `PostgresUserRepositoryTest::purge_escruba_a_pii_na_linha_persistida`, `::purge_some_das_buscas` |
 | Elegibilidade de purge exige `trashed` há mais de 30 dias e ainda não anonimizado | `UserTest::is_eligible_for_purge_exige_trashed_ha_mais_de_grace_days_e_ainda_nao_anonimizado`; `PostgresUserRepositoryTest::find_purge_eligible_so_traz_trashed_ha_mais_de_grace_days_e_ainda_nao_anonimizado` |
 | Rotina agendada (`PurgeTrashedUsersTask`) só purga quem é elegível, audita cada purge, não é no-op quando não há ninguém | `PurgeTrashedUsersTaskTest` (3 casos) |
@@ -143,7 +152,7 @@ Domínio ainda não implementado -- mesma situação de Veículos/Agendamento ac
 
 ## Acessibilidade (WCAG 2.1 AA)
 
-Não é seção de `business-rules.md` (é requisito não-funcional, não regra de domínio), catalogado aqui pela mesma razão que LGPD acima:
+Não é seção de `business-rules.md` (é requisito não-funcional, não regra de domínio):
 
 | Regra | Testes |
 |---|---|

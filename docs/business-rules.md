@@ -44,7 +44,7 @@ Anonimização escruba o que localiza a porta (rua, número, complemento) e o qu
 
 Uma só, não galeria -- `POST /dealerships/{id}/photo` substitui a anterior (que é apagada do storage, não fica órfã); `DELETE` remove. Até 20MB por upload; validada por MIME real, não só a extensão.
 
-Processada fora do request: o endpoint só valida o essencial (arquivo presente, tamanho) e enfileira, devolvendo `202` com um `job_id` na hora -- quem chamou acompanha o resultado por `GET /jobs/{job_id}` (snapshot) ou `GET /jobs/{job_id}/events` (SSE, evento por mudança de status: `queued` → `processing` → `done`/`failed`). O worker é quem converte pro padrão do site (WebP, redimensionada a até 1600px no lado maior) antes de gravar -- pensado pra reaproveitar no futuro import em lote da galeria de veículo, mesmo mecanismo.
+Processada fora do request: o endpoint só valida o essencial (arquivo presente, tamanho) e enfileira, devolvendo `202` com um `job_id` na hora -- quem chamou acompanha o resultado por `GET /jobs/{id}` (snapshot) ou `GET /jobs/{id}/events` (SSE, evento por mudança de status: `queued` → `processing` → `done`/`failed`). O worker é quem converte pro padrão do site (WebP, redimensionada a até 1600px no lado maior) antes de gravar -- o mesmo mecanismo que o import em lote da galeria de veículo usa (ver [Galeria](#galeria)).
 
 ### Endereço e contato
 
@@ -52,7 +52,7 @@ Além do endereço, a concessionária tem telefone e e-mail próprios (contato d
 
 ### Página pública
 
-`GET /dealerships/{id}` é a mesma rota que o gerenciamento usa -- o formato da resposta muda pra quem chama, não a URL: dono/admin recebem o perfil completo, qualquer outro caso (outro seller, customer, sem conta nenhuma) recebe um perfil enxuto (nome, endereço, telefone/e-mail da concessionária, foto, só o **nome** do vendedor -- nenhum outro dado dele) e só se a concessionária estiver `active` (trashed/deleted viram `404`, igual concessionária inexistente, de propósito). `vehicles` vai vazio até a Epic Veículo existir, contrato já reservado pra não quebrar quando a listagem chegar.
+`GET /dealerships/{id}` é a mesma rota que o gerenciamento usa -- o formato da resposta muda pra quem chama, não a URL: dono/admin recebem o perfil completo, qualquer outro caso (outro seller, customer, sem conta nenhuma) recebe um perfil enxuto (nome, endereço, telefone/e-mail da concessionária, foto, só o **nome** do vendedor -- nenhum outro dado dele) e só se a concessionária estiver `active` (trashed/deleted viram `404`, igual concessionária inexistente, de propósito). `vehicles` ainda vai vazio -- contrato já reservado, listagem entra quando a vitrine pública do estoque for implementada.
 
 A URL pública (`/concessionarias/{slug}` no front) usa um `slug` gerado a partir do nome + parte do id, nunca o `id` em si -- estável mesmo se o nome mudar depois, só é trocado por um neutro na anonimização. O mapa (Google Maps Embed, só exibição por string de endereço) usa o mesmo endereço já salvo.
 
@@ -88,6 +88,24 @@ A ordem é definida por `position`, sendo `0` a primeira imagem apresentada -- a
 
 Otimizar e gravar sai do request, como na foto da concessionária -- o lote inteiro tem um `job_id` só, acompanhado pelo mesmo SSE. Uma transação por foto: uma imagem ruim no meio do lote não desfaz as que já entraram, e o erro vira status `failed` em vez de exceção.
 
+## Busca
+
+Listar e buscar veículo são a mesma requisição: `GET /vehicles` com filtros opcionais na query string, todos combináveis. Sem filtro nenhum, é a listagem de sempre.
+
+| Filtro | Como recorta |
+|---|---|
+| `q` | texto livre sobre marca, modelo, versão, ano e descrição |
+| `brand`, `model` | índice de texto, não igualdade |
+| `year_min`, `year_max` | faixa numérica |
+| `price_min`, `price_max` | faixa numérica |
+| `dealership_id` | igualdade |
+
+Marca e modelo passarem pelo índice de texto é a razão de a busca ser configurada no banco: **filtrar por "Chevrolet" encontra também o anúncio que só escreveu a marca na descrição**. E filtrar não é só recortar -- o campo próprio pesa mais que o texto livre, então quem é da marca aparece antes de quem só a cita.
+
+A busca também tolera erro de digitação e palavra parcial (`corola` acha `Corolla`), o que a FTS sozinha não faz -- é o `pg_trgm` que cobre isso.
+
+`GET /vehicles/filters` devolve as marcas, modelos e anos que existem no estoque de quem chama, pra tela não oferecer combinação que não devolve nada. Admin vê o catálogo inteiro; seller, só o próprio.
+
 ## Disponibilidade
 
 Um horário somente está disponível quando:
@@ -106,7 +124,7 @@ não existe agendamento ativo no horário
 
 Os horários disponíveis são definidos por data. Ao selecionar uma data, somente os horários válidos para aquele dia devem ser apresentados.
 
-## Exemplo
+### Exemplo
 
 Se a concessionária estiver disponível das 09:00 às 18:00 e o veículo das 10:00 às 15:00, com duração de 60 minutos, os horários possíveis são:
 
@@ -405,25 +423,6 @@ O worker PHP consome uma fila (`Queue`/Redis) e executa tarefas assíncronas, co
 
 As tarefas devem ser idempotentes sempre que possível. Falha reenfileira com `attempts` incrementado; passadas 3 tentativas, o job vai pra uma lista de falhas (dead-letter) em vez de tentar pra sempre.
 
-## Busca
-
-A busca utiliza PostgreSQL Full Text Search e `pg_trgm`.
-
-Não é necessário utilizar Elasticsearch na primeira versão.
-
-## Imagens
-
-Arquivos enviados devem ser validados antes do armazenamento, considerando o conteúdo real e o MIME type.
-
-As imagens são armazenadas no MinIO e o PostgreSQL mantém somente suas referências.
-
 ## Integridade
 
-As regras críticas devem ser protegidas também pelo banco de dados:
-
-- e-mail único;
-- foreign keys;
-- cada concessionária pertence a exatamente um seller (`owner_user_id` `NOT NULL`, sem tabela de associação);
-- posição única das imagens;
-- intervalos de disponibilidade válidos;
-- prevenção de agendamentos concorrentes.
+Toda regra crítica listada aqui também é constraint no banco -- ver [`docs/database.md#integridade`](database.md#integridade). Validação da aplicação não substitui isso.

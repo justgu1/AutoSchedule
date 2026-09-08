@@ -132,7 +132,7 @@ Hoje: rate limiting (sliding window, script Lua atômico -- ver `docs/business-r
 Upload -> Backend (valida MIME/tamanho) -> Job assíncrono (otimiza pro padrão do site) -> MinIO -> tabela `files`
 ```
 
-PostgreSQL guarda a referência do objeto (`files`), nunca o binário. Upload confirmado no MinIO só depois disso vira linha em `files` -- nada de registro órfão apontando pra um objeto que falhou no meio do caminho. Foto de site (hoje: concessionária) é convertida pro padrão do site -- WebP, redimensionada -- pelo `ImageOptimizer` (GD) antes de gravar; nunca o arquivo cru que o cliente mandou.
+PostgreSQL guarda a referência do objeto (`files`), nunca o binário. Upload confirmado no MinIO só depois disso vira linha em `files` -- nada de registro órfão apontando pra um objeto que falhou no meio do caminho. Toda foto de site (concessionária, galeria de veículo) é convertida pro padrão do site -- WebP, redimensionada -- pelo `ImageOptimizer` (GD) antes de gravar; nunca o arquivo cru que o cliente mandou.
 
 ## Autorização e RLS
 
@@ -175,7 +175,9 @@ Job que o cliente precisa acompanhar (hoje: processar foto) grava progresso num 
 
 ## Busca e geolocalização
 
-PostgreSQL Full Text Search + `pg_trgm` cobrem a busca inicial, sem depender de Elasticsearch. Busca por proximidade ainda não existe: `dealerships` teve `latitude`/`longitude`/`google_place_id` desde a criação e nunca gravou valor em nenhuma, então as três foram removidas por migration. Quando a proximidade for real, a coluna volta com o geocoder que a preenche -- e aí vale decidir entre cálculo no Postgres puro ou PostGIS.
+PostgreSQL Full Text Search + `pg_trgm` cobrem a busca de veículo, sem depender de Elasticsearch. Um caminho de SQL só serve listagem e busca: filtro ausente vira `IS NULL` no parâmetro e some da conta, então "sem filtro nenhum" é literalmente a listagem de antes -- não há duas consultas pra manter em sincronia. Detalhes de dicionário, pesos e índices em [`docs/database.md`](database.md).
+
+Busca por proximidade ainda não existe -- ver [`docs/database.md#geolocalização`](database.md#geolocalização) pro porquê e pro que falta.
 
 CEP autopreenche o resto do endereço no formulário via `GET /zip-codes/{cep}` (proxy cacheado do ViaCEP, ver "Ports & Adapters"), e a página pública da concessionária (`/concessionarias/{slug}` -- `slug`, nunca o `id`) mostra a localização com Google Maps Embed em modo `place` -- só exibição por string de endereço, sem geocoding nem Places autocomplete. `VITE_GOOGLE_MAPS_API_KEY` ausente não quebra a página, só omite o mapa (mesmo padrão do `VITE_GOOGLE_CLIENT_ID` do login social).
 

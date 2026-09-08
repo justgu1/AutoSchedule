@@ -20,6 +20,7 @@ use App\Domain\Exceptions\DomainException;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\RequestActor;
 use App\Infrastructure\Http\Response;
+use App\Infrastructure\Http\VehicleFilterQuery;
 use App\Infrastructure\Pagination\PaginationPolicy;
 use App\Infrastructure\Validation\Validator;
 
@@ -43,7 +44,12 @@ final readonly class VehicleController
     public function index(Request $request): Response
     {
         [$page, $perPage] = $this->pagination->resolve($request->query('page'), $request->query('per_page'));
-        $result = ($this->listVehicles)(RequestActor::fromRequest($request), $perPage, ($page - 1) * $perPage);
+        $result = ($this->listVehicles)(
+            RequestActor::fromRequest($request),
+            VehicleFilterQuery::fromRequest($request),
+            $perPage,
+            ($page - 1) * $perPage,
+        );
 
         return Response::paginated(
             array_map(static fn (VehicleProfile $profile): array => $profile->toArray(), $result['items']),
@@ -51,6 +57,11 @@ final readonly class VehicleController
             $perPage,
             $result['total'],
         );
+    }
+
+    public function filters(Request $request): Response
+    {
+        return Response::success($this->listVehicles->availableFilters(RequestActor::fromRequest($request)));
     }
 
     public function show(Request $request): Response

@@ -7,9 +7,9 @@ namespace App\Application\Vehicle;
 use App\Application\Shared\ActorContext;
 use App\Application\Vehicle\DTO\VehicleProfile;
 use App\Domain\Vehicle\Ports\VehicleRepository;
-use App\Domain\Vehicle\Vehicle;
+use App\Domain\Vehicle\VehicleFilters;
 
-/** Admin vê todos; seller só os das próprias concessionárias. */
+/** Admin vê todo o estoque; seller só o das próprias concessionárias. */
 final readonly class ListVehicles
 {
     public function __construct(private VehicleRepository $vehicles)
@@ -17,29 +17,19 @@ final readonly class ListVehicles
     }
 
     /** @return array{items: list<VehicleProfile>, total: int} */
-    public function __invoke(ActorContext $context, int $limit, int $offset): array
+    public function __invoke(ActorContext $context, VehicleFilters $filters, int $limit, int $offset): array
     {
-        if ($context->isAdmin()) {
-            return [
-                'items' => $this->toProfiles($this->vehicles->findPage($limit, $offset)),
-                'total' => $this->vehicles->count(),
-            ];
-        }
-
-        $ownerId = (string) $context->actorId;
+        $ownerUserId = $context->isAdmin() ? null : (string) $context->actorId;
 
         return [
-            'items' => $this->toProfiles($this->vehicles->findByOwner($ownerId, $limit, $offset)),
-            'total' => $this->vehicles->countByOwner($ownerId),
+            'items' => array_map(VehicleProfile::fromVehicle(...), $this->vehicles->search($filters, $ownerUserId, $limit, $offset)),
+            'total' => $this->vehicles->countSearch($filters, $ownerUserId),
         ];
     }
 
-    /**
-     * @param list<Vehicle> $vehicles
-     * @return list<VehicleProfile>
-     */
-    private function toProfiles(array $vehicles): array
+    /** @return array{brands: list<string>, models: list<string>, years: list<int>} */
+    public function availableFilters(ActorContext $context): array
     {
-        return array_map(VehicleProfile::fromVehicle(...), $vehicles);
+        return $this->vehicles->availableFilters($context->isAdmin() ? null : (string) $context->actorId);
     }
 }

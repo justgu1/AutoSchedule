@@ -30,7 +30,7 @@ O AutoSchedule é uma aplicação para agendamento de visitas a veículos. Fluxo
 
 Os horários disponíveis são definidos por data — ao selecionar um dia, só os horários livres naquele dia são apresentados.
 
-Antes desse fluxo existir, o projeto precisou de uma base de conta/autenticação, concessionária e infraestrutura por trás dele (login com role, MinIO pra foto, fila/scheduler pra e-mail assíncrono e purga da lixeira, CRUD de concessionária com página pública em `/concessionarias/{id}` já sem exigir conta) — é o que já está implementado hoje; veículo/disponibilidade/agendamento em si são a próxima etapa (`Worklist.md`).
+Antes desse fluxo existir, o projeto precisou de uma base de conta/autenticação, concessionária e veículo (login com role, MinIO pra foto, fila/scheduler pra e-mail assíncrono e purga da lixeira, CRUD de concessionária e de veículo com galeria e busca, página pública da concessionária em `/concessionarias/{slug}` já sem exigir conta) — é o que já está implementado hoje; disponibilidade e agendamento em si são a próxima etapa (`Worklist.md`).
 
 ## Stack
 
@@ -71,12 +71,14 @@ Acesse `http://localhost:8080`.
 | `make ps` | Verifica o status dos serviços |
 | `make logs` | Acompanha os logs |
 | `make migrate` / `make rollback` / `make seed` | Migrations e seeders |
-| `make test` | Roda os testes do backend |
+| `make test` / `make test-unit` | Todos os testes do backend / só os puros, sem Postgres/Redis/MinIO |
 | `make load-test` | Roda a suíte de teste de carga (k6) |
 | `make e2e` | Roda a suíte E2E (Playwright) contra o build real |
 | `make static-analysis` | PHPStan (backend) |
 | `make lint` / `make lint-fix` | PHP-CS-Fixer (backend) -- checa / aplica |
 | `make rector` / `make rector-fix` | Rector (backend) -- checa / aplica |
+| `make arch` | Deptrac -- regra de dependência entre camadas |
+| `make comments` | Checa `docs/code-style.md` |
 
 ### Live-reload (PHP + React)
 
@@ -125,6 +127,7 @@ Contratos de cada rota (validação, roles, cascatas) ficam documentados por dom
 - [Banco de dados](docs/database.md)
 - [Testes](docs/testing.md)
 - [Catálogo regra → teste](docs/test-catalog.md)
+- [Estilo de código](docs/code-style.md)
 - [Worklist](Worklist.md)
 
 ## Processo seletivo
