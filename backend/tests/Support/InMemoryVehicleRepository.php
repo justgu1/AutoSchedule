@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Support;
 
+use App\Domain\Shared\Money;
 use App\Domain\Shared\Trashable;
 use App\Domain\Shared\TrashableStatus;
 use App\Domain\Shared\TrashState;
 use App\Domain\Vehicle\Ports\VehicleRepository;
 use App\Domain\Vehicle\Vehicle;
+use App\Domain\Vehicle\VehicleFilters;
 
 /**
  * A lixeira e as duas cascatas são SQL de massa no adapter real, então aqui elas são reimplementadas
@@ -39,41 +41,61 @@ final class InMemoryVehicleRepository implements VehicleRepository
         $this->vehicles[$vehicle->id] = $vehicle;
     }
 
-    public function findByOwner(string $ownerUserId, int $limit, int $offset): array
+    public function search(VehicleFilters $filters, ?string $ownerUserId, int $limit, int $offset): array
     {
-        $owned = array_filter($this->vehicles, fn (Vehicle $v): bool => $this->ownerOf($v) === $ownerUserId && $this->isVisible($v));
-
-        return array_values(array_slice($owned, $offset, $limit));
-    }
-
-    public function countByOwner(string $ownerUserId): int
-    {
-        return count($this->findByOwner($ownerUserId, PHP_INT_MAX, 0));
-    }
-
-    public function findByDealership(string $dealershipId, int $limit, int $offset): array
-    {
-        $inDealership = array_filter(
+        $matching = array_values(array_filter(
             $this->vehicles,
-            fn (Vehicle $v): bool => $v->dealershipId === $dealershipId && $this->isVisible($v),
-        );
+            fn (Vehicle $v): bool => $this->isVisible($v) && $this->matches($v, $filters, $ownerUserId),
+        ));
 
-        return array_values(array_slice($inDealership, $offset, $limit));
+        return array_slice($matching, $offset, $limit);
     }
 
-    public function countByDealership(string $dealershipId): int
+    public function countSearch(VehicleFilters $filters, ?string $ownerUserId): int
     {
-        return count($this->findByDealership($dealershipId, PHP_INT_MAX, 0));
+        return count($this->search($filters, $ownerUserId, PHP_INT_MAX, 0));
     }
 
-    public function findPage(int $limit, int $offset): array
+    public function availableFilters(?string $ownerUserId): array
     {
-        return array_values(array_slice(array_filter($this->vehicles, $this->isVisible(...)), $offset, $limit));
+        $matching = $this->search(new VehicleFilters(), $ownerUserId, PHP_INT_MAX, 0);
+
+        $brands = array_values(array_unique(array_map(static fn (Vehicle $v): string => $v->brand, $matching)));
+        $models = array_values(array_unique(array_map(static fn (Vehicle $v): string => $v->model, $matching)));
+        $years = array_values(array_unique(array_filter(array_map(static fn (Vehicle $v): ?int => $v->year, $matching))));
+
+        sort($brands);
+        sort($models);
+        rsort($years);
+
+        return ['brands' => $brands, 'models' => $models, 'years' => $years];
     }
 
-    public function count(): int
+    /** Aproximação honesta do que o Postgres faz: casamento por substring no lugar do índice de texto. */
+    private function matches(Vehicle $vehicle, VehicleFilters $filters, ?string $ownerUserId): bool
     {
-        return count($this->findPage(PHP_INT_MAX, 0));
+        if ($ownerUserId !== null && $this->ownerOf($vehicle) !== $ownerUserId) {
+            return false;
+        }
+
+        $haystack = mb_strtolower(implode(' ', [$vehicle->brand, $vehicle->model, $vehicle->version ?? '', $vehicle->description ?? '']));
+
+        foreach ([$filters->term, $filters->brand, $filters->model] as $needle) {
+            if ($needle !== null && !str_contains($haystack, mb_strtolower($needle))) {
+                return false;
+            }
+        }
+
+        return $this->withinRanges($vehicle, $filters);
+    }
+
+    private function withinRanges(Vehicle $vehicle, VehicleFilters $filters): bool
+    {
+        return ($filters->yearMin === null || ($vehicle->year ?? 0) >= $filters->yearMin)
+            && ($filters->yearMax === null || ($vehicle->year ?? PHP_INT_MAX) <= $filters->yearMax)
+            && (!$filters->priceMin instanceof Money || $vehicle->price->cents >= $filters->priceMin->cents)
+            && (!$filters->priceMax instanceof Money || $vehicle->price->cents <= $filters->priceMax->cents)
+            && ($filters->dealershipId === null || $vehicle->dealershipId === $filters->dealershipId);
     }
 
     public function trash(string $id): void

@@ -91,7 +91,7 @@ Backlog do projeto: epic > issue > task. Cada `[x]` já está em `main`; `[ ]` �
 ### Issue: Upload assíncrono de foto
 
 - [x] `POST /dealerships/{id}/photo` só enfileira (`202`+`job_id`) -- processamento roda no worker, não no request
-- [x] `ImageOptimizer` (GD): converte pro padrão do site (WebP, redimensionada a até 1600px), reaproveitável por qualquer domínio futuro (import em lote da galeria de veículo, por exemplo)
+- [x] `ImageOptimizer` (GD): converte pro padrão do site (WebP, redimensionada a até 1600px), reaproveitado sem alteração pelo import em lote da galeria de veículo
 - [x] Limite de 20MB, validado antes de enfileirar
 - [x] `JobStatusStore` (Redis) + `GET /jobs/{id}` (snapshot) e `GET /jobs/{id}/events` (SSE) -- genérico, não específico de foto de concessionária
 - [x] RLS: scheduler/worker (contexto de serviço) faltava em `dealerships` desde a Epic acima -- achado e corrigido só agora que um job de verdade passou a rodar em background sobre essa tabela
@@ -112,7 +112,7 @@ Backlog do projeto: epic > issue > task. Cada `[x]` já está em `main`; `[ ]` �
 
 - [x] Autocomplete de CEP no formulário de concessionária -- `GET /zip-codes/{cep}` no próprio backend, proxy do ViaCEP cacheado (`zip_code_cache`, sem TTL) depois da primeira consulta, front nunca chama o terceiro direto
 - [x] Concessionária ganha `email` próprio (contato do negócio, ao lado do `phone` que já existia)
-- [x] Página pública da concessionária (`/concessionarias/{slug}`, sem conta) -- banner, endereço, contato, nome do vendedor (só o nome, nenhum outro dado dele), veículos reservado pra Epic Veículo
+- [x] Página pública da concessionária (`/concessionarias/{slug}`, sem conta) -- banner, endereço, contato, nome do vendedor (só o nome, nenhum outro dado dele), veículos reservado pra quando a vitrine pública do estoque existir
 - [x] `GET /dealerships/{id}` unificado -- mesma rota do gerenciamento, resposta muda conforme quem chama (perfil completo pro dono/admin, perfil público pro resto); RLS com contexto de leitura pública próprio (`app.is_public_read`, composto com o contexto autenticado normal, só concessionária `active` visível)
 - [x] `slug` amigável (nome + parte do id) substitui o `id` na URL pública -- estável mesmo se o nome mudar, só troca na anonimização
 - [x] Exibição em mapa pro cliente (Google Maps Embed, read-only, modo `place` por endereço)
@@ -122,7 +122,7 @@ Backlog do projeto: epic > issue > task. Cada `[x]` já está em `main`; `[ ]` �
 - [x] `Vehicle` (marca/modelo/versão/ano/preço/descrição/status), pertence a uma concessionária -- status é só a lixeira (`active`/`trashed`/`deleted`), idêntica à da conta e da concessionária; sem estado "vendido" nem "agendado" guardado; dono transitivo pela concessionária (RLS por `EXISTS`, sem `owner_user_id` duplicado)
 - [x] Galeria de fotos -- referencia `files` como a foto da concessionária, upload em lote pela fila com um `job_id` só, reordenação em duas passadas, arquivo compartilhado só sai do storage quando ninguém mais aponta pra ele
 - [ ] GC de `files` órfãos: a purga agendada limpa linha, não storage, então arquivo sem referência sobra pago no MinIO
-- [ ] Busca (PostgreSQL Full Text Search + `pg_trgm`)
+- [x] Busca (PostgreSQL Full Text Search + `pg_trgm`) -- filtros empilhados na mesma rota da listagem, `search_vector` gerado, filtro de marca alcançando a descrição, facetas do estoque em `GET /vehicles/filters`
 - [x] CRUD (seller gerencia os das próprias concessionárias, admin qualquer um) -- lixeira/restore/purge iguais aos outros domínios, cascata de dois níveis (conta -> concessionária -> veículo), auditoria `vehicle.*`
 
 ## Epic: Disponibilidade e agendamento
@@ -155,15 +155,15 @@ Fluxo do cliente final -- o motivo de tudo acima existir:
 
 ### Issue: Camada de aplicação explícita
 
-- [x] `src/Application/`: caso de uso por ação (`LoginWithPassword`, `CreateDealership`, `TrashAccount`, ...), tirando a regra de negócio dos controllers -- `UserController` 351 -> 208 linhas, `DealershipController` 385 -> 183
+- [x] `src/Application/`: caso de uso por ação (`LoginWithPassword`, `CreateDealership`, `TrashAccount`, ...), tirando a regra de negócio dos controllers
 - [x] `Domain/Ports/` dissolvido: cada port foi pra camada de quem depende dele (`StorageProvider` -> `Domain/File/Ports/`, `Queue`/`Job` -> `Application/Ports/`, `DatabaseConnection`/`ScheduledTask` -> `Infrastructure/`)
 - [x] `OAuthService` (237 linhas, 8 ports) quebrado em 5 casos de uso + 3 colaboradores; o acoplamento `Domain\Auth -> Domain\Dealership` virou composição legítima na Application
 - [x] `Application.php` (era um config holder, não bootstrap) renomeado pra `Config`, com acesso tipado por caminho (`$app->int('auth.access_token_ttl')`)
 - [x] `Validator` devolve `ValidatedInput` tipado: `mixed` morre na fronteira HTTP em vez de vazar até a entidade
 - [x] Módulos no singular (`Domain/User/`, `Infrastructure/Dealership/`, ...) e `Domain/Support/` fundido em `Domain/Shared/`
 - [x] Deptrac no CI (`make arch`) -- a regra de dependência entre camadas deixou de ser só prosa no `docs/architecture.md`
-- [x] `#[Group('integration')]` separa os 114 testes que precisam de Postgres/Redis/MinIO dos 194 puros (`make test-unit`)
-- [x] `phpstan-baseline.neon`: 383 -> 184 entradas suprimidas, zero em `Domain/`, `Application/` e `Bootstrap/`
+- [x] `#[Group('integration')]` separa os testes que precisam de Postgres/Redis/MinIO dos puros (`make test-unit`)
+- [x] `phpstan-baseline.neon` reduzida, zero entrada em `Domain/`, `Application/` e `Bootstrap/`
 
 ## Epic: CI/CD e deploy
 

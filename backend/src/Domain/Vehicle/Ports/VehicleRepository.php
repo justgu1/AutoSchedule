@@ -6,6 +6,7 @@ namespace App\Domain\Vehicle\Ports;
 
 use App\Domain\Shared\Ports\TrashableRepository;
 use App\Domain\Vehicle\Vehicle;
+use App\Domain\Vehicle\VehicleFilters;
 
 interface VehicleRepository extends TrashableRepository
 {
@@ -15,20 +16,24 @@ interface VehicleRepository extends TrashableRepository
 
     public function update(Vehicle $vehicle): void;
 
-    /** @return list<Vehicle> */
-    public function findByOwner(string $ownerUserId, int $limit, int $offset): array;
+    /**
+     * Listagem e busca são a mesma consulta: sem filtro nenhum ela degenera na listagem simples,
+     * então não existem dois caminhos de SQL pra manter em sincronia.
+     *
+     * @param ?string $ownerUserId escopo do seller; `null` enxerga todo o estoque (admin)
+     * @return list<Vehicle>
+     */
+    public function search(VehicleFilters $filters, ?string $ownerUserId, int $limit, int $offset): array;
 
-    public function countByOwner(string $ownerUserId): int;
+    public function countSearch(VehicleFilters $filters, ?string $ownerUserId): int;
 
-    /** @return list<Vehicle> */
-    public function findByDealership(string $dealershipId, int $limit, int $offset): array;
-
-    public function countByDealership(string $dealershipId): int;
-
-    /** @return list<Vehicle> */
-    public function findPage(int $limit, int $offset): array;
-
-    public function count(): int;
+    /**
+     * Marcas, modelos e anos que existem em estoque, pros filtros da tela não oferecerem
+     * combinação que não devolve nada.
+     *
+     * @return array{brands: list<string>, models: list<string>, years: list<int>}
+     */
+    public function availableFilters(?string $ownerUserId): array;
 
     public function trash(string $id): void;
 

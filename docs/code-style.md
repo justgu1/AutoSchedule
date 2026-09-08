@@ -66,6 +66,6 @@ Registradas aqui pra ninguém "corrigir" achando que é bug:
 
 - **`trash`/`restore`/`markUsed`/`update`/`delete` não checam `rowCount()`.** Id inexistente
   responde sucesso em vez de 404. O caminho real já carrega a entidade antes (`UserFinder`,
-  `DealershipFinder` dão 404), então o cenário só existe numa corrida — e o custo de fechá-lo
+  `DealershipFinder`, `VehicleFinder` dão 404), então o cenário só existe numa corrida — e o custo de fechá-lo
   (exceção nova em 6 métodos, contrato de API mudando) não se paga hoje.
 - **`PostgresAuditLogger` engole exceção.** Falha ao auditar não pode derrubar a resposta.

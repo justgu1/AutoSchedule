@@ -291,7 +291,7 @@ WHERE deleted_at IS NULL
   AND status IN ('pending', 'confirmed');
 ```
 
-## Imagens
+## Galeria
 
 Cada posição da galeria de veículo deve ser única dentro do próprio veículo (concessionária não tem galeria, só uma foto, sem posição pra ter conflito):
 
@@ -302,23 +302,47 @@ ON vehicle_images (vehicle_id, position);
 
 ## Busca
 
-A busca inicial utiliza PostgreSQL Full Text Search e `pg_trgm`.
+Full Text Search e `pg_trgm` juntos, cada um cobrindo o que o outro não faz: a FTS acha palavra
+inteira e ranqueia por peso, o trigram acha erro de digitação, palavra parcial e acento.
+
+`search_vector` é coluna **gerada**, não trigger nem escrita pela aplicação. Trigger é um segundo
+lugar onde lógica mora, invisível ao repositório; escrita pela aplicação exige que todo caminho
+futuro lembre de recalcular, e esquecer produz veículo que nunca aparece na busca, em silêncio.
+Coluna gerada não pode ser esquecida -- e, por não aceitar escrita, fica fora de `COLUMNS` e de
+`toParams()`, ao contrário do hábito de listar toda coluna.
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
-CREATE INDEX vehicles_search_vector_gin_idx
-ON vehicles USING GIN (search_vector);
+ALTER TABLE vehicles ADD COLUMN search_vector tsvector
+GENERATED ALWAYS AS (
+    setweight(to_tsvector('simple'::regconfig, coalesce(brand, '')),       'A') ||
+    setweight(to_tsvector('simple'::regconfig, coalesce(model, '')),       'A') ||
+    setweight(to_tsvector('simple'::regconfig, coalesce(version, '')),     'B') ||
+    setweight(to_tsvector('simple'::regconfig, coalesce(year::text, '')),  'B') ||
+    setweight(to_tsvector('simple'::regconfig, coalesce(description, '')), 'D')
+) STORED;
 
-CREATE INDEX vehicles_brand_trgm_idx
-ON vehicles USING GIN (brand gin_trgm_ops);
+CREATE INDEX vehicles_search_vector_gin_idx ON vehicles USING GIN (search_vector);
 
-CREATE INDEX vehicles_model_trgm_idx
-ON vehicles USING GIN (model gin_trgm_ops);
-
-CREATE INDEX vehicles_version_trgm_idx
-ON vehicles USING GIN (version gin_trgm_ops);
+CREATE INDEX vehicles_name_trgm_idx ON vehicles
+USING GIN ((brand || ' ' || model || ' ' || coalesce(version, '')) gin_trgm_ops);
 ```
+
+Três escolhas que não são detalhe:
+
+- **Dicionário `simple`, não `portuguese`.** Stopword come versão curta ("S", "Up!") e stemming
+  quebra nome próprio ("Corolla" vira `corol`) sem comprar recall, porque "Onix"/"Onyx" continua
+  não casando -- stemming não é fuzzy. Quem cobre isso é o trigram.
+- **`::regconfig` explícito.** A sobrecarga de um argumento é `STABLE` (lê
+  `default_text_search_config`) e o Postgres recusa em coluna gerada.
+- **Um índice trigram de expressão, não três por coluna.** A query casa `%` contra a concatenação
+  inteira; três índices separados não servem essa forma, e `similarity()` sobre a concatenação é
+  melhor sinal que três scores a combinar depois.
+
+Na query, a relevância vive só no `ORDER BY` -- assim `COUNT(*)` usa exatamente o mesmo `WHERE` e o
+total nunca discorda da página. O desempate por `id` também não é enfeite: muita linha empata em
+rank, e `OFFSET` com ordenação não determinística duplica e pula linha entre páginas, calado.
 
 ## Geolocalização
 
