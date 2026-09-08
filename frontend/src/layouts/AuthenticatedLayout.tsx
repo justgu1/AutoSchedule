@@ -57,6 +57,11 @@ export function AuthenticatedLayout() {
                                 Concessionárias
                             </Button>
                         )}
+                        {(me.data.role === 'admin' || me.data.role === 'seller') && (
+                            <Button component={RouterLink} to="/vehicles" size="small">
+                                Veículos
+                            </Button>
+                        )}
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                         <Typography variant="body2">{me.data.name}</Typography>

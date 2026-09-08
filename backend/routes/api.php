@@ -49,6 +49,19 @@ return static function (Router $router): void {
         ->publicRead()
         ->describes('Returns a dealership -- full profile for its owner/admin, public-safe profile (name only, no other seller data) for anyone else, including no account at all. Only active dealerships are visible to non-owners.');
 
+    $router->get('/api/vehicles', [VehicleController::class, 'index'])
+        ->publicRead()
+        ->describes('Without scope, the public catalog (everyone sees the same active stock, logged in or not). With scope=mine (requires admin/seller), the caller\'s own inventory. Query: q, brand, model, year_min, year_max, price_min, price_max, dealership_id, page, per_page. Brand and model go through the text index, so they also match a vehicle that only mentions them in the description.');
+
+    // Antes de `{id}`: o router devolve a primeira rota que casa, e o parâmetro engoliria "filters".
+    $router->get('/api/vehicles/filters', [VehicleController::class, 'filters'])
+        ->publicRead()
+        ->describes('Brands, models and years in stock, to fill the filter inputs. Public catalog by default, caller\'s own stock with scope=mine.');
+
+    $router->get('/api/vehicles/{id}', [VehicleController::class, 'show'])
+        ->publicRead()
+        ->describes('Returns a vehicle -- full profile for its owner/admin, public profile (with the dealership it belongs to) for anyone else. Only active vehicles of an active dealership are visible to non-owners.');
+
     $router->get('/api/zip-codes/{zip_code}', [ZipCodeController::class, 'show'])
         ->describes('Resolves a Brazilian CEP into street/neighborhood/city/state (ViaCEP, cached after the first lookup).');
 
@@ -127,16 +140,6 @@ return static function (Router $router): void {
 
         $router->delete('/api/dealerships/{id}/photo', [DealershipController::class, 'removePhoto'])
             ->describes('Removes the dealership photo.');
-
-        $router->get('/api/vehicles', [VehicleController::class, 'index'])
-            ->describes('Lists and searches vehicles -- admin sees all, seller sees only the ones in their own dealerships (query: q, brand, model, year_min, year_max, price_min, price_max, dealership_id, page, per_page). Brand and model go through the text index, so they also match a vehicle that only mentions them in the description.');
-
-        // Antes de `{id}`: o router devolve a primeira rota que casa, e o parâmetro engoliria "filters".
-        $router->get('/api/vehicles/filters', [VehicleController::class, 'filters'])
-            ->describes('Brands, models and years that exist in the caller stock, to fill the filter inputs.');
-
-        $router->get('/api/vehicles/{id}', [VehicleController::class, 'show'])
-            ->describes('Returns a vehicle owned by the caller (or any vehicle, for an admin).');
 
         $router->post('/api/vehicles', [VehicleController::class, 'store'])
             ->describes('Creates a vehicle in one of the caller dealerships.')

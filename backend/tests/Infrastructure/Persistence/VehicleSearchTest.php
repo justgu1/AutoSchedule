@@ -194,6 +194,53 @@ final class VehicleSearchTest extends TestCase
         $this->assertSame([2023, 2020], $filters['years']);
     }
 
+    /** O catálogo público não é `search()` com filtro a mais -- ele reforça `active` na query, sem depender só do RLS. */
+    #[Test]
+    public function catalogo_publico_traz_veiculo_de_qualquer_dono_mas_so_ativo(): void
+    {
+        $mine = $this->register('Chevrolet', 'Onix');
+        $otherOwnerDealership = $this->insertDealership($this->insertSellerUser());
+        $othersVehicle = $this->register('Fiat', 'Argo', dealershipId: $otherOwnerDealership);
+        $trashed = $this->register('Toyota', 'Corolla');
+        $this->repository->trash($trashed->id);
+
+        $ids = array_map(
+            static fn (Vehicle $v): string => $v->id,
+            $this->repository->searchPublic(new VehicleFilters(), 10, 0),
+        );
+
+        $this->assertContains($mine->id, $ids);
+        $this->assertContains($othersVehicle->id, $ids);
+        $this->assertNotContains($trashed->id, $ids);
+        $this->assertSame(2, $this->repository->countSearchPublic(new VehicleFilters()));
+    }
+
+    #[Test]
+    public function catalogo_publico_esconde_veiculo_ativo_de_concessionaria_na_lixeira(): void
+    {
+        $vehicle = $this->register('Chevrolet', 'Onix');
+        $this->pdo->prepare('UPDATE dealerships SET status = ? WHERE id = ?')->execute(['trashed', $this->dealershipId]);
+
+        $ids = array_map(
+            static fn (Vehicle $v): string => $v->id,
+            $this->repository->searchPublic(new VehicleFilters(), 10, 0),
+        );
+
+        $this->assertNotContains($vehicle->id, $ids);
+    }
+
+    #[Test]
+    public function facetas_publicas_ignoram_veiculo_trashed(): void
+    {
+        $this->register('Chevrolet', 'Onix');
+        $trashed = $this->register('Toyota', 'Corolla');
+        $this->repository->trash($trashed->id);
+
+        $filters = $this->repository->availableFiltersPublic();
+
+        $this->assertSame(['Chevrolet'], $filters['brands']);
+    }
+
     /** @return list<string> */
     private function idsOf(VehicleFilters $filters, int $limit = 10, int $offset = 0): array
     {

@@ -71,6 +71,36 @@ final class InMemoryVehicleRepository implements VehicleRepository
         return ['brands' => $brands, 'models' => $models, 'years' => $years];
     }
 
+    public function searchPublic(VehicleFilters $filters, int $limit, int $offset): array
+    {
+        $matching = array_values(array_filter(
+            $this->vehicles,
+            fn (Vehicle $v): bool => $v->trash->status === TrashableStatus::Active && $this->matches($v, $filters, null),
+        ));
+
+        return array_slice($matching, $offset, $limit);
+    }
+
+    public function countSearchPublic(VehicleFilters $filters): int
+    {
+        return count($this->searchPublic($filters, PHP_INT_MAX, 0));
+    }
+
+    public function availableFiltersPublic(): array
+    {
+        $matching = $this->searchPublic(new VehicleFilters(), PHP_INT_MAX, 0);
+
+        $brands = array_values(array_unique(array_map(static fn (Vehicle $v): string => $v->brand, $matching)));
+        $models = array_values(array_unique(array_map(static fn (Vehicle $v): string => $v->model, $matching)));
+        $years = array_values(array_unique(array_filter(array_map(static fn (Vehicle $v): ?int => $v->year, $matching))));
+
+        sort($brands);
+        sort($models);
+        rsort($years);
+
+        return ['brands' => $brands, 'models' => $models, 'years' => $years];
+    }
+
     /** Aproximação honesta do que o Postgres faz: casamento por substring no lugar do índice de texto. */
     private function matches(Vehicle $vehicle, VehicleFilters $filters, ?string $ownerUserId): bool
     {

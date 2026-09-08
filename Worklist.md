@@ -124,6 +124,8 @@ Backlog do projeto: epic > issue > task. Cada `[x]` já está em `main`; `[ ]` �
 - [ ] GC de `files` órfãos: a purga agendada limpa linha, não storage, então arquivo sem referência sobra pago no MinIO
 - [x] Busca (PostgreSQL Full Text Search + `pg_trgm`) -- filtros empilhados na mesma rota da listagem, `search_vector` gerado, filtro de marca alcançando a descrição, facetas do estoque em `GET /vehicles/filters`
 - [x] CRUD (seller gerencia os das próprias concessionárias, admin qualquer um) -- lixeira/restore/purge iguais aos outros domínios, cascata de dois níveis (conta -> concessionária -> veículo), auditoria `vehicle.*`
+- [x] Painel do vendedor -- tabela com filtros empilhados, form, galeria e lixeira, mesmo molde do painel de concessionárias
+- [x] Catálogo público -- `GET /vehicles`/`GET /vehicles/{id}` viram públicas por padrão (`scope=mine` reusa a mesma rota pro painel), index do site com filtros e vitrine no perfil da concessionária (até 12 veículos, `vehicles_total` separado)
 
 ## Epic: Disponibilidade e agendamento
 

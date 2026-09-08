@@ -14,10 +14,10 @@ import { ApiError } from '../lib/apiClient';
 import {
     removeDealershipPhoto,
     setDealershipPhoto,
-    subscribeToPhotoJob,
     type Dealership,
-    type PhotoJobStatus,
+    type DealershipPhotoJobStatus,
 } from '../lib/dealerships';
+import { subscribeToPhotoJob } from '../lib/jobs';
 
 const STEP_LABEL: Record<string, string> = {
     queued: 'Na fila...',
@@ -44,7 +44,7 @@ export function DealershipPhotoDialog({ open, dealership, onClose }: DealershipP
     const queryClient = useQueryClient();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const unsubscribeRef = useRef<(() => void) | null>(null);
-    const [job, setJob] = useState<PhotoJobStatus | null>(null);
+    const [job, setJob] = useState<DealershipPhotoJobStatus | null>(null);
     const [photoUrl, setPhotoUrl] = useState<string | null>(() => dealership?.photo_url ?? null);
 
     useEffect(() => {
@@ -63,7 +63,7 @@ export function DealershipPhotoDialog({ open, dealership, onClose }: DealershipP
         mutationFn: (file: File) => setDealershipPhoto(dealership!.id, file),
         onSuccess: (photoJob) => {
             setJob({ status: 'queued', step: 'queued', progress: 0 });
-            unsubscribeRef.current = subscribeToPhotoJob(photoJob.events_url, (status) => {
+            unsubscribeRef.current = subscribeToPhotoJob<{ photo_url: string }>(photoJob.events_url, (status) => {
                 setJob(status);
 
                 if (status.status === 'done' && status.result) {

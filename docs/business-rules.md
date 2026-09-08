@@ -52,7 +52,7 @@ Além do endereço, a concessionária tem telefone e e-mail próprios (contato d
 
 ### Página pública
 
-`GET /dealerships/{id}` é a mesma rota que o gerenciamento usa -- o formato da resposta muda pra quem chama, não a URL: dono/admin recebem o perfil completo, qualquer outro caso (outro seller, customer, sem conta nenhuma) recebe um perfil enxuto (nome, endereço, telefone/e-mail da concessionária, foto, só o **nome** do vendedor -- nenhum outro dado dele) e só se a concessionária estiver `active` (trashed/deleted viram `404`, igual concessionária inexistente, de propósito). `vehicles` ainda vai vazio -- contrato já reservado, listagem entra quando a vitrine pública do estoque for implementada.
+`GET /dealerships/{id}` é a mesma rota que o gerenciamento usa -- o formato da resposta muda pra quem chama, não a URL: dono/admin recebem o perfil completo, qualquer outro caso (outro seller, customer, sem conta nenhuma) recebe um perfil enxuto (nome, endereço, telefone/e-mail da concessionária, foto, só o **nome** do vendedor -- nenhum outro dado dele) e só se a concessionária estiver `active` (trashed/deleted viram `404`, igual concessionária inexistente, de propósito). O perfil público também traz a vitrine: até 12 veículos ativos da concessionária (`vehicles`) e o total real de estoque visível (`vehicles_total`), separado -- é leitura de recurso único, não listagem paginada, então não aceita `page`/`per_page`.
 
 A URL pública (`/concessionarias/{slug}` no front) usa um `slug` gerado a partir do nome + parte do id, nunca o `id` em si -- estável mesmo se o nome mudar depois, só é trocado por um neutro na anonimização. O mapa (Google Maps Embed, só exibição por string de endereço) usa o mesmo endereço já salvo.
 
@@ -77,6 +77,14 @@ Seller gerencia os veículos das próprias concessionárias; admin gerencia qual
 Um veículo pode ser movido de concessionária pelo mesmo `PATCH` que edita o resto, mandando `dealership_id`. Quem move precisa alcançar as duas pontas: o seller só enxerga as próprias, então mover pro estoque alheio é `404` (a mesma resposta de concessionária inexistente); pro admin a restrição não se aplica, ele move pra qualquer uma. A movimentação gera `vehicle.dealership_reassigned` além do `vehicle.updated`, como a reassociação de dono da concessionária.
 
 Preço é enviado e devolvido como string decimal, porque número em JSON vira ponto flutuante no cliente e perde o centavo que `numeric(12,2)` protege no banco.
+
+### Catálogo público
+
+`GET /vehicles` e `GET /vehicles/{id}` são as mesmas rotas que o painel usa, públicas -- sem conta, sem role. Por padrão devolvem o catálogo: todo veículo `active` de concessionária `active`, num formato enxuto (sem `dealership_id`/`status`, sem os dados de gestão). Trashed/deleted, ou de concessionária na lixeira, viram ausência do resultado -- não erro, só não aparece.
+
+`?scope=mine` muda o comportamento pra "meu estoque": exige sessão de `admin`/`seller` (`401`/`403` senão) e devolve o perfil completo de gestão, escopado ao próprio dono (RLS reforça). É o painel chamando o mesmo endpoint com um parâmetro a mais, não uma rota paralela pra ação equivalente.
+
+`GET /vehicles/{id}` segue o mesmo padrão de `GET /dealerships/{id}`: dono/admin recebem o perfil completo; qualquer outro recebe o perfil público, com a galeria e a concessionária aninhada (`slug`, nome, cidade, UF) pra linkar de volta.
 
 ## Galeria
 
@@ -104,7 +112,7 @@ Marca e modelo passarem pelo índice de texto é a razão de a busca ser configu
 
 A busca também tolera erro de digitação e palavra parcial (`corola` acha `Corolla`), o que a FTS sozinha não faz -- é o `pg_trgm` que cobre isso.
 
-`GET /vehicles/filters` devolve as marcas, modelos e anos que existem no estoque de quem chama, pra tela não oferecer combinação que não devolve nada. Admin vê o catálogo inteiro; seller, só o próprio.
+`GET /vehicles/filters` devolve as marcas, modelos e anos que existem no estoque relevante, pra tela não oferecer combinação que não devolve nada -- sem `scope`, é o catálogo público inteiro; com `scope=mine`, só o estoque de quem chama (admin vê tudo, seller só o próprio).
 
 ## Disponibilidade
 
