@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Tests\Application\Address;
+namespace Tests\Application\ZipCode;
 
-use App\Application\Address\LookupZipCode;
-use App\Domain\Address\Ports\ZipCodeCacheRepository;
-use App\Domain\Address\Ports\ZipCodeProvider;
-use App\Domain\Address\ZipCodeAddress;
+use App\Application\ZipCode\LookupZipCode;
+use App\Domain\ZipCode\Ports\ZipCodeCacheRepository;
+use App\Domain\ZipCode\Ports\ZipCodeProvider;
+use App\Domain\ZipCode\ZipCodeAddress;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 

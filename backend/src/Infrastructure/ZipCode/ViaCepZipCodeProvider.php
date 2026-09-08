@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Infrastructure\Address;
+namespace App\Infrastructure\ZipCode;
 
-use App\Domain\Address\Ports\ZipCodeProvider;
-use App\Domain\Address\ZipCodeAddress;
+use App\Domain\ZipCode\Ports\ZipCodeProvider;
+use App\Domain\ZipCode\ZipCodeAddress;
 
 /**
  * CEP inexistente vem com `erro: true` e HTTP 200, então "não encontrado" não é falha de rede.

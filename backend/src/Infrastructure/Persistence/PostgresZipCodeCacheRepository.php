@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Persistence;
 
-use App\Domain\Address\Ports\ZipCodeCacheRepository;
-use App\Domain\Address\ZipCodeAddress;
+use App\Domain\ZipCode\Ports\ZipCodeCacheRepository;
+use App\Domain\ZipCode\ZipCodeAddress;
 
 final readonly class PostgresZipCodeCacheRepository implements ZipCodeCacheRepository
 {

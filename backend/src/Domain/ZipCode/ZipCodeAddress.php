@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Address;
+namespace App\Domain\ZipCode;
 
 /** Endereço resolvido a partir de um CEP (ViaCEP hoje) -- sem lat/long, isso é sobre autopreencher formulário, não geocoding. */
 final readonly class ZipCodeAddress

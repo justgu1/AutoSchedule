@@ -18,8 +18,6 @@ use App\Application\Ports\TempFileStore;
 use App\Application\Ports\Transaction;
 use App\Application\User\RequestPasswordReset;
 use App\Config;
-use App\Domain\Address\Ports\ZipCodeCacheRepository;
-use App\Domain\Address\Ports\ZipCodeProvider;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Audit\Ports\AuditLogger;
 use App\Domain\Auth\Ports\GoogleIdTokenVerifier;
@@ -34,7 +32,8 @@ use App\Domain\File\Ports\ImageOptimizer;
 use App\Domain\File\Ports\StorageProvider;
 use App\Domain\Notification\Ports\MailProvider;
 use App\Domain\User\Ports\UserRepository;
-use App\Infrastructure\Address\ViaCepZipCodeProvider;
+use App\Domain\ZipCode\Ports\ZipCodeCacheRepository;
+use App\Domain\ZipCode\Ports\ZipCodeProvider;
 use App\Infrastructure\Auth\Google\GoogleJwksIdTokenVerifier;
 use App\Infrastructure\Auth\Jwt\JwtTokenIssuer;
 use App\Infrastructure\Container\Container;
@@ -67,6 +66,7 @@ use App\Infrastructure\Redis\RedisConnection;
 use App\Infrastructure\Scheduler\PurgeTrashedEntitiesTask;
 use App\Infrastructure\Scheduler\Scheduler;
 use App\Infrastructure\Storage\MinioAdapter;
+use App\Infrastructure\ZipCode\ViaCepZipCodeProvider;
 use Psr\Log\LoggerInterface;
 
 /**

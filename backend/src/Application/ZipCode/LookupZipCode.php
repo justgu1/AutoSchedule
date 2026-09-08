@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Application\Address;
+namespace App\Application\ZipCode;
 
-use App\Domain\Address\Ports\ZipCodeCacheRepository;
-use App\Domain\Address\Ports\ZipCodeProvider;
-use App\Domain\Address\ZipCodeAddress;
+use App\Domain\ZipCode\Ports\ZipCodeCacheRepository;
+use App\Domain\ZipCode\Ports\ZipCodeProvider;
+use App\Domain\ZipCode\ZipCodeAddress;
 
 /** Cache-aside: só chama o provedor externo na primeira vez que um CEP aparece, depois é sempre o cache do próprio banco. */
 final readonly class LookupZipCode

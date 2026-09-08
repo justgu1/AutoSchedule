@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Address\Ports;
+namespace App\Domain\ZipCode\Ports;
 
-use App\Domain\Address\ZipCodeAddress;
+use App\Domain\ZipCode\ZipCodeAddress;
 
 interface ZipCodeProvider
 {
