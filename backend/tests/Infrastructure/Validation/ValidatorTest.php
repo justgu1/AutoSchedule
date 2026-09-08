@@ -89,6 +89,38 @@ final class ValidatorTest extends TestCase
     }
 
     #[Test]
+    public function rejeita_valor_que_nao_e_numero(): void
+    {
+        try {
+            Validator::validate(['price' => 'grátis'], ['price' => 'numeric']);
+            $this->fail('Expected a DomainException to be thrown.');
+        } catch (DomainException $exception) {
+            $this->assertSame(['price' => 'The price field must be a number.'], $exception->errors());
+        }
+    }
+
+    /** `between` lê o valor e `max` lê o tamanho: um ano de 4 dígitos passaria em `max:2100` sem checar nada. */
+    #[Test]
+    public function rejeita_valor_fora_da_faixa_do_between(): void
+    {
+        try {
+            Validator::validate(['year' => 1800], ['year' => 'between:1900,2100']);
+            $this->fail('Expected a DomainException to be thrown.');
+        } catch (DomainException $exception) {
+            $this->assertSame(['year' => 'The year field must be between 1900 and 2100.'], $exception->errors());
+        }
+    }
+
+    #[Test]
+    public function aceita_numero_como_string_ou_como_numero(): void
+    {
+        $rules = ['year' => 'numeric|between:1900,2100', 'price' => 'numeric'];
+
+        $this->assertSame(['year' => 2023, 'price' => 89900.5], Validator::validate(['year' => 2023, 'price' => 89900.5], $rules)->all());
+        $this->assertSame(['year' => '2023', 'price' => '89900.50'], Validator::validate(['year' => '2023', 'price' => '89900.50'], $rules)->all());
+    }
+
+    #[Test]
     public function aceita_valor_presente_na_lista_do_in(): void
     {
         $validated = Validator::validate(['role' => 'admin'], ['role' => 'required|in:admin,seller,customer']);

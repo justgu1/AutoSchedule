@@ -72,6 +72,12 @@ Não existe estado "vendido": o sistema não tem como saber que a venda acontece
 
 Concessionária que vai pra lixeira arrasta o estoque junto, e restaurá-la devolve só o que caiu por cascata -- veículo que o seller tinha apagado sozinho continua na lixeira. Desativar a conta do seller arrasta os dois níveis de uma vez.
 
+Seller gerencia os veículos das próprias concessionárias; admin gerencia qualquer um.
+
+Um veículo pode ser movido de concessionária pelo mesmo `PATCH` que edita o resto, mandando `dealership_id`. Quem move precisa alcançar as duas pontas: o seller só enxerga as próprias, então mover pro estoque alheio é `404` (a mesma resposta de concessionária inexistente); pro admin a restrição não se aplica, ele move pra qualquer uma. A movimentação gera `vehicle.dealership_reassigned` além do `vehicle.updated`, como a reassociação de dono da concessionária.
+
+Preço é enviado e devolvido como string decimal, porque número em JSON vira ponto flutuante no cliente e perde o centavo que `numeric(12,2)` protege no banco.
+
 ## Galeria
 
 Um veículo pode possuir várias imagens.
@@ -321,17 +327,19 @@ dealership.trashed
 dealership.restored
 dealership.purged
 dealership.owner_reassigned
-dealership.image_added
-dealership.image_removed
+dealership.photo_updated
+dealership.photo_removed
+vehicle.created
+vehicle.updated
+vehicle.dealership_reassigned
+vehicle.trashed
+vehicle.restored
+vehicle.purged
 ```
 
 Planejados conforme os domínios abaixo forem implementados:
 
 ```text
-vehicle.created
-vehicle.updated
-vehicle.status_changed
-vehicle.deleted
 availability.created
 availability.updated
 availability.deleted

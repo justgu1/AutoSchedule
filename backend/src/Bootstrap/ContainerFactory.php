@@ -222,6 +222,14 @@ final class ContainerFactory
                     event: AuditEvent::DealershipPurged,
                     transaction: $c->get(Transaction::class),
                 ),
+                new PurgeTrashedEntitiesTask(
+                    name: 'purge-trashed-vehicles',
+                    dueIntervalSeconds: 86400,
+                    repository: $c->get(VehicleRepository::class),
+                    audit: $c->get(AuditLogger::class),
+                    event: AuditEvent::VehiclePurged,
+                    transaction: $c->get(Transaction::class),
+                ),
             ],
         ));
     }

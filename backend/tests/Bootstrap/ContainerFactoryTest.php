@@ -10,6 +10,7 @@ use App\Domain\Auth\Ports\OAuthClientRepository;
 use App\Infrastructure\Http\Controllers\DealershipController;
 use App\Infrastructure\Http\Controllers\OAuthController;
 use App\Infrastructure\Http\Controllers\UserController;
+use App\Infrastructure\Http\Controllers\VehicleController;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -27,6 +28,7 @@ final class ContainerFactoryTest extends TestCase
         $this->assertInstanceOf(OAuthController::class, $container->get(OAuthController::class));
         $this->assertInstanceOf(UserController::class, $container->get(UserController::class));
         $this->assertInstanceOf(DealershipController::class, $container->get(DealershipController::class));
+        $this->assertInstanceOf(VehicleController::class, $container->get(VehicleController::class));
     }
 
     #[Test]

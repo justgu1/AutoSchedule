@@ -12,6 +12,7 @@ use App\Domain\Dealership\Ports\DealershipRepository;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
 use App\Domain\User\Ports\UserRepository;
+use App\Domain\Vehicle\Ports\VehicleRepository;
 
 /** Recupera sem esperar o dono logar de novo, que é o outro caminho de restore. */
 final readonly class RestoreAccount
@@ -20,6 +21,7 @@ final readonly class RestoreAccount
         private UserFinder $finder,
         private UserRepository $users,
         private DealershipRepository $dealerships,
+        private VehicleRepository $vehicles,
         private AuditLogger $audit,
         private Transaction $transaction,
     ) {
@@ -36,6 +38,7 @@ final readonly class RestoreAccount
         $this->transaction->run(function () use ($user): void {
             $this->users->restore($user->id);
             $this->dealerships->restoreAutoTrashedOwnedBy($user->id);
+            $this->vehicles->restoreAutoTrashedOwnedByUser($user->id);
         });
 
         $this->audit->record($context->audits(AuditEvent::AccountRestored, $user->id));

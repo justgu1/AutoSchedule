@@ -74,6 +74,13 @@ final readonly class Vehicle implements Trashable
         ]);
     }
 
+    /** Trocar de concessionária é trocar de dono, já que a propriedade é resolvida por ela. */
+    #[\NoDiscard]
+    public function movedTo(string $dealershipId): self
+    {
+        return clone($this, ['dealershipId' => $dealershipId, 'updatedAt' => new \DateTimeImmutable()]);
+    }
+
     /** Veículo não tem dado pessoal pra escrubar, e marca/modelo seguem sendo o que o histórico de agendamento exibe. */
     #[\NoDiscard]
     public function anonymized(): static

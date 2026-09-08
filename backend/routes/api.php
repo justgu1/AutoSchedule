@@ -9,6 +9,7 @@ use App\Infrastructure\Http\Controllers\DealershipController;
 use App\Infrastructure\Http\Controllers\JobController;
 use App\Infrastructure\Http\Controllers\OAuthController;
 use App\Infrastructure\Http\Controllers\UserController;
+use App\Infrastructure\Http\Controllers\VehicleController;
 use App\Infrastructure\Http\Controllers\ZipCodeController;
 use App\Infrastructure\Http\Router;
 
@@ -126,5 +127,28 @@ return static function (Router $router): void {
 
         $router->delete('/api/dealerships/{id}/photo', [DealershipController::class, 'removePhoto'])
             ->describes('Removes the dealership photo.');
+
+        $router->get('/api/vehicles', [VehicleController::class, 'index'])
+            ->describes('Lists vehicles -- admin sees all, seller sees only the ones in their own dealerships (query: page, per_page).');
+
+        $router->get('/api/vehicles/{id}', [VehicleController::class, 'show'])
+            ->describes('Returns a vehicle owned by the caller (or any vehicle, for an admin).');
+
+        $router->post('/api/vehicles', [VehicleController::class, 'store'])
+            ->describes('Creates a vehicle in one of the caller dealerships.')
+            ->accepts('dealership_id', 'brand', 'model', 'version', 'year', 'price', 'description');
+
+        $router->patch('/api/vehicles/{id}', [VehicleController::class, 'update'])
+            ->describes('Updates vehicle fields. Sending dealership_id moves it to another dealership the caller can reach.')
+            ->accepts('dealership_id', 'brand', 'model', 'version', 'year', 'price', 'description');
+
+        $router->delete('/api/vehicles/{id}', [VehicleController::class, 'destroy'])
+            ->describes('Moves a vehicle to trash.');
+
+        $router->post('/api/vehicles/{id}/restore', [VehicleController::class, 'restore'])
+            ->describes('Restores a trashed vehicle before the recovery window expires.');
+
+        $router->post('/api/vehicles/{id}/purge', [VehicleController::class, 'purge'])
+            ->describes(sprintf('Permanently deletes a trashed vehicle now, without waiting %d days.', TrashState::GRACE_DAYS));
     });
 };

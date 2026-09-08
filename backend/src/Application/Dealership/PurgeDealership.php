@@ -11,6 +11,7 @@ use App\Domain\Audit\Ports\AuditLogger;
 use App\Domain\Dealership\Ports\DealershipRepository;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
+use App\Domain\Vehicle\Ports\VehicleRepository;
 
 /** Antecipa o que a purga agendada faria, a pedido de quem é dono. */
 final readonly class PurgeDealership
@@ -19,6 +20,7 @@ final readonly class PurgeDealership
         private DealershipFinder $finder,
         private DealershipRepository $dealerships,
         private DealershipPhotos $photos,
+        private VehicleRepository $vehicles,
         private AuditLogger $audit,
         private Transaction $transaction,
     ) {
@@ -35,6 +37,7 @@ final readonly class PurgeDealership
         $this->transaction->run(function () use ($dealership): void {
             $oldPhotoFileId = $dealership->photoFileId;
             $this->dealerships->update($dealership->anonymized());
+            $this->vehicles->trashAllInDealership($dealership->id);
             $this->photos->delete($oldPhotoFileId);
         });
 
