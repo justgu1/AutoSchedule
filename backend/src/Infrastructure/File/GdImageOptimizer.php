@@ -19,9 +19,10 @@ final readonly class GdImageOptimizer implements ImageOptimizer
     {
     }
 
-    public function optimizeToWebp(string $contents): OptimizedImage
+    public function optimizeToWebp(string $sourcePath): OptimizedImage
     {
-        $source = @imagecreatefromstring($contents);
+        $contents = file_get_contents($sourcePath);
+        $source = $contents === false ? false : @imagecreatefromstring($contents);
 
         if (!$source instanceof \GdImage) {
             throw new DomainException('Uploaded file is not a valid image.', DomainErrorType::Validation, ['image' => 'The file could not be decoded as an image.']);

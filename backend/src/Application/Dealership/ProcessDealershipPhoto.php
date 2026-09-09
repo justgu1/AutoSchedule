@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Dealership;
 
+use App\Application\File\MaterializeStagedFile;
 use App\Application\File\UploadFile;
 use App\Application\Ports\JobProgress;
 use App\Application\Ports\TempFileStore;
@@ -27,6 +28,7 @@ final readonly class ProcessDealershipPhoto
         private AuditLogger $audit,
         private JobProgress $jobProgress,
         private TempFileStore $tempFiles,
+        private MaterializeStagedFile $materialize,
         private Transaction $transaction,
     ) {
     }
@@ -38,6 +40,10 @@ final readonly class ProcessDealershipPhoto
         string $originalName,
         ?string $uploadedBy,
     ): void {
+        // Staged pode ter vindo de outro pod (backend recebeu o upload, worker processa) --
+        // `uploadImage()` só aceita caminho local de verdade.
+        $localPath = ($this->materialize)($sourcePath);
+
         try {
             $dealership = $this->dealerships->findById($dealershipId);
 
@@ -50,8 +56,8 @@ final readonly class ProcessDealershipPhoto
             $this->jobProgress->update($jobId, 'processing', 'optimizing', 25);
 
             // Fora do request não há transação nenhuma: sem isto, falhar no meio deixa arquivo gravado e foto não trocada.
-            $file = $this->transaction->run(function () use ($dealership, $sourcePath, $originalName, $uploadedBy, $jobId): StoredFile {
-                $file = $this->uploads->uploadImage($sourcePath, $originalName, $uploadedBy);
+            $file = $this->transaction->run(function () use ($dealership, $localPath, $originalName, $uploadedBy, $jobId): StoredFile {
+                $file = $this->uploads->uploadImage($localPath, $originalName, $uploadedBy);
 
                 $this->jobProgress->update($jobId, 'processing', 'saving', 75);
                 $oldPhotoFileId = $dealership->photoFileId;
@@ -71,6 +77,7 @@ final readonly class ProcessDealershipPhoto
             $this->jobProgress->update($jobId, 'failed', 'failed', 100, ['error' => $exception->getMessage()]);
         } finally {
             $this->tempFiles->discard($sourcePath);
+            @unlink($localPath);
         }
     }
 }
