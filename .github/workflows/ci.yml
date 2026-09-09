@@ -184,6 +184,16 @@ jobs:
       - name: E2E
         run: RATE_LIMIT_AUTH_MAX=1000 docker compose run --rm --no-deps e2e npx playwright test
 
+      # Sem isso, falha em CI só mostra o call log -- sem trace/DOM real pra
+      # diagnosticar sem precisar reproduzir localmente.
+      - name: Trace do Playwright em caso de falha
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: frontend/test-results
+          retention-days: 3
+
       - name: Restaura o rate limit padrão do backend
         if: always()
         run: docker compose up -d backend
