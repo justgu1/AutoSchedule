@@ -17,6 +17,9 @@ export default defineConfig({
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 2 : 0,
     reporter: 'list',
+    // Falha vista batendo bem em cima dos 30s default (30.0-30.9s) sob carga do CI --
+    // folga pequena em vez de mascarar um bug real (esses já foram corrigidos à parte).
+    timeout: 45_000,
     expect: { timeout: 10_000 },
     use: {
         baseURL: process.env.BASE_URL ?? 'http://localhost:8085',
