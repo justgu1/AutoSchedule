@@ -42,7 +42,7 @@ final class GdImageOptimizerTest extends TestCase
     {
         $source = $this->createPngFixture(200, 100);
 
-        $optimized = $this->optimizer->optimizeToWebp($source);
+        $optimized = $this->optimizer->optimizeToWebp($this->readFixture($source));
 
         $this->assertFileExists($optimized->path);
         $this->assertSame(200, $optimized->width);
@@ -55,7 +55,7 @@ final class GdImageOptimizerTest extends TestCase
     {
         $source = $this->createPngFixture(3200, 1600);
 
-        $optimized = $this->optimizer->optimizeToWebp($source);
+        $optimized = $this->optimizer->optimizeToWebp($this->readFixture($source));
 
         $this->assertSame(1600, $optimized->width);
         $this->assertSame(800, $optimized->height);
@@ -66,7 +66,7 @@ final class GdImageOptimizerTest extends TestCase
     {
         $source = $this->createPngFixture(10, 10);
 
-        $optimized = $this->optimizer->optimizeToWebp($source);
+        $optimized = $this->optimizer->optimizeToWebp($this->readFixture($source));
 
         $this->assertStringStartsWith(rtrim($this->tempPath, '/') . '/', $optimized->path);
         $this->assertStringEndsWith('.webp', $optimized->path);
@@ -80,7 +80,7 @@ final class GdImageOptimizerTest extends TestCase
 
         $this->expectException(DomainException::class);
 
-        $this->optimizer->optimizeToWebp($source);
+        $this->optimizer->optimizeToWebp($this->readFixture($source));
     }
 
     /**
@@ -116,5 +116,13 @@ final class GdImageOptimizerTest extends TestCase
         $this->createdFiles[] = $path;
 
         return $path;
+    }
+
+    private function readFixture(string $path): string
+    {
+        $contents = file_get_contents($path);
+        $this->assertNotFalse($contents);
+
+        return $contents;
     }
 }

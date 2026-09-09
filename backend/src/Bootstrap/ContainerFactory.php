@@ -52,7 +52,7 @@ use App\Infrastructure\Auth\Google\GoogleJwksIdTokenVerifier;
 use App\Infrastructure\Auth\Jwt\JwtTokenIssuer;
 use App\Infrastructure\Container\Container;
 use App\Infrastructure\File\GdImageOptimizer;
-use App\Infrastructure\File\LocalTempFileStore;
+use App\Infrastructure\File\S3TempFileStore;
 use App\Infrastructure\Http\Controllers\OAuthController;
 use App\Infrastructure\Http\ExceptionHandler;
 use App\Infrastructure\Http\Router;
@@ -193,7 +193,7 @@ final class ContainerFactory
         ));
 
         $container->singleton(ImageOptimizer::class, static fn (): ImageOptimizer => new GdImageOptimizer($config->string('storage.temp_path')));
-        $container->singleton(TempFileStore::class, static fn (): TempFileStore => new LocalTempFileStore($config->string('storage.temp_path')));
+        $container->singleton(TempFileStore::class, static fn (Container $c): TempFileStore => new S3TempFileStore($c->get(StorageProvider::class)));
 
         $container->singleton(PaginationPolicy::class, static fn (): PaginationPolicy => new PaginationPolicy(
             $config->int('pagination.default_per_page'),

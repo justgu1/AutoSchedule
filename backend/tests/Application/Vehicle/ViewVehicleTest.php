@@ -97,6 +97,11 @@ final class NoopStorageProvider implements \App\Domain\File\Ports\StorageProvide
     {
     }
 
+    public function get(string $path): string
+    {
+        return '';
+    }
+
     public function url(string $path): string
     {
         return 'https://storage.test/' . $path;

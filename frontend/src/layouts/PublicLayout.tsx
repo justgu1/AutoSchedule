@@ -18,9 +18,11 @@ export function PublicLayout() {
     const me = useQuery({ queryKey: ['me'], queryFn: getMe, retry: false });
 
     function handleLogout() {
+        // Sem navegação daqui (fica na home) -- `invalidateQueries` força o refetch do
+        // observer já montado; `removeQueries` sozinho não garante isso sem remount.
         void logout()
             .catch(() => undefined)
-            .finally(() => queryClient.removeQueries({ queryKey: ['me'] }));
+            .finally(() => queryClient.invalidateQueries({ queryKey: ['me'] }));
     }
 
     return (

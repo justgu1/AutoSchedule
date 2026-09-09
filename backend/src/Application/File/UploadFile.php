@@ -30,7 +30,9 @@ final readonly class UploadFile
     /** O whitelist é só `image/webp` porque o otimizador é a autoridade sobre o formato final. */
     public function uploadImage(string $uploadedTmpPath, string $originalName, ?string $uploadedBy): StoredFile
     {
-        $optimized = $this->imageOptimizer->optimizeToWebp($uploadedTmpPath);
+        // Lê via `TempFileStore` (não `file_get_contents` direto): quem chama pode estar no
+        // worker, num processo diferente de quem gravou o arquivo original.
+        $optimized = $this->imageOptimizer->optimizeToWebp($this->tempFiles->read($uploadedTmpPath));
 
         try {
             return $this->upload($optimized->path, $originalName, ['image/webp'], $uploadedBy);
