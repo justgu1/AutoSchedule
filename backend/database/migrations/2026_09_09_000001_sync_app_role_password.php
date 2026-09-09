@@ -11,13 +11,17 @@ use App\Infrastructure\Persistence\Schema\Migration;
 return new class () implements Migration {
     public function up(\PDO $pdo): void
     {
-        $password = getenv('DB_APP_PASSWORD') ?: 'changeme';
+        // Secret selado costuma chegar com `\n` sobrando (mesmo motivo do trim em `Env::raw()`) --
+        // sem isso a senha setada aqui diverge da que a conexão de verdade usa (`Env::string`, com trim).
+        $password = trim(getenv('DB_APP_PASSWORD') ?: '') ?: 'changeme';
         $pdo->exec('ALTER ROLE autoschedule_app WITH PASSWORD ' . $pdo->quote($password));
     }
 
     public function down(\PDO $pdo): void
     {
-        $password = getenv('DB_APP_PASSWORD') ?: 'changeme';
+        // Secret selado costuma chegar com `\n` sobrando (mesmo motivo do trim em `Env::raw()`) --
+        // sem isso a senha setada aqui diverge da que a conexão de verdade usa (`Env::string`, com trim).
+        $password = trim(getenv('DB_APP_PASSWORD') ?: '') ?: 'changeme';
         $pdo->exec('ALTER ROLE autoschedule_app WITH PASSWORD ' . $pdo->quote($password));
     }
 };

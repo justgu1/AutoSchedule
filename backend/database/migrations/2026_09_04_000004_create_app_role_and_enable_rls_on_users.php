@@ -7,9 +7,8 @@ use App\Infrastructure\Persistence\Schema\Migration;
 return new class () implements Migration {
     public function up(\PDO $pdo): void
     {
-        // Senha vem de env porque a interface Migration só recebe PDO -- não
-        // tem outro jeito de injetar config aqui sem mudar a assinatura.
-        $password = getenv('DB_APP_PASSWORD') ?: 'changeme';
+        // `trim()` pro mesmo valor que `Env::string()` usa de verdade na conexão.
+        $password = trim(getenv('DB_APP_PASSWORD') ?: '') ?: 'changeme';
         $roleExists = (bool) $pdo->query("SELECT 1 FROM pg_roles WHERE rolname = 'autoschedule_app'")->fetchColumn();
 
         if (!$roleExists) {
