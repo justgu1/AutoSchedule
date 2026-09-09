@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Application\Vehicle;
 
+use App\Application\File\MaterializeStagedFile;
 use App\Application\File\UploadFile;
 use App\Application\Vehicle\ProcessVehiclePhotos;
 use App\Domain\Audit\AuditEvent;
@@ -56,6 +57,7 @@ final class ProcessVehiclePhotosTest extends TestCase
             $this->audit,
             $this->jobStatus,
             $tempFiles,
+            new MaterializeStagedFile($tempFiles),
             new DirectTransaction(),
         );
 
@@ -156,6 +158,11 @@ final class NullStorageProvider implements \App\Domain\File\Ports\StorageProvide
 {
     public function put(string $path, string $contents, string $mimeType): void
     {
+    }
+
+    public function get(string $path): string
+    {
+        return '';
     }
 
     public function url(string $path): string

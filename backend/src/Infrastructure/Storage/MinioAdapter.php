@@ -45,6 +45,11 @@ final readonly class MinioAdapter implements StorageProvider
         $this->filesystem->write($path, $contents, ['mimetype' => $mimeType]);
     }
 
+    public function get(string $path): string
+    {
+        return $this->filesystem->read($path);
+    }
+
     public function url(string $path): string
     {
         return rtrim($this->publicUrl, '/') . '/' . ltrim($path, '/');

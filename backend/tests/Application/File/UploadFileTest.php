@@ -193,6 +193,11 @@ final class FakeStorageProvider implements StorageProvider
         $this->objects[$path] = $contents;
     }
 
+    public function get(string $path): string
+    {
+        return $this->objects[$path] ?? '';
+    }
+
     public function url(string $path): string
     {
         return 'https://fake-storage.test/' . $path;

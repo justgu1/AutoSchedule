@@ -12,6 +12,8 @@ interface StorageProvider
 {
     public function put(string $path, string $contents, string $mimeType): void;
 
+    public function get(string $path): string;
+
     public function url(string $path): string;
 
     public function delete(string $path): void;

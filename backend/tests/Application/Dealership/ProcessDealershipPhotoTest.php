@@ -6,6 +6,7 @@ namespace Tests\Application\Dealership;
 
 use App\Application\Dealership\DealershipPhotos;
 use App\Application\Dealership\ProcessDealershipPhoto;
+use App\Application\File\MaterializeStagedFile;
 use App\Application\File\UploadFile;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Dealership\Dealership;
@@ -63,6 +64,7 @@ final class ProcessDealershipPhotoTest extends TestCase
             $this->audit,
             $this->jobStatus,
             $tempFiles,
+            new MaterializeStagedFile($tempFiles),
             new DirectTransaction(),
         );
 
@@ -184,6 +186,11 @@ final class FakeStorageProvider implements StorageProvider
     public function put(string $path, string $contents, string $mimeType): void
     {
         $this->objects[$path] = $contents;
+    }
+
+    public function get(string $path): string
+    {
+        return $this->objects[$path] ?? '';
     }
 
     public function url(string $path): string

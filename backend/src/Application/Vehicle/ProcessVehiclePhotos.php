@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Vehicle;
 
+use App\Application\File\MaterializeStagedFile;
 use App\Application\File\UploadFile;
 use App\Application\Ports\JobProgress;
 use App\Application\Ports\TempFileStore;
@@ -26,6 +27,7 @@ final readonly class ProcessVehiclePhotos
         private AuditLogger $audit,
         private JobProgress $jobProgress,
         private TempFileStore $tempFiles,
+        private MaterializeStagedFile $materialize,
         private Transaction $transaction,
     ) {
     }
@@ -48,11 +50,18 @@ final readonly class ProcessVehiclePhotos
             foreach ($sources as $index => $source) {
                 $this->jobProgress->update($jobId, 'processing', sprintf('optimizing %d/%d', $index + 1, $total), (int) (($index / $total) * 100));
 
-                // Uma transação por foto: uma imagem ruim no meio do lote não desfaz as que já entraram.
-                $this->transaction->run(function () use ($vehicle, $source, $uploadedBy): void {
-                    $file = $this->uploads->uploadImage($source['source_path'], $source['original_name'], $uploadedBy);
-                    $this->images->insert(VehicleImage::register($vehicle->id, $file->id, $this->images->nextPosition($vehicle->id)));
-                });
+                // Staged pode ter vindo de outro pod -- `uploadImage()` só aceita caminho local de verdade.
+                $localPath = ($this->materialize)($source['source_path']);
+
+                try {
+                    // Uma transação por foto: uma imagem ruim no meio do lote não desfaz as que já entraram.
+                    $this->transaction->run(function () use ($vehicle, $localPath, $source, $uploadedBy): void {
+                        $file = $this->uploads->uploadImage($localPath, $source['original_name'], $uploadedBy);
+                        $this->images->insert(VehicleImage::register($vehicle->id, $file->id, $this->images->nextPosition($vehicle->id)));
+                    });
+                } finally {
+                    @unlink($localPath);
+                }
 
                 ++$added;
             }
