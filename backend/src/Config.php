@@ -18,6 +18,7 @@ final class Config
         'rate_limit',
         'redis',
         'security',
+        'seeding',
         'storage',
     ];
 

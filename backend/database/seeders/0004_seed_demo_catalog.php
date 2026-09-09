@@ -9,7 +9,7 @@ use App\Infrastructure\Persistence\Schema\Seeder;
 
 /**
  * Catálogo de demonstração: 10 concessionárias com agenda/veículos/fotos/agendamentos próprios.
- * Idempotente pelo slug da concessionária; foto real por modelo via Wikimedia, cai pro placeholder de GD sem rede.
+ * Idempotente pelo slug da concessionária; foto real só com `SEED_FETCH_REAL_IMAGES=true`.
  */
 return new class () implements Seeder {
     // Endereço/CEP/bairro de cada linha conferido contra o ViaCEP real.
@@ -100,6 +100,9 @@ return new class () implements Seeder {
     /** @var array<string, list<string>> "brand|model" -> file ids, uma busca de rede só por modelo, não por veículo. */
     private array $modelImageCache = [];
 
+    /** `config/seeding.php` -- desligado em CI/pipeline, liga só quando o dev quer navegar o catálogo com foto real. */
+    private bool $fetchRealImages = false;
+
     public function run(\PDO $pdo): void
     {
         // Só pro banco de dev/demo -- nem teste, nem E2E precisam (ou querem) do catálogo sintético inteiro.
@@ -115,6 +118,7 @@ return new class () implements Seeder {
 
         $kernel = CliKernel::boot();
         $uploadFile = $kernel->container->get(UploadFile::class);
+        $this->fetchRealImages = $kernel->config->bool('seeding.fetch_real_images');
 
         $amenityIds = $this->fetchAmenityIds($pdo);
         $customerIds = $this->seedCustomers($pdo);
@@ -456,7 +460,7 @@ return new class () implements Seeder {
         $key = "{$brand}|{$modelName}";
 
         if (!isset($this->modelImageCache[$key])) {
-            $fileIds = $this->fetchRealCarImages($uploadFile, $brand, $modelName);
+            $fileIds = $this->fetchRealImages ? $this->fetchRealCarImages($uploadFile, $brand, $modelName) : [];
 
             $this->modelImageCache[$key] = $fileIds !== []
                 ? $fileIds

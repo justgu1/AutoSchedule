@@ -64,6 +64,10 @@ services:
 
       TEMP_STORAGE_PATH: /var/www/html/storage/tmp
 
+      # Seeder de demo baixar foto real via Wikimedia é pesado (rede + conversão WebP) --
+      # desligado por default, CI/pipeline nunca seta essa variável.
+      SEED_FETCH_REAL_IMAGES: ${SEED_FETCH_REAL_IMAGES:-false}
+
     volumes: &backend-volumes # Prefiro que tenhamos um backup dos uploads até o retorno 200 do s3.
       - backend_tmp:/var/www/html/storage/tmp
 

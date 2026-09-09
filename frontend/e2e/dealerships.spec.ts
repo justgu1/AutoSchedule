@@ -221,28 +221,32 @@ test('admin cria concessionária pra um seller e reassocia o dono pra outro', as
     await page.getByRole('link', { name: 'Concessionárias' }).click();
     await page.getByRole('button', { name: 'Nova concessionária' }).click();
     const dealershipName = `Admin Reassoc ${Date.now()}`;
+    // Card/botão de concessionária já existente na lista de trás pode ter o nome como
+    // substring do rótulo (ex. "Renomeado" contém "nome") -- escopar ao dialog evita ambiguidade.
+    const createDialog = page.getByRole('dialog');
     // Dropdown de dono é um Autocomplete que busca pelo nome/e-mail exibido -- nunca UUID digitado.
-    await page.getByLabel(/Dono/).fill(ownerAEmail);
+    await createDialog.getByLabel(/Dono/).fill(ownerAEmail);
     await page.getByRole('option', { name: new RegExp(`${ownerAName}.*${ownerAEmail}`) }).click();
-    await page.getByLabel('Nome').fill(dealershipName);
-    await page.getByLabel('CEP').fill('01000-000');
+    await createDialog.getByLabel('Nome').fill(dealershipName);
+    await createDialog.getByLabel('CEP').fill('01000-000');
     // CEP completo -> debounce dispara sozinho (mocado) e preenche Endereço/Bairro/Cidade/UF.
-    await page.getByLabel('Número').click();
-    await expect(page.getByLabel('Cidade')).toHaveValue('Rio de Janeiro');
-    await page.getByLabel('Número').fill('1');
-    await page.getByRole('button', { name: 'Criar' }).click();
-    await expect(page.getByRole('dialog')).not.toBeVisible();
+    await createDialog.getByLabel('Número').click();
+    await expect(createDialog.getByLabel('Cidade')).toHaveValue('Rio de Janeiro');
+    await createDialog.getByLabel('Número').fill('1');
+    await createDialog.getByRole('button', { name: 'Criar' }).click();
+    await expect(createDialog).not.toBeVisible();
 
     await findCardAcrossPages(page, dealershipName);
     await page
         .getByRole('group', { name: dealershipName })
         .getByRole('button', { name: `Editar ${dealershipName}` })
         .click();
-    await expect(page.getByLabel(/Dono/)).toHaveValue(`${ownerAName} (${ownerAEmail})`);
-    await page.getByLabel(/Dono/).fill(ownerBEmail);
+    const editDialog = page.getByRole('dialog');
+    await expect(editDialog.getByLabel(/Dono/)).toHaveValue(`${ownerAName} (${ownerAEmail})`);
+    await editDialog.getByLabel(/Dono/).fill(ownerBEmail);
     await page.getByRole('option', { name: new RegExp(`${ownerBName}.*${ownerBEmail}`) }).click();
-    await page.getByRole('button', { name: 'Salvar' }).click();
-    await expect(page.getByRole('dialog')).not.toBeVisible();
+    await editDialog.getByRole('button', { name: 'Salvar' }).click();
+    await expect(editDialog).not.toBeVisible();
 
     await findCardAcrossPages(page, dealershipName);
     await page

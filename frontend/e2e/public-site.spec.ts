@@ -93,6 +93,11 @@ test('index lista o catálogo público e o card abre a página do veículo, sem 
 
     await page.getByRole('heading', { name: `${brand} Argo` }).click();
     await expect(page).toHaveURL(/\/veiculos\//);
+    // Navegação é client-side (RouterLink) -- por um instante a grade antiga do catálogo pode
+    // continuar montada enquanto os dados do veículo carregam, e o card de outro teste com o
+    // mesmo preço de fixture ("R$ 89.900,00") ainda visível quebra o `getByText` (strict mode).
+    // Esperar algo que só existe na página de detalhe garante que a troca de rota já terminou.
+    await expect(page.getByRole('heading', { name: 'Sobre os diferenciais do anúncio' })).toBeVisible();
     await expect(page.getByRole('heading', { name: `${brand} Argo` })).toBeVisible();
     await expect(page.getByText('R$ 89.900,00')).toBeVisible();
 });
