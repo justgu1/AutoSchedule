@@ -195,6 +195,9 @@ services:
     container_name: autoschedule-e2e
     profiles: ["e2e"]
     working_dir: /app
+    # Default do Docker (64MB) é pouco pra Chromium com 4 workers concorrentes --
+    # estoura e a página crasha ("Page closed") sob carga, sem ser bug de teste.
+    shm_size: '2gb'
     environment:
       BASE_URL: http://nginx
       MAILPIT_URL: http://mailpit:8025
