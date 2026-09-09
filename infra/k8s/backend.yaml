@@ -87,6 +87,8 @@ spec:
               valueFrom: { secretKeyRef: { name: autoschedule-secrets, key: S3_SECRET_KEY } }
             - name: TEMP_STORAGE_PATH
               value: /var/www/html/storage/tmp
+            - name: SEED_FETCH_REAL_IMAGES
+              value: 'true'
           volumeMounts: &backend-volume-mounts
             - name: jwt-keys
               mountPath: /var/www/html/storage/keys
