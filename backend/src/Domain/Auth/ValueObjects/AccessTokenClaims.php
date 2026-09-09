@@ -11,8 +11,8 @@ final readonly class AccessTokenClaims
 {
     /**
      * @param list<string> $scopes
-     * @param string $subject id do usuário num token WTM, client_id num token M2M
-     * @param ?UserRole $role ausente (null) em token M2M -- não tem usuário
+     * @param string $subject id do usuário -- inclusive em token M2M de client com dono, que empresta a identidade dele
+     * @param ?UserRole $role ausente (null) só em token M2M de client sem dono (client de sistema, sem usuário por trás)
      */
     public function __construct(
         public string $subject,

@@ -46,7 +46,14 @@ final readonly class UserController
     public function index(Request $request): Response
     {
         [$page, $perPage] = $this->pagination->resolve($request->query('page'), $request->query('per_page'));
-        $result = ($this->listUsers)($perPage, ($page - 1) * $perPage);
+        $role = $request->query('role');
+
+        // Papel inválido só some do resultado (sem match nenhum) -- não é motivo de 400, é filtro opcional.
+        if ($role !== null && UserRole::tryFrom($role) === null) {
+            return Response::paginated([], $page, $perPage, 0);
+        }
+
+        $result = ($this->listUsers)($perPage, ($page - 1) * $perPage, $role);
 
         return Response::paginated(
             array_map(static fn (UserProfile $profile): array => $profile->toArray(), $result['items']),

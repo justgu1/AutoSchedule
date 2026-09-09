@@ -20,7 +20,6 @@ use App\Domain\Auth\ClientType;
 use App\Domain\Auth\GrantType;
 use App\Domain\Auth\OAuthClient;
 use App\Domain\Auth\Ports\GoogleIdTokenVerifier;
-use App\Domain\Auth\Ports\OAuthClientRepository;
 use App\Domain\Auth\Ports\RefreshTokenRepository;
 use App\Domain\Auth\Ports\TokenIssuer;
 use App\Domain\Auth\Ports\UserIdentityRepository;
@@ -42,6 +41,7 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\DirectTransaction;
 use Tests\Support\FakeAuditLogger;
 use Tests\Support\InMemoryDealershipRepository;
+use Tests\Support\InMemoryOAuthClientRepository;
 use Tests\Support\InMemoryVehicleRepository;
 
 /** Os quatro fluxos de `POST /oauth/token` mais o logout, cada um no seu caso de uso, sobre os mesmos dublês. */
@@ -357,6 +357,59 @@ final class OAuthFlowsTest extends TestCase
         ($this->issueServiceToken($this->clients($client)))('autoschedule-no-m2m', 'correct-secret', $this->context());
     }
 
+    #[Test]
+    public function client_credentials_de_client_com_dono_autentica_como_o_dono(): void
+    {
+        $owner = User::register('Seller Owner', new Email('seller-owner@example.com'), null, 'x', UserRole::Seller);
+        $this->users->insert($owner);
+        [$secret, $client] = OAuthClient::createForOwner($owner->id, 'Minha integração');
+
+        $tokens = new FakeTokenIssuer();
+        $tokenPair = ($this->issueServiceToken($this->clients($client), $tokens))($client->clientId, $secret, $this->context());
+        $claims = $tokens->decodeAccessToken($tokenPair->accessToken);
+
+        $this->assertSame($owner->id, $claims->subject);
+        $this->assertSame(UserRole::Seller, $claims->role);
+        $this->assertSame($client->clientId, $claims->clientId);
+        $this->assertSame([AuditEvent::ServiceTokenIssued], $this->audit->events);
+        $this->assertSame($owner->id, $this->audit->entries[0]->actorId);
+    }
+
+    #[Test]
+    public function client_credentials_de_client_revogado_e_negado(): void
+    {
+        $owner = User::register('Seller Owner', new Email('seller-owner-2@example.com'), null, 'x', UserRole::Seller);
+        $this->users->insert($owner);
+        [$secret, $client] = OAuthClient::createForOwner($owner->id, 'Minha integração');
+
+        $this->expectException(DomainException::class);
+        ($this->issueServiceToken($this->clients($client->revoked())))($client->clientId, $secret, $this->context());
+    }
+
+    #[Test]
+    public function client_credentials_de_dono_trashed_e_negado(): void
+    {
+        $owner = User::register('Seller Owner', new Email('seller-owner-3@example.com'), null, 'x', UserRole::Seller);
+        $trashedOwner = new User(
+            id: $owner->id,
+            name: $owner->name,
+            email: $owner->email,
+            phone: $owner->phone,
+            passwordHash: $owner->passwordHash,
+            role: $owner->role,
+            passwordSetAt: $owner->passwordSetAt,
+            emailVerifiedAt: $owner->emailVerifiedAt,
+            createdAt: $owner->createdAt,
+            updatedAt: $owner->updatedAt,
+            trash: new TrashState(TrashableStatus::Trashed, new \DateTimeImmutable()),
+        );
+        $this->users->insert($trashedOwner);
+        [$secret, $client] = OAuthClient::createForOwner($owner->id, 'Minha integração');
+
+        $this->expectException(DomainException::class);
+        ($this->issueServiceToken($this->clients($client)))($client->clientId, $secret, $this->context());
+    }
+
     private function context(): ActorContext
     {
         return new ActorContext(ipAddress: '127.0.0.1', userAgent: 'phpunit');
@@ -386,7 +439,7 @@ final class OAuthFlowsTest extends TestCase
 
     private function clients(OAuthClient ...$clients): ClientAuthenticator
     {
-        return new ClientAuthenticator(new InMemoryOAuthClientRepository(array_values($clients)));
+        return new ClientAuthenticator(new InMemoryOAuthClientRepository(...array_values($clients)));
     }
 
     private function ttl(): TokenTtl
@@ -440,33 +493,14 @@ final class OAuthFlowsTest extends TestCase
         );
     }
 
-    private function issueServiceToken(ClientAuthenticator $clients): IssueServiceToken
+    private function issueServiceToken(ClientAuthenticator $clients, ?TokenIssuer $tokens = null): IssueServiceToken
     {
-        return new IssueServiceToken($clients, new FakeTokenIssuer(), $this->audit, $this->ttl());
+        return new IssueServiceToken($clients, $this->users, $tokens ?? new FakeTokenIssuer(), $this->audit, $this->ttl());
     }
 
     private function logout(): Logout
     {
         return new Logout($this->refreshTokens);
-    }
-}
-
-final readonly class InMemoryOAuthClientRepository implements OAuthClientRepository
-{
-    /** @param list<OAuthClient> $clients */
-    public function __construct(private array $clients)
-    {
-    }
-
-    public function findByClientId(string $clientId): ?OAuthClient
-    {
-        foreach ($this->clients as $client) {
-            if ($client->clientId === $clientId) {
-                return $client;
-            }
-        }
-
-        return null;
     }
 }
 
@@ -554,14 +588,19 @@ final class InMemoryUserRepository implements UserRepository
         );
     }
 
-    public function findPage(int $limit, int $offset): array
+    public function findPage(int $limit, int $offset, ?string $role = null): array
     {
-        return array_slice(array_values($this->byId), $offset, $limit);
+        $users = $role === null ? array_values($this->byId) : array_values(array_filter(
+            $this->byId,
+            static fn (User $user): bool => $user->role->value === $role,
+        ));
+
+        return array_slice($users, $offset, $limit);
     }
 
-    public function count(): int
+    public function count(?string $role = null): int
     {
-        return count($this->byId);
+        return count($this->findPage(PHP_INT_MAX, 0, $role));
     }
 
     public function countByRole(UserRole $role): int

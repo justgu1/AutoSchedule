@@ -32,8 +32,13 @@ final class MigrationRunnerTest extends TestCase
         $this->pdo->exec('DROP TABLE IF EXISTS vehicle_availability_rules CASCADE');
         $this->pdo->exec('DROP TABLE IF EXISTS dealership_availability_rules CASCADE');
         $this->pdo->exec('DROP TABLE IF EXISTS vehicle_images CASCADE');
+        $this->pdo->exec('DROP TABLE IF EXISTS vehicle_amenity_links CASCADE');
+        $this->pdo->exec('DROP TABLE IF EXISTS vehicle_amenity_catalog CASCADE');
         $this->pdo->exec('DROP TABLE IF EXISTS vehicles CASCADE');
         $this->pdo->exec('DROP TYPE IF EXISTS vehicle_status');
+        $this->pdo->exec('DROP TYPE IF EXISTS vehicle_transmission');
+        $this->pdo->exec('DROP TYPE IF EXISTS vehicle_body_type');
+        $this->pdo->exec('DROP TYPE IF EXISTS vehicle_fuel_type');
         $this->pdo->exec('DROP TABLE IF EXISTS dealership_images CASCADE');
         $this->pdo->exec('DROP TABLE IF EXISTS dealerships CASCADE');
         $this->pdo->exec('DROP TABLE IF EXISTS zip_code_cache CASCADE');

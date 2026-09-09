@@ -46,6 +46,7 @@ final readonly class ListAvailableDates
         $occupied = $this->appointments->findOccupiedStarts($vehicle->id, $from, $to->modify('+1 day'));
 
         $dates = [];
+        $now = new \DateTimeImmutable();
 
         for ($cursor = $from; $cursor < $to; $cursor = $cursor->modify('+1 day')) {
             $slots = $this->calculator->slotsFor(
@@ -55,6 +56,7 @@ final readonly class ListAvailableDates
                 exceptions: $this->onDate($exceptions, $cursor),
                 occupiedStarts: $this->onDate($occupied, $cursor),
                 durationMinutes: Appointment::DURATION_MINUTES,
+                notBefore: $now,
             );
 
             if ($slots !== []) {

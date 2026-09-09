@@ -14,12 +14,15 @@ use App\Domain\Auth\Ports\TokenIssuer;
 use App\Domain\Auth\ValueObjects\AccessTokenClaims;
 use App\Domain\Exceptions\DomainErrorType;
 use App\Domain\Exceptions\DomainException;
+use App\Domain\User\Ports\UserRepository;
+use App\Domain\User\User;
 
 /** M2M não tem sessão pra renovar, então sai access token sem refresh token. */
 final readonly class IssueServiceToken
 {
     public function __construct(
         private ClientAuthenticator $clients,
+        private UserRepository $users,
         private TokenIssuer $tokens,
         private AuditLogger $audit,
         private TokenTtl $ttl,
@@ -34,16 +37,32 @@ final readonly class IssueServiceToken
             throw new DomainException('Invalid client credentials.', DomainErrorType::Unauthorized);
         }
 
+        $subject = $client->clientId;
+        $role = null;
+        $auditContext = $context;
+
+        if ($client->ownerUserId !== null) {
+            $owner = $this->users->findById($client->ownerUserId);
+
+            // Dono apagado/trashed: client fica sem identidade válida pra emprestar -- nega, não regride pra "sem dono".
+            if (!$owner instanceof User || !$owner->trash->isActive()) {
+                throw new DomainException('Invalid client credentials.', DomainErrorType::Unauthorized);
+            }
+
+            $subject = $owner->id;
+            $role = $owner->role;
+            $auditContext = $context->actedBy($owner->id);
+        }
+
         $accessToken = $this->tokens->issueAccessToken(AccessTokenClaims::issue(
-            subject: $client->clientId,
+            subject: $subject,
             clientId: $client->clientId,
-            role: null,
+            role: $role,
             scopes: $client->allowedScopes,
             ttlSeconds: $this->ttl->accessSeconds,
         ));
 
-        // Sem actor nem alvo: quem se autenticou é o client, e ele vai no context.
-        $this->audit->record($context->audits(AuditEvent::ServiceTokenIssued, context: ['client_id' => $client->clientId]));
+        $this->audit->record($auditContext->audits(AuditEvent::ServiceTokenIssued, context: ['client_id' => $client->clientId]));
 
         return new TokenPair($accessToken, $this->ttl->accessSeconds, $client->allowedScopes);
     }

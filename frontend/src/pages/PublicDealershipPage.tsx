@@ -1,10 +1,6 @@
 import Alert from '@mui/material/Alert';
 import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import CardActionArea from '@mui/material/CardActionArea';
-import CardContent from '@mui/material/CardContent';
-import CardMedia from '@mui/material/CardMedia';
 import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
 import Grid from '@mui/material/Grid';
@@ -12,8 +8,10 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useQuery } from '@tanstack/react-query';
-import { Link as RouterLink, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
+import { Breadcrumb } from '../components/Breadcrumb';
 import { DealershipMap } from '../components/DealershipMap';
+import { VehicleCard } from '../components/VehicleCard';
 import { ApiError } from '../lib/apiClient';
 import { getPublicDealership } from '../lib/dealerships';
 
@@ -31,7 +29,7 @@ export function PublicDealershipPage() {
     if (dealership.isPending) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                <CircularProgress />
+                <CircularProgress aria-label="Carregando" />
             </Box>
         );
     }
@@ -50,89 +48,87 @@ export function PublicDealershipPage() {
     const fullAddress = `${data.address}, ${data.number} - ${data.neighborhood}, ${data.city}/${data.state}`;
 
     return (
-        <Paper sx={{ overflow: 'hidden' }}>
-            {data.photo_url && (
-                <Box
-                    component="img"
-                    src={data.photo_url}
-                    alt={data.name}
-                    sx={{ width: '100%', maxHeight: 320, objectFit: 'cover', display: 'block' }}
-                />
-            )}
-            <Stack spacing={2} sx={{ p: 3 }}>
-                <Typography variant="h4" component="h1">
-                    {data.name}
-                </Typography>
-
-                <Stack spacing={0.5}>
-                    <Typography>{fullAddress}</Typography>
-                    {data.complement && <Typography color="text.secondary">{data.complement}</Typography>}
-                    <Typography color="text.secondary">CEP {data.zip_code}</Typography>
-                    {data.phone && <Typography color="text.secondary">Telefone: {data.phone}</Typography>}
-                    {data.email && <Typography color="text.secondary">E-mail: {data.email}</Typography>}
-                </Stack>
-
-                <DealershipMap address={fullAddress} />
-
-                {data.seller_name && (
-                    <>
-                        <Divider />
-                        <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-                            <Avatar>{data.seller_name.charAt(0)}</Avatar>
-                            <Stack>
-                                <Typography variant="subtitle2">Vendedor responsável</Typography>
-                                <Typography color="text.secondary">{data.seller_name}</Typography>
-                            </Stack>
-                        </Stack>
-                    </>
+        <>
+            <Breadcrumb items={[{ label: data.name }]} />
+            <Paper sx={{ overflow: 'hidden' }}>
+                {data.photo_url && (
+                    <Box
+                        component="img"
+                        src={data.photo_url}
+                        alt={data.name}
+                        sx={{ width: '100%', height: 280, objectFit: 'cover', display: 'block' }}
+                    />
                 )}
-
-                <Divider />
-                <Stack spacing={1}>
-                    <Typography variant="h6" component="h2">
-                        Veículos
+                <Stack spacing={2} sx={{ p: 3 }}>
+                    <Typography variant="h4" component="h1">
+                        {data.name}
                     </Typography>
-                    {data.vehicles.length === 0 && (
-                        <Typography color="text.secondary">Em breve -- nenhum veículo cadastrado ainda.</Typography>
-                    )}
-                    {data.vehicles.length > 0 && (
-                        <Grid container spacing={2}>
-                            {data.vehicles.map((vehicle) => (
-                                <Grid key={vehicle.id} size={{ xs: 12, sm: 6, md: 4 }}>
-                                    <Card variant="outlined">
-                                        <CardActionArea component={RouterLink} to={`/veiculos/${vehicle.id}`}>
-                                            {vehicle.photo_url && (
-                                                <CardMedia
-                                                    component="img"
-                                                    height="140"
-                                                    image={vehicle.photo_url}
-                                                    alt=""
-                                                />
-                                            )}
-                                            <CardContent>
-                                                <Typography variant="subtitle2">
-                                                    {vehicle.brand} {vehicle.model}
-                                                </Typography>
-                                                <Typography variant="body2" color="text.secondary">
-                                                    {Number(vehicle.price).toLocaleString('pt-BR', {
-                                                        style: 'currency',
-                                                        currency: 'BRL',
-                                                    })}
-                                                </Typography>
-                                            </CardContent>
-                                        </CardActionArea>
-                                    </Card>
-                                </Grid>
-                            ))}
+
+                    <Grid container spacing={2}>
+                        <Grid size={{ xs: 12, md: 5 }}>
+                            <Stack spacing={0.5}>
+                                <Typography>{fullAddress}</Typography>
+                                {data.complement && <Typography color="text.secondary">{data.complement}</Typography>}
+                                <Typography color="text.secondary">CEP {data.zip_code}</Typography>
+                            </Stack>
                         </Grid>
+                        <Grid size={{ xs: 12, md: 7 }}>
+                            <DealershipMap address={fullAddress} />
+                        </Grid>
+                    </Grid>
+
+                    {(data.seller_name ?? data.phone ?? data.email) && (
+                        <>
+                            <Divider />
+                            <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                                {data.seller_name && (
+                                    <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+                                        <Avatar>{data.seller_name.charAt(0)}</Avatar>
+                                        <Stack>
+                                            <Typography variant="subtitle2">Vendedor responsável</Typography>
+                                            <Typography color="text.secondary">{data.seller_name}</Typography>
+                                        </Stack>
+                                    </Stack>
+                                )}
+                                {(data.phone ?? data.email) && (
+                                    <Stack sx={{ ml: { sm: 'auto' } }}>
+                                        {data.phone && (
+                                            <Typography color="text.secondary">Telefone: {data.phone}</Typography>
+                                        )}
+                                        {data.email && (
+                                            <Typography color="text.secondary">E-mail: {data.email}</Typography>
+                                        )}
+                                    </Stack>
+                                )}
+                            </Stack>
+                        </>
                     )}
-                    {data.vehicles_total > data.vehicles.length && (
-                        <Typography color="text.secondary">
-                            Mostrando {data.vehicles.length} de {data.vehicles_total} veículos.
+
+                    <Divider />
+                    <Stack spacing={1}>
+                        <Typography variant="h6" component="h2">
+                            Veículos
                         </Typography>
-                    )}
+                        {data.vehicles.length === 0 && (
+                            <Typography color="text.secondary">Em breve -- nenhum veículo cadastrado ainda.</Typography>
+                        )}
+                        {data.vehicles.length > 0 && (
+                            <Grid container spacing={2}>
+                                {data.vehicles.map((vehicle) => (
+                                    <Grid key={vehicle.id} size={{ xs: 12, sm: 6, md: 4 }}>
+                                        <VehicleCard vehicle={vehicle} />
+                                    </Grid>
+                                ))}
+                            </Grid>
+                        )}
+                        {data.vehicles_total > data.vehicles.length && (
+                            <Typography color="text.secondary">
+                                Mostrando {data.vehicles.length} de {data.vehicles_total} veículos.
+                            </Typography>
+                        )}
+                    </Stack>
                 </Stack>
-            </Stack>
-        </Paper>
+            </Paper>
+        </>
     );
 }

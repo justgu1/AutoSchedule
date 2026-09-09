@@ -2,11 +2,21 @@ import { apiFetch, apiFetchPage, apiFetchPublic, apiFetchPublicPage, apiUpload, 
 import type { PhotoJob } from './jobs';
 
 export type VehicleStatus = 'active' | 'trashed' | 'deleted';
+export type Transmission = 'manual' | 'automatic' | 'automated' | 'cvt';
+export type BodyType = 'hatch' | 'sedan' | 'suv' | 'pickup' | 'coupe' | 'convertible' | 'minivan' | 'wagon';
+export type FuelType = 'flex' | 'gasoline' | 'ethanol' | 'diesel' | 'electric' | 'hybrid';
+export type VehicleSort = 'price_desc' | 'price_asc' | 'year_desc' | 'created_desc' | 'created_asc';
 
 export interface VehicleImage {
     id: string;
     position: number;
     url: string;
+}
+
+export interface VehicleAmenity {
+    id: string;
+    code: string;
+    label: string;
 }
 
 export interface Vehicle {
@@ -15,13 +25,24 @@ export interface Vehicle {
     brand: string;
     model: string;
     version: string | null;
-    year: number | null;
+    manufacture_year: number | null;
+    model_year: number | null;
     /** Sempre string decimal (ex: `"89900.00"`) -- número em JSON vira ponto flutuante e perde centavo. */
     price: string;
     description: string | null;
+    mileage_km: number | null;
+    transmission: Transmission | null;
+    body_type: BodyType | null;
+    fuel_type: FuelType | null;
+    color: string | null;
+    plate_end_digit: number | null;
+    accepts_trade: boolean;
+    ipva_paid: boolean;
+    licensed: boolean;
     status: VehicleStatus;
     photo_url: string | null;
     images: VehicleImage[];
+    amenities: VehicleAmenity[];
 }
 
 export interface VehicleInput {
@@ -29,14 +50,26 @@ export interface VehicleInput {
     brand: string;
     model: string;
     version?: string;
-    year?: number;
+    manufacture_year?: number;
+    model_year?: number;
     price: string;
     description?: string;
+    mileage_km?: number;
+    transmission?: Transmission;
+    body_type?: BodyType;
+    fuel_type?: FuelType;
+    color?: string;
+    plate_end_digit?: number;
+    accepts_trade?: boolean;
+    ipva_paid?: boolean;
+    licensed?: boolean;
+    amenity_ids?: string[];
 }
 
 /** Todos opcionais e combináveis -- filtro ausente vira "sem essa restrição", tanto no painel quanto no catálogo. */
 export interface VehicleFilterParams {
     q?: string;
+    sort?: VehicleSort;
     brand?: string;
     model?: string;
     year_min?: number;
@@ -44,12 +77,19 @@ export interface VehicleFilterParams {
     price_min?: string;
     price_max?: string;
     dealership_id?: string;
+    transmission?: Transmission;
+    body_type?: BodyType;
+    fuel_type?: FuelType;
+    mileage_km_max?: number;
 }
 
 export interface VehicleFacets {
     brands: string[];
     models: string[];
     years: number[];
+    transmissions: Transmission[];
+    body_types: BodyType[];
+    fuel_types: FuelType[];
 }
 
 export interface PublicVehicleSummary {
@@ -57,8 +97,9 @@ export interface PublicVehicleSummary {
     brand: string;
     model: string;
     version: string | null;
-    year: number | null;
+    model_year: number | null;
     price: string;
+    mileage_km: number | null;
     photo_url: string | null;
 }
 
@@ -67,10 +108,21 @@ export interface PublicVehicleProfile {
     brand: string;
     model: string;
     version: string | null;
-    year: number | null;
+    manufacture_year: number | null;
+    model_year: number | null;
     price: string;
     description: string | null;
+    mileage_km: number | null;
+    transmission: Transmission | null;
+    body_type: BodyType | null;
+    fuel_type: FuelType | null;
+    color: string | null;
+    plate_end_digit: number | null;
+    accepts_trade: boolean;
+    ipva_paid: boolean;
+    licensed: boolean;
     images: VehicleImage[];
+    amenities: VehicleAmenity[];
     dealership: {
         slug: string;
         name: string;
@@ -171,4 +223,9 @@ export function getPublicVehicleFacets(filters: VehicleFilterParams = {}): Promi
 
 export function getPublicVehicle(id: string): Promise<PublicVehicleProfile> {
     return apiFetchPublic<PublicVehicleProfile>(`/vehicles/${id}`);
+}
+
+/** Catálogo global e estático de itens/equipamentos -- cache longo, o mesmo pra todo veículo. */
+export function listVehicleAmenityCatalog(): Promise<VehicleAmenity[]> {
+    return apiFetchPublic<VehicleAmenity[]>('/vehicles/amenities-catalog');
 }

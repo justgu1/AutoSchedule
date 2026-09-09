@@ -14,8 +14,9 @@ final readonly class PublicVehicleSummary
         public string $brand,
         public string $model,
         public ?string $version,
-        public ?int $year,
+        public ?int $modelYear,
         public string $price,
+        public ?int $mileageKm,
         public ?string $photoUrl,
     ) {
     }
@@ -27,8 +28,9 @@ final readonly class PublicVehicleSummary
             brand: $vehicle->brand,
             model: $vehicle->model,
             version: $vehicle->version,
-            year: $vehicle->year,
+            modelYear: $vehicle->modelYear,
             price: $vehicle->price->toDecimal(),
+            mileageKm: $vehicle->mileageKm,
             photoUrl: $photoUrl,
         );
     }
@@ -41,8 +43,9 @@ final readonly class PublicVehicleSummary
             'brand' => $this->brand,
             'model' => $this->model,
             'version' => $this->version,
-            'year' => $this->year,
+            'model_year' => $this->modelYear,
             'price' => $this->price,
+            'mileage_km' => $this->mileageKm,
             'photo_url' => $this->photoUrl,
         ];
     }

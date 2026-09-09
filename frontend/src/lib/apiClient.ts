@@ -103,8 +103,14 @@ export async function apiUpload<T>(path: string, formData: FormData): Promise<T>
  * o dono/admin estiver logado no mesmo navegador. Omitir a opção não bastaria: o default do fetch
  * pra request same-origin é `'same-origin'`, que manda o cookie de sessão do mesmo jeito.
  */
-async function requestPublic(path: string): Promise<ApiEnvelope> {
-    const response = await fetch(`${BASE_URL}${path}`, { credentials: 'omit' });
+async function requestPublic(path: string, options: RequestInit = {}): Promise<ApiEnvelope> {
+    const headers = new Headers(options.headers);
+
+    if (options.body !== undefined) {
+        headers.set('Content-Type', 'application/json');
+    }
+
+    const response = await fetch(`${BASE_URL}${path}`, { ...options, headers, credentials: 'omit' });
     const payload = (await response.json().catch(() => null)) as ApiEnvelope | null;
 
     if (!response.ok) {
@@ -114,8 +120,8 @@ async function requestPublic(path: string): Promise<ApiEnvelope> {
     return payload ?? {};
 }
 
-export async function apiFetchPublic<T>(path: string): Promise<T> {
-    const envelope = await requestPublic(path);
+export async function apiFetchPublic<T>(path: string, options: RequestInit = {}): Promise<T> {
+    const envelope = await requestPublic(path, options);
 
     return envelope.data as T;
 }

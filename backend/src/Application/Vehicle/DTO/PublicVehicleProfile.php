@@ -11,16 +11,30 @@ use App\Domain\Vehicle\Vehicle;
 /** Sem `dealership_id`/`status` -- quem visita não gerencia nada. Concessionária aninhada e enxuta. */
 final readonly class PublicVehicleProfile
 {
-    /** @param list<array{id: string, position: int, url: string}> $images */
+    /**
+     * @param list<array{id: string, position: int, url: string}> $images
+     * @param list<array{id: string, code: string, label: string}> $amenities
+     */
     public function __construct(
         public string $id,
         public string $brand,
         public string $model,
         public ?string $version,
-        public ?int $year,
+        public ?int $manufactureYear,
+        public ?int $modelYear,
         public Money $price,
         public ?string $description,
+        public ?int $mileageKm,
+        public ?string $transmission,
+        public ?string $bodyType,
+        public ?string $fuelType,
+        public ?string $color,
+        public ?int $plateEndDigit,
+        public bool $acceptsTrade,
+        public bool $ipvaPaid,
+        public bool $licensed,
         public array $images,
+        public array $amenities,
         public string $dealershipSlug,
         public string $dealershipName,
         public string $dealershipCity,
@@ -28,18 +42,32 @@ final readonly class PublicVehicleProfile
     ) {
     }
 
-    /** @param list<array{id: string, position: int, url: string}> $images */
-    public static function fromVehicle(Vehicle $vehicle, array $images, Dealership $dealership): self
+    /**
+     * @param list<array{id: string, position: int, url: string}> $images
+     * @param list<array{id: string, code: string, label: string}> $amenities
+     */
+    public static function fromVehicle(Vehicle $vehicle, array $images, array $amenities, Dealership $dealership): self
     {
         return new self(
             id: $vehicle->id,
             brand: $vehicle->brand,
             model: $vehicle->model,
             version: $vehicle->version,
-            year: $vehicle->year,
+            manufactureYear: $vehicle->manufactureYear,
+            modelYear: $vehicle->modelYear,
             price: $vehicle->price,
             description: $vehicle->description,
+            mileageKm: $vehicle->mileageKm,
+            transmission: $vehicle->transmission?->value,
+            bodyType: $vehicle->bodyType?->value,
+            fuelType: $vehicle->fuelType?->value,
+            color: $vehicle->color,
+            plateEndDigit: $vehicle->plateEndDigit,
+            acceptsTrade: $vehicle->acceptsTrade,
+            ipvaPaid: $vehicle->ipvaPaid,
+            licensed: $vehicle->licensed,
             images: $images,
+            amenities: $amenities,
             dealershipSlug: $dealership->slug,
             dealershipName: $dealership->name,
             dealershipCity: $dealership->address->city,
@@ -55,10 +83,21 @@ final readonly class PublicVehicleProfile
             'brand' => $this->brand,
             'model' => $this->model,
             'version' => $this->version,
-            'year' => $this->year,
+            'manufacture_year' => $this->manufactureYear,
+            'model_year' => $this->modelYear,
             'price' => $this->price->toDecimal(),
             'description' => $this->description,
+            'mileage_km' => $this->mileageKm,
+            'transmission' => $this->transmission,
+            'body_type' => $this->bodyType,
+            'fuel_type' => $this->fuelType,
+            'color' => $this->color,
+            'plate_end_digit' => $this->plateEndDigit,
+            'accepts_trade' => $this->acceptsTrade,
+            'ipva_paid' => $this->ipvaPaid,
+            'licensed' => $this->licensed,
             'images' => $this->images,
+            'amenities' => $this->amenities,
             'dealership' => [
                 'slug' => $this->dealershipSlug,
                 'name' => $this->dealershipName,

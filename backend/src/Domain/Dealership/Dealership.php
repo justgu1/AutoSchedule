@@ -6,6 +6,7 @@ namespace App\Domain\Dealership;
 
 use App\Domain\Shared\Address;
 use App\Domain\Shared\Email;
+use App\Domain\Shared\Slugger;
 use App\Domain\Shared\Trashable;
 use App\Domain\Shared\TrashState;
 use App\Domain\Shared\Uuid;
@@ -104,8 +105,7 @@ final readonly class Dealership implements Trashable
      */
     private static function buildSlug(string $name, string $id): string
     {
-        $transliterated = iconv('UTF-8', 'ASCII//TRANSLIT', $name);
-        $base = strtolower(trim((string) preg_replace('/[^a-zA-Z0-9]+/', '-', $transliterated !== false ? $transliterated : $name), '-'));
+        $base = Slugger::slugify($name);
         $suffix = substr(str_replace('-', '', $id), -6);
 
         return ($base !== '' ? $base : 'concessionaria') . '-' . $suffix;

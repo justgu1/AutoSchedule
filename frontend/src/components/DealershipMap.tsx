@@ -9,7 +9,7 @@ interface DealershipMapProps {
 
 /**
  * Maps Embed API, modo "place" -- só exibição por endereço, sem geocoding
- * nem Places autocomplete (`docs/business-rules.md`). Sem
+ * nem Places autocomplete (`docs/02-architecture/decisions/ADR-008.md`). Sem
  * `VITE_GOOGLE_MAPS_API_KEY` configurado, mostra um aviso em vez de um
  * iframe quebrado -- mapa é complemento, não pode travar a página.
  */

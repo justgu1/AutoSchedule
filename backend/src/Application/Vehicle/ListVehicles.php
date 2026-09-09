@@ -36,7 +36,7 @@ final readonly class ListVehicles
         ];
     }
 
-    /** @return array{brands: list<string>, models: list<string>, years: list<int>} */
+    /** @return array{brands: list<string>, models: list<string>, years: list<int>, transmissions: list<string>, body_types: list<string>, fuel_types: list<string>} */
     public function availableFilters(ActorContext $context): array
     {
         return $this->vehicles->availableFilters($context->isAdmin() ? null : (string) $context->actorId);
@@ -62,7 +62,7 @@ final readonly class ListVehicles
         ];
     }
 
-    /** @return array{brands: list<string>, models: list<string>, years: list<int>} */
+    /** @return array{brands: list<string>, models: list<string>, years: list<int>, transmissions: list<string>, body_types: list<string>, fuel_types: list<string>} */
     public function availableFiltersPublic(): array
     {
         return $this->vehicles->availableFiltersPublic();

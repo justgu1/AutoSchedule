@@ -23,6 +23,7 @@ RUN apk add --no-cache \
     && apk del .build-deps
 
 COPY infra/docker/backend/php.ini /usr/local/etc/php/conf.d/zz-app.ini
+COPY infra/docker/backend/fpm-pool.conf /usr/local/etc/php-fpm.d/zz-app.conf
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 

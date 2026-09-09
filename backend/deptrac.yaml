@@ -1,5 +1,5 @@
 # A regra de dependência das camadas, que antes só existia em prosa no
-# docs/architecture.md. Sem baseline de propósito: o código já passava quando
+# docs/02-architecture/dependencies.md. Sem baseline de propósito: o código já passava quando
 # esta configuração entrou, então qualquer violação daqui pra frente é nova.
 parameters:
     paths:

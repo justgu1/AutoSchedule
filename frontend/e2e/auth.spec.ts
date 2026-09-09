@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openMenuIfCollapsed } from './support/ui';
 
 function uniqueEmail(prefix: string): string {
     return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@example.com`;
@@ -78,6 +79,7 @@ test('logout limpa a sessão e redireciona pro login', async ({ page }) => {
     await page.getByRole('button', { name: 'Criar conta' }).click();
     await expect(page).toHaveURL(/\/me$/);
 
+    await openMenuIfCollapsed(page);
     await page.getByRole('button', { name: 'Sair' }).click();
     await expect(page).toHaveURL(/\/login$/);
 

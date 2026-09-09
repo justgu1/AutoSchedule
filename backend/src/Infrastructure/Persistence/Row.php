@@ -103,6 +103,20 @@ final readonly class Row
      *
      * @param class-string<T> $enum
      *
+     * @return ?T
+     */
+    public function nullableEnum(string $enum, string $column): ?\BackedEnum
+    {
+        $value = $this->nullableString($column);
+
+        return $value === null ? null : $enum::from($value);
+    }
+
+    /**
+     * @template T of \BackedEnum
+     *
+     * @param class-string<T> $enum
+     *
      * @return list<T>
      */
     public function enumList(string $enum, string $column): array

@@ -8,6 +8,7 @@ use App\Application\Dealership\DealershipFinder;
 use App\Application\Shared\ActorContext;
 use App\Application\Shared\ValidatedInput;
 use App\Application\Vehicle\CreateVehicle;
+use App\Application\Vehicle\VehicleAmenities;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Dealership\Dealership;
 use App\Domain\Exceptions\DomainErrorType;
@@ -17,8 +18,11 @@ use App\Domain\Shared\Uf;
 use App\Domain\User\UserRole;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\DirectTransaction;
 use Tests\Support\FakeAuditLogger;
 use Tests\Support\InMemoryDealershipRepository;
+use Tests\Support\InMemoryVehicleAmenityCatalog;
+use Tests\Support\InMemoryVehicleAmenityLinkRepository;
 use Tests\Support\InMemoryVehicleRepository;
 
 final class CreateVehicleTest extends TestCase
@@ -33,7 +37,8 @@ final class CreateVehicleTest extends TestCase
         $this->dealerships = new InMemoryDealershipRepository();
         $this->vehicles = new InMemoryVehicleRepository();
         $this->audit = new FakeAuditLogger();
-        $this->createVehicle = new CreateVehicle(new DealershipFinder($this->dealerships), $this->vehicles, $this->audit);
+        $amenities = new VehicleAmenities(new InMemoryVehicleAmenityCatalog(), new InMemoryVehicleAmenityLinkRepository(), new DirectTransaction());
+        $this->createVehicle = new CreateVehicle(new DealershipFinder($this->dealerships), $this->vehicles, $amenities, $this->audit);
     }
 
     #[Test]
@@ -41,7 +46,7 @@ final class CreateVehicleTest extends TestCase
     {
         $dealership = $this->registerDealership('seller-1');
 
-        $profile = ($this->createVehicle)($this->input($dealership->id), $this->actor('seller-1', UserRole::Seller));
+        $profile = ($this->createVehicle)($this->input($dealership->id), null, $this->actor('seller-1', UserRole::Seller));
 
         $this->assertSame($dealership->id, $profile->dealershipId);
         $this->assertSame('Chevrolet', $profile->brand);
@@ -55,7 +60,7 @@ final class CreateVehicleTest extends TestCase
     public function seller_nao_cria_veiculo_em_concessionaria_que_nao_e_dele(): void
     {
         try {
-            ($this->createVehicle)($this->input('11111111-1111-4111-8111-111111111111'), $this->actor('seller-1', UserRole::Seller));
+            ($this->createVehicle)($this->input('11111111-1111-4111-8111-111111111111'), null, $this->actor('seller-1', UserRole::Seller));
             $this->fail('Expected a not found error.');
         } catch (DomainException $exception) {
             $this->assertSame(DomainErrorType::NotFound, $exception->type());
@@ -69,7 +74,7 @@ final class CreateVehicleTest extends TestCase
     {
         $dealership = $this->registerDealership('seller-1');
 
-        $profile = ($this->createVehicle)($this->input($dealership->id), $this->actor('admin-1', UserRole::Admin));
+        $profile = ($this->createVehicle)($this->input($dealership->id), null, $this->actor('admin-1', UserRole::Admin));
 
         $this->assertSame($dealership->id, $profile->dealershipId);
     }
@@ -80,11 +85,12 @@ final class CreateVehicleTest extends TestCase
         $dealership = $this->registerDealership('seller-1');
 
         $profile = ($this->createVehicle)(
-            new ValidatedInput(['dealership_id' => $dealership->id, 'brand' => 'Fiat', 'model' => 'Argo', 'year' => 2024, 'price' => 75500.5]),
+            new ValidatedInput(['dealership_id' => $dealership->id, 'brand' => 'Fiat', 'model' => 'Argo', 'model_year' => 2024, 'price' => 75500.5]),
+            null,
             $this->actor('seller-1', UserRole::Seller),
         );
 
-        $this->assertSame(2024, $profile->year);
+        $this->assertSame(2024, $profile->modelYear);
         $this->assertSame('75500.50', $profile->toArray()['price']);
     }
 
@@ -108,7 +114,8 @@ final class CreateVehicleTest extends TestCase
             'brand' => 'Chevrolet',
             'model' => 'Onix',
             'version' => 'LTZ 1.0 Turbo',
-            'year' => 2023,
+            'manufacture_year' => 2023,
+            'model_year' => 2023,
             'price' => '89900.00',
         ]);
     }

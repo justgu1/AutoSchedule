@@ -1,16 +1,18 @@
 import Autocomplete from '@mui/material/Autocomplete';
-import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import Grid from '@mui/material/Grid';
 import InputAdornment from '@mui/material/InputAdornment';
 import Button from '@mui/material/Button';
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState, type FormEvent } from 'react';
+import { ResponsiveDialog as Dialog } from './ResponsiveDialog';
 import { FormError } from './FormError';
 import { FormTextField } from './FormTextField';
 import { SubmitButton } from './SubmitButton';
 import { apiFetch, ApiError } from '../lib/apiClient';
+import { listSellers, type UserProfile } from '../lib/auth';
 import { BRAZILIAN_STATES, type BrazilianState } from '../lib/brazilianStates';
 import type { Dealership, DealershipProfileInput } from '../lib/dealerships';
 
@@ -100,6 +102,16 @@ export function DealershipFormDialog({
 }: DealershipFormDialogProps) {
     const [form, setForm] = useState<DealershipProfileInput>(() => formFromDealership(dealership));
 
+    // Catálogo de vendedores só é buscado quando o campo aparece (admin) -- `enabled` evita
+    // uma chamada 403 inútil quando quem abre o diálogo é o próprio seller.
+    const sellers = useQuery({
+        queryKey: ['users', 'sellers', 'for-dealership-form'],
+        queryFn: listSellers,
+        enabled: isAdmin,
+    });
+    const sellerOptions = sellers.data ?? [];
+    const selectedSeller = sellerOptions.find((seller) => seller.id === form.owner_user_id) ?? null;
+
     function set<K extends keyof DealershipProfileInput>(field: K, value: DealershipProfileInput[K]) {
         setForm((current) => ({ ...current, [field]: value }));
     }
@@ -156,16 +168,24 @@ export function DealershipFormDialog({
                         </Grid>
                         {isAdmin && (
                             <Grid size={12}>
-                                <FormTextField
-                                    label="Dono (ID do usuário seller)"
-                                    value={form.owner_user_id}
-                                    onChange={(event) => set('owner_user_id', event.target.value)}
-                                    error={error?.errors?.owner_user_id}
-                                    helperText={
-                                        error?.errors?.owner_user_id ??
-                                        'UUID do usuário seller dono desta concessionária'
-                                    }
-                                    required
+                                <Autocomplete<UserProfile>
+                                    options={sellerOptions}
+                                    loading={sellers.isPending}
+                                    getOptionLabel={(seller) => `${seller.name} (${seller.email})`}
+                                    value={selectedSeller}
+                                    onChange={(_, seller) => set('owner_user_id', seller?.id ?? '')}
+                                    isOptionEqualToValue={(option, selected) => option.id === selected.id}
+                                    renderInput={(params) => (
+                                        <FormTextField
+                                            {...params}
+                                            label="Dono"
+                                            error={error?.errors?.owner_user_id}
+                                            helperText={
+                                                error?.errors?.owner_user_id ?? 'Vendedor dono desta concessionária'
+                                            }
+                                            required
+                                        />
+                                    )}
                                 />
                             </Grid>
                         )}

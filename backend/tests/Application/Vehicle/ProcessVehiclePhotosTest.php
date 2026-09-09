@@ -59,7 +59,7 @@ final class ProcessVehiclePhotosTest extends TestCase
             new DirectTransaction(),
         );
 
-        $this->vehicle = Vehicle::register('dealership-1', 'Chevrolet', 'Onix', null, 2023, new Money(8990000));
+        $this->vehicle = Vehicle::register('dealership-1', 'Chevrolet', 'Onix', null, 2023, 2023, new Money(8990000));
         $this->vehicles->insert($this->vehicle);
     }
 

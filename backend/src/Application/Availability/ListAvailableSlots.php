@@ -45,6 +45,7 @@ final readonly class ListAvailableSlots
             ],
             occupiedStarts: $this->appointments->findOccupiedStarts($vehicle->id, $date, $nextDay),
             durationMinutes: Appointment::DURATION_MINUTES,
+            notBefore: new \DateTimeImmutable(),
         );
     }
 }

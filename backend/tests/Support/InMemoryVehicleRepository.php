@@ -62,13 +62,13 @@ final class InMemoryVehicleRepository implements VehicleRepository
 
         $brands = array_values(array_unique(array_map(static fn (Vehicle $v): string => $v->brand, $matching)));
         $models = array_values(array_unique(array_map(static fn (Vehicle $v): string => $v->model, $matching)));
-        $years = array_values(array_unique(array_filter(array_map(static fn (Vehicle $v): ?int => $v->year, $matching))));
+        $years = array_values(array_unique(array_filter(array_map(static fn (Vehicle $v): ?int => $v->modelYear, $matching))));
 
         sort($brands);
         sort($models);
         rsort($years);
 
-        return ['brands' => $brands, 'models' => $models, 'years' => $years];
+        return ['brands' => $brands, 'models' => $models, 'years' => $years, 'transmissions' => [], 'body_types' => [], 'fuel_types' => []];
     }
 
     public function searchPublic(VehicleFilters $filters, int $limit, int $offset): array
@@ -92,13 +92,13 @@ final class InMemoryVehicleRepository implements VehicleRepository
 
         $brands = array_values(array_unique(array_map(static fn (Vehicle $v): string => $v->brand, $matching)));
         $models = array_values(array_unique(array_map(static fn (Vehicle $v): string => $v->model, $matching)));
-        $years = array_values(array_unique(array_filter(array_map(static fn (Vehicle $v): ?int => $v->year, $matching))));
+        $years = array_values(array_unique(array_filter(array_map(static fn (Vehicle $v): ?int => $v->modelYear, $matching))));
 
         sort($brands);
         sort($models);
         rsort($years);
 
-        return ['brands' => $brands, 'models' => $models, 'years' => $years];
+        return ['brands' => $brands, 'models' => $models, 'years' => $years, 'transmissions' => [], 'body_types' => [], 'fuel_types' => []];
     }
 
     /** Aproximação honesta do que o Postgres faz: casamento por substring no lugar do índice de texto. */
@@ -121,8 +121,8 @@ final class InMemoryVehicleRepository implements VehicleRepository
 
     private function withinRanges(Vehicle $vehicle, VehicleFilters $filters): bool
     {
-        return ($filters->yearMin === null || ($vehicle->year ?? 0) >= $filters->yearMin)
-            && ($filters->yearMax === null || ($vehicle->year ?? PHP_INT_MAX) <= $filters->yearMax)
+        return ($filters->yearMin === null || ($vehicle->modelYear ?? 0) >= $filters->yearMin)
+            && ($filters->yearMax === null || ($vehicle->modelYear ?? PHP_INT_MAX) <= $filters->yearMax)
             && (!$filters->priceMin instanceof Money || $vehicle->price->cents >= $filters->priceMin->cents)
             && (!$filters->priceMax instanceof Money || $vehicle->price->cents <= $filters->priceMax->cents)
             && ($filters->dealershipId === null || $vehicle->dealershipId === $filters->dealershipId);
@@ -216,9 +216,19 @@ final class InMemoryVehicleRepository implements VehicleRepository
             brand: $vehicle->brand,
             model: $vehicle->model,
             version: $vehicle->version,
-            year: $vehicle->year,
+            manufactureYear: $vehicle->manufactureYear,
+            modelYear: $vehicle->modelYear,
             price: $vehicle->price,
             description: $vehicle->description,
+            mileageKm: $vehicle->mileageKm,
+            transmission: $vehicle->transmission,
+            bodyType: $vehicle->bodyType,
+            fuelType: $vehicle->fuelType,
+            color: $vehicle->color,
+            plateEndDigit: $vehicle->plateEndDigit,
+            acceptsTrade: $vehicle->acceptsTrade,
+            ipvaPaid: $vehicle->ipvaPaid,
+            licensed: $vehicle->licensed,
             trash: $trash,
             trashedByDealershipTrash: $byDealershipTrash,
             createdAt: $vehicle->createdAt,

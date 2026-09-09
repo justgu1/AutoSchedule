@@ -12,4 +12,5 @@ enum AuditableType: string
     case Vehicle = 'Vehicle';
     case Availability = 'Availability';
     case Appointment = 'Appointment';
+    case ApiClient = 'ApiClient';
 }

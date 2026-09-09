@@ -18,6 +18,7 @@ final readonly class ViewVehicle
     public function __construct(
         private VehicleFinder $finder,
         private VehicleGallery $gallery,
+        private VehicleAmenities $amenities,
         private DealershipFinder $dealerships,
     ) {
     }
@@ -26,12 +27,13 @@ final readonly class ViewVehicle
     {
         $vehicle = $this->finder->findOrFail($id);
         $images = $this->gallery->forVehicle($vehicle->id);
+        $amenities = $this->amenities->linksFor($vehicle->id);
         $dealership = $this->dealerships->findOrFail($vehicle->dealershipId);
 
         if ($context->isAdmin() || ($context->actorId !== null && $context->actorId === $dealership->ownerUserId)) {
-            return VehicleProfile::fromVehicle($vehicle, $images[0]['url'] ?? null, $images);
+            return VehicleProfile::fromVehicle($vehicle, $images[0]['url'] ?? null, $images, $amenities);
         }
 
-        return PublicVehicleProfile::fromVehicle($vehicle, $images, $dealership);
+        return PublicVehicleProfile::fromVehicle($vehicle, $images, $amenities, $dealership);
     }
 }

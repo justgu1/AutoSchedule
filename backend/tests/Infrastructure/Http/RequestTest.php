@@ -85,6 +85,30 @@ final class RequestTest extends TestCase
         $this->assertSame(['a' => 1], $request->json());
     }
 
+    /** Ação de painel sem payload (ex. `POST /appointments/{id}/confirm` sem token) manda corpo vazio. */
+    #[Test]
+    public function json_com_corpo_vazio_devolve_null_em_vez_de_lancar(): void
+    {
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+        $_SERVER['PATH_INFO'] = '/api/ping';
+
+        $request = Request::fromGlobals(rawBody: '');
+
+        $this->assertNull($request->json());
+    }
+
+    #[Test]
+    public function json_com_corpo_invalido_de_verdade_ainda_lanca(): void
+    {
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+        $_SERVER['PATH_INFO'] = '/api/ping';
+
+        $request = Request::fromGlobals(rawBody: '{not valid json');
+
+        $this->expectException(\JsonException::class);
+        $request->json();
+    }
+
     #[Test]
     public function normaliza_barra_final_do_path(): void
     {

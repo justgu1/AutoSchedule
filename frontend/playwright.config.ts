@@ -10,7 +10,10 @@ export default defineConfig({
     // Poucos workers de propósito: cada registro/login passa por Argon2id no
     // backend (lento por design, contra brute-force) -- workers demais disputam
     // o mesmo PHP-FPM e estouram timeout sem ser um bug real, só fila.
-    workers: 4,
+    // No CI o runner tem menos CPU real por worker que a máquina local -- 4
+    // Chromium concorrentes starvam entre si (ação nunca "stable", às vezes
+    // a página crasha de vez, "Page closed"). Metade só lá.
+    workers: process.env.CI ? 2 : 4,
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 2 : 0,
     reporter: 'list',

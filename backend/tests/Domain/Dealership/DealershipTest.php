@@ -44,6 +44,20 @@ final class DealershipTest extends TestCase
         $this->assertStringNotContainsString($dealership->id, $dealership->slug);
     }
 
+    /** Regressão: `iconv` transliterava "ã" pra "~a", quebrando a palavra num hífen espúrio antes da letra. */
+    #[Test]
+    public function register_normaliza_acento_sem_quebrar_a_palavra_no_slug(): void
+    {
+        $dealership = Dealership::register(
+            ownerUserId: 'owner-1',
+            name: 'São Paulo Concessionária',
+            address: $this->addressFixture(),
+            phone: null,
+        );
+
+        $this->assertMatchesRegularExpression('/^sao-paulo-concessionaria-[0-9a-f]{6}$/', $dealership->slug);
+    }
+
     #[Test]
     public function with_profile_troca_os_dados_mas_preserva_dono_status_e_slug(): void
     {

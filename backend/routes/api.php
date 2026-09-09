@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Domain\Shared\TrashState;
 use App\Domain\User\UserRole;
 use App\Infrastructure\Http\Controllers\ApiCatalogController;
+use App\Infrastructure\Http\Controllers\ApiClientController;
 use App\Infrastructure\Http\Controllers\AppointmentController;
 use App\Infrastructure\Http\Controllers\AvailabilityExceptionController;
 use App\Infrastructure\Http\Controllers\DealershipAvailabilityController;
@@ -55,12 +56,16 @@ return static function (Router $router): void {
 
     $router->get('/api/vehicles', [VehicleController::class, 'index'])
         ->publicRead()
-        ->describes('Without scope, the public catalog (everyone sees the same active stock, logged in or not). With scope=mine (requires admin/seller), the caller\'s own inventory. Query: q, brand, model, year_min, year_max, price_min, price_max, dealership_id, page, per_page. Brand and model go through the text index, so they also match a vehicle that only mentions them in the description.');
+        ->describes('Without scope, the public catalog (everyone sees the same active stock, logged in or not). With scope=mine (requires admin/seller), the caller\'s own inventory. Query: q, sort, brand, model, year_min, year_max, price_min, price_max, dealership_id, transmission, body_type, fuel_type, mileage_km_max, page, per_page. Brand and model go through the text index, so they also match a vehicle that only mentions them in the description. A small per_page with q also works as typeahead suggestions -- no separate endpoint for that.');
 
-    // Antes de `{id}`: o router devolve a primeira rota que casa, e o parâmetro engoliria "filters".
+    // Antes de `{id}`: o router devolve a primeira rota que casa, e o parâmetro engoliria "filters"/"amenities-catalog".
     $router->get('/api/vehicles/filters', [VehicleController::class, 'filters'])
         ->publicRead()
-        ->describes('Brands, models and years in stock, to fill the filter inputs. Public catalog by default, caller\'s own stock with scope=mine.');
+        ->describes('Brands, models, years, transmissions, body types and fuel types in stock, to fill the filter inputs. Public catalog by default, caller\'s own stock with scope=mine.');
+
+    $router->get('/api/vehicles/amenities-catalog', [VehicleController::class, 'amenitiesCatalog'])
+        ->publicRead()
+        ->describes('The full, global catalog of vehicle amenities/equipment items (seeded, read-only).');
 
     $router->get('/api/vehicles/{id}', [VehicleController::class, 'show'])
         ->publicRead()
@@ -79,6 +84,10 @@ return static function (Router $router): void {
         ->rateLimit('auth')
         ->describes('Books a test drive, no account required -- finds or creates a customer account by email.')
         ->accepts('vehicle_id', 'scheduled_at', 'customer_name', 'customer_email', 'customer_phone');
+
+    $router->get('/api/appointments/{id}', [AppointmentController::class, 'show'])
+        ->serviceContext()
+        ->describes('Returns an appointment -- the caller\'s own session (owner/admin) or the token from the confirmation email (query: token).');
 
     $router->post('/api/appointments/{id}/confirm', [AppointmentController::class, 'confirm'])
         ->serviceContext()
@@ -112,6 +121,19 @@ return static function (Router $router): void {
         $router->post('/api/me/purge', [UserController::class, 'purge'])
             ->describes(sprintf('Permanently anonymizes your trashed account now, without waiting %d days.', TrashState::GRACE_DAYS));
 
+        $router->get('/api/me/api-clients', [ApiClientController::class, 'index'])
+            ->describes('Lists your own client_credentials API clients (metadata only, never the secret).');
+
+        $router->post('/api/me/api-clients', [ApiClientController::class, 'store'])
+            ->describes('Creates a new client_credentials client for you (m2m -- it authenticates as you, same role/RLS as your session). Returns client_id and client_secret in plain text ONCE.')
+            ->accepts('name');
+
+        $router->post('/api/me/api-clients/{id}/rotate-secret', [ApiClientController::class, 'rotateSecret'])
+            ->describes('Regenerates the secret of one of your clients, keeping the same client_id. Returns the new secret in plain text ONCE.');
+
+        $router->delete('/api/me/api-clients/{id}', [ApiClientController::class, 'destroy'])
+            ->describes('Revokes one of your clients. Tokens already issued from it remain valid until they expire.');
+
         $router->get('/api/jobs/{id}', [JobController::class, 'show'])
             ->describes('Returns the current status of an async job (queued/processing/done/failed).');
 
@@ -121,7 +143,7 @@ return static function (Router $router): void {
 
     $router->group([UserRole::Admin], static function (Router $router): void {
         $router->get('/api/users', [UserController::class, 'index'])
-            ->describes('Lists users, paginated (query: page, per_page).');
+            ->describes('Lists users, paginated (query: page, per_page, role).');
 
         $router->get('/api/users/{id}', [UserController::class, 'show'])
             ->describes('Returns a single user.');
@@ -173,11 +195,11 @@ return static function (Router $router): void {
 
         $router->post('/api/vehicles', [VehicleController::class, 'store'])
             ->describes('Creates a vehicle in one of the caller dealerships.')
-            ->accepts('dealership_id', 'brand', 'model', 'version', 'year', 'price', 'description');
+            ->accepts('dealership_id', 'brand', 'model', 'version', 'manufacture_year', 'model_year', 'price', 'description', 'mileage_km', 'transmission', 'body_type', 'fuel_type', 'color', 'plate_end_digit', 'accepts_trade', 'ipva_paid', 'licensed', 'amenity_ids');
 
         $router->patch('/api/vehicles/{id}', [VehicleController::class, 'update'])
-            ->describes('Updates vehicle fields. Sending dealership_id moves it to another dealership the caller can reach.')
-            ->accepts('dealership_id', 'brand', 'model', 'version', 'year', 'price', 'description');
+            ->describes('Updates vehicle fields. Sending dealership_id moves it to another dealership the caller can reach. amenity_ids, when sent, replaces the whole set.')
+            ->accepts('dealership_id', 'brand', 'model', 'version', 'manufacture_year', 'model_year', 'price', 'description', 'mileage_km', 'transmission', 'body_type', 'fuel_type', 'color', 'plate_end_digit', 'accepts_trade', 'ipva_paid', 'licensed', 'amenity_ids');
 
         $router->delete('/api/vehicles/{id}', [VehicleController::class, 'destroy'])
             ->describes('Moves a vehicle to trash.');

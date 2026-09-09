@@ -14,14 +14,14 @@ final readonly class ListUsers
     }
 
     /** @return array{items: list<UserProfile>, total: int} */
-    public function __invoke(int $limit, int $offset): array
+    public function __invoke(int $limit, int $offset, ?string $role = null): array
     {
         return [
             'items' => array_map(
                 UserProfile::fromUser(...),
-                $this->users->findPage($limit, $offset),
+                $this->users->findPage($limit, $offset, $role),
             ),
-            'total' => $this->users->count(),
+            'total' => $this->users->count($role),
         ];
     }
 }

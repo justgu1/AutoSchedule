@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { closeFiltersIfOpen, openFiltersIfCollapsed, openMenuIfCollapsed } from './support/ui';
 
 function uniqueEmail(prefix: string): string {
     return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@example.com`;
@@ -35,7 +36,7 @@ async function createDealership(page: Page, name: string): Promise<void> {
     await expect(page.getByLabel('Endereço')).toHaveValue('Rua de Teste');
     await page.getByLabel('Número').fill('10');
     await page.getByRole('button', { name: 'Criar' }).click();
-    await expect(page.getByRole('cell', { name })).toBeVisible();
+    await expect(page.getByRole('group', { name })).toBeVisible();
 }
 
 /**
@@ -53,7 +54,7 @@ async function createVehicle(
     await dialog.getByLabel('Concessionária').fill(dealershipName);
     await page.getByRole('option', { name: dealershipName }).click();
     await dialog.getByLabel('Marca').fill(fields.brand);
-    await dialog.getByLabel('Modelo').fill(fields.model);
+    await dialog.getByLabel(/^Modelo/).fill(fields.model);
     await dialog.getByLabel('Preço').fill(fields.price);
     await dialog.getByRole('button', { name: 'Criar' }).click();
 }
@@ -71,18 +72,17 @@ test('seller cadastra veículo, edita, envia fotos da galeria e move pra lixeira
     await registerSeller(page, 'Seller Vehicletest');
     await createDealership(page, 'Auto Center Vehicle E2E');
 
+    await openMenuIfCollapsed(page);
     await page.getByRole('link', { name: 'Veículos' }).click();
     await expect(page).toHaveURL(/\/vehicles$/);
     await expect(page.getByText('Nenhum veículo encontrado')).toBeVisible();
 
     await createVehicle(page, 'Auto Center Vehicle E2E', { brand: 'Chevrolet', model: 'Onix', price: '89900.00' });
-    await expect(page.getByRole('cell', { name: 'Chevrolet Onix' })).toBeVisible();
+    const card = page.getByRole('group', { name: 'Chevrolet Onix' });
+    await expect(card).toBeVisible();
 
-    // Editar -- reabre o mesmo form pré-preenchido, muda só o preço.
-    await page
-        .getByRole('row', { name: /Chevrolet Onix/ })
-        .getByRole('button', { name: 'Editar' })
-        .click();
+    // Editar -- clicar no corpo do card (não é mais um botão "Editar" à parte) reabre o form pré-preenchido.
+    await card.getByRole('button', { name: 'Editar Chevrolet Onix' }).click();
     const editDialog = page.getByRole('dialog');
     await expect(editDialog.getByLabel('Marca')).toHaveValue('Chevrolet');
     await editDialog.getByLabel('Preço').fill('79900.00');
@@ -90,10 +90,7 @@ test('seller cadastra veículo, edita, envia fotos da galeria e move pra lixeira
     await expect(page.getByText('R$ 79.900,00')).toBeVisible();
 
     // Galeria -- lote de fotos processado de forma assíncrona (job + SSE), acompanhado até "done".
-    await page
-        .getByRole('row', { name: /Chevrolet Onix/ })
-        .getByRole('button', { name: 'Galeria' })
-        .click();
+    await card.getByRole('button', { name: 'Galeria' }).click();
     await expect(page.getByText('Nenhuma foto ainda.')).toBeVisible();
     await page
         .locator('input[type="file"]')
@@ -102,14 +99,13 @@ test('seller cadastra veículo, edita, envia fotos da galeria e move pra lixeira
     await page.getByRole('button', { name: 'Fechar' }).click();
 
     // Lixeira -- some da lista? não, seller ainda enxerga o próprio status trashed.
-    const row = page.getByRole('row', { name: /Chevrolet Onix/ });
-    await row.getByRole('button', { name: 'Mover pra lixeira' }).click();
+    await card.getByRole('button', { name: 'Mover pra lixeira' }).click();
     await page.getByRole('button', { name: 'Mover pra lixeira', exact: true }).click();
-    await expect(row.getByText('Na lixeira')).toBeVisible();
+    await expect(card.getByText('Na lixeira')).toBeVisible();
 
-    await row.getByRole('button', { name: 'Restaurar' }).click();
+    await card.getByRole('button', { name: 'Restaurar' }).click();
     await expect(page.getByText('Veículo restaurado.')).toBeVisible();
-    await expect(row.getByText('Ativo')).toBeVisible();
+    await expect(card.getByText('Ativo')).toBeVisible();
 });
 
 test('filtro de marca encontra o veículo pelo painel', async ({ page }) => {
@@ -119,10 +115,12 @@ test('filtro de marca encontra o veículo pelo painel', async ({ page }) => {
 
     await page.goto('/vehicles');
     await createVehicle(page, 'Filter Center E2E', { brand: 'Toyota', model: 'Corolla', price: '145000.00' });
-    await expect(page.getByRole('cell', { name: 'Toyota Corolla' })).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Toyota Corolla' })).toBeVisible();
 
+    await openFiltersIfCollapsed(page);
     await page.getByLabel('Buscar').fill('corola');
-    await expect(page.getByRole('cell', { name: 'Toyota Corolla' })).toBeVisible();
+    await closeFiltersIfOpen(page);
+    await expect(page.getByRole('group', { name: 'Toyota Corolla' })).toBeVisible();
 });
 
 test('customer não vê o link de veículos e é redirecionado se acessar a rota direto', async ({ page }) => {

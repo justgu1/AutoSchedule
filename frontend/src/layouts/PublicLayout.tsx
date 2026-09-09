@@ -25,7 +25,8 @@ export function PublicLayout() {
 
     return (
         <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', bgcolor: 'grey.50' }}>
-            <AppBar position="static" color="default" elevation={1}>
+            {/* `sticky` -- acompanha a rolagem em vez de sumir, mesmo critério do header autenticado. */}
+            <AppBar position="sticky" color="default" elevation={1} sx={{ top: 0 }}>
                 <Toolbar sx={{ justifyContent: 'space-between' }}>
                     <Typography
                         variant="h6"

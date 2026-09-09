@@ -82,7 +82,7 @@ final class ViewDealershipPublicVehiclesTest extends TestCase
 
     private function register(string $brand, string $model): Vehicle
     {
-        $vehicle = Vehicle::register($this->dealership->id, $brand, $model, null, 2023, new Money(8990000));
+        $vehicle = Vehicle::register($this->dealership->id, $brand, $model, null, 2023, 2023, new Money(8990000));
         $this->vehicles->insert($vehicle);
 
         return $vehicle;
@@ -139,12 +139,12 @@ final class NullUserRepository implements UserRepository
     {
     }
 
-    public function findPage(int $limit, int $offset): array
+    public function findPage(int $limit, int $offset, ?string $role = null): array
     {
         return [];
     }
 
-    public function count(): int
+    public function count(?string $role = null): int
     {
         return 0;
     }

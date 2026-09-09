@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openMenuIfCollapsed, searchOnHome } from './support/ui';
 
 function uniqueEmail(prefix: string): string {
     return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@example.com`;
@@ -13,13 +14,13 @@ async function mockZipCodeLookup(page: Page): Promise<void> {
 }
 
 /**
- * Lista paginada e sem filtro por nome -- procura clicando "próxima página" até achar
+ * Grid paginado e sem filtro por nome -- procura clicando "próxima página" até achar
  * ou acabarem as páginas. Mesmo helper de `dealerships.spec.ts`.
  */
-async function findRowAcrossPages(page: Page, cellText: string) {
+async function findCardAcrossPages(page: Page, cardName: string) {
     for (;;) {
         try {
-            await expect(page.getByRole('cell', { name: cellText })).toBeVisible({ timeout: 2000 });
+            await expect(page.getByRole('group', { name: cardName })).toBeVisible({ timeout: 2000 });
 
             return;
         } catch {
@@ -29,7 +30,7 @@ async function findRowAcrossPages(page: Page, cellText: string) {
         const nextPage = page.getByRole('button', { name: 'Go to next page' });
 
         if (!(await nextPage.isEnabled().catch(() => false))) {
-            throw new Error(`Linha "${cellText}" não encontrada em nenhuma página.`);
+            throw new Error(`Card "${cardName}" não encontrado em nenhuma página.`);
         }
 
         await nextPage.click();
@@ -61,7 +62,7 @@ async function registerSellerWithVehicle(
     await expect(page.getByLabel('Endereço')).toHaveValue('Rua de Teste');
     await page.getByLabel('Número').fill('10');
     await page.getByRole('button', { name: 'Criar' }).click();
-    await expect(page.getByRole('cell', { name: dealershipName })).toBeVisible();
+    await expect(page.getByRole('group', { name: dealershipName })).toBeVisible();
 
     await page.goto('/vehicles');
     await page.getByRole('button', { name: 'Novo veículo' }).click();
@@ -70,11 +71,12 @@ async function registerSellerWithVehicle(
     await dialog.getByLabel('Concessionária').fill(dealershipName);
     await page.getByRole('option', { name: dealershipName }).click();
     await dialog.getByLabel('Marca').fill(brand);
-    await dialog.getByLabel('Modelo').fill(model);
+    await dialog.getByLabel(/^Modelo/).fill(model);
     await dialog.getByLabel('Preço').fill('89900.00');
     await dialog.getByRole('button', { name: 'Criar' }).click();
-    await expect(page.getByRole('cell', { name: `${brand} ${model}` })).toBeVisible();
+    await expect(page.getByRole('group', { name: `${brand} ${model}` })).toBeVisible();
 
+    await openMenuIfCollapsed(page);
     await page.getByRole('button', { name: 'Sair' }).click();
     await expect(page).toHaveURL(/\/login$/);
 }
@@ -85,12 +87,17 @@ test('index lista o catálogo público e o card abre a página do veículo, sem 
     await registerSellerWithVehicle(page, `Index Center ${Date.now()}`, brand, 'Argo');
 
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: 'Encontre seu próximo veículo' })).toBeVisible();
-    await page.getByLabel('Buscar').fill(brand);
+    await expect(page.getByRole('heading', { name: /veículos/ })).toBeVisible();
+    await searchOnHome(page, brand);
     await expect(page.getByRole('heading', { name: `${brand} Argo` })).toBeVisible();
 
     await page.getByRole('heading', { name: `${brand} Argo` }).click();
     await expect(page).toHaveURL(/\/veiculos\//);
+    // Navegação é client-side (RouterLink) -- por um instante a grade antiga do catálogo pode
+    // continuar montada enquanto os dados do veículo carregam, e o card de outro teste com o
+    // mesmo preço de fixture ("R$ 89.900,00") ainda visível quebra o `getByText` (strict mode).
+    // Esperar algo que só existe na página de detalhe garante que a troca de rota já terminou.
+    await expect(page.getByRole('heading', { name: 'Sobre os diferenciais do anúncio' })).toBeVisible();
     await expect(page.getByRole('heading', { name: `${brand} Argo` })).toBeVisible();
     await expect(page.getByText('R$ 89.900,00')).toBeVisible();
 });
@@ -124,11 +131,12 @@ test('vitrine da página pública da concessionária mostra o veículo cadastrad
     await page.getByRole('button', { name: 'Entrar' }).click();
     await expect(page).toHaveURL(/\/me$/);
     await page.goto('/dealerships');
-    await findRowAcrossPages(page, dealershipName);
+    await findCardAcrossPages(page, dealershipName);
     const publicUrl = await page
-        .getByRole('row', { name: new RegExp(dealershipName) })
+        .getByRole('group', { name: dealershipName })
         .getByRole('link', { name: 'Ver página pública' })
         .getAttribute('href');
+    await openMenuIfCollapsed(page);
     await page.getByRole('button', { name: 'Sair' }).click();
     await expect(page).toHaveURL(/\/login$/);
 

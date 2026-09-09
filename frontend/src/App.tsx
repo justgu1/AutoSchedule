@@ -2,6 +2,8 @@ import { Route, Routes } from 'react-router-dom';
 import { AuthLayout } from './layouts/AuthLayout';
 import { AuthenticatedLayout } from './layouts/AuthenticatedLayout';
 import { PublicLayout } from './layouts/PublicLayout';
+import { AppointmentsPage } from './pages/AppointmentsPage';
+import { ConfirmAppointmentPage } from './pages/ConfirmAppointmentPage';
 import { DealershipsPage } from './pages/DealershipsPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { HomePage } from './pages/HomePage';
@@ -20,6 +22,7 @@ export default function App() {
                 <Route path="/" element={<HomePage />} />
                 <Route path="/concessionarias/:slug" element={<PublicDealershipPage />} />
                 <Route path="/veiculos/:id" element={<PublicVehiclePage />} />
+                <Route path="/agendamentos/:id/confirmar" element={<ConfirmAppointmentPage />} />
             </Route>
             <Route element={<AuthLayout />}>
                 <Route path="/login" element={<LoginPage />} />
@@ -31,6 +34,7 @@ export default function App() {
                 <Route path="/me" element={<MePage />} />
                 <Route path="/dealerships" element={<DealershipsPage />} />
                 <Route path="/vehicles" element={<VehiclesPage />} />
+                <Route path="/appointments" element={<AppointmentsPage />} />
             </Route>
         </Routes>
     );

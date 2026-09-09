@@ -8,6 +8,7 @@ use App\Application\Dealership\DealershipFinder;
 use App\Application\Shared\ActorContext;
 use App\Application\Shared\ValidatedInput;
 use App\Application\Vehicle\UpdateVehicle;
+use App\Application\Vehicle\VehicleAmenities;
 use App\Application\Vehicle\VehicleFinder;
 use App\Domain\Audit\AuditEvent;
 use App\Domain\Dealership\Dealership;
@@ -20,8 +21,11 @@ use App\Domain\User\UserRole;
 use App\Domain\Vehicle\Vehicle;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\DirectTransaction;
 use Tests\Support\FakeAuditLogger;
 use Tests\Support\InMemoryDealershipRepository;
+use Tests\Support\InMemoryVehicleAmenityCatalog;
+use Tests\Support\InMemoryVehicleAmenityLinkRepository;
 use Tests\Support\InMemoryVehicleRepository;
 
 final class UpdateVehicleTest extends TestCase
@@ -38,27 +42,29 @@ final class UpdateVehicleTest extends TestCase
         $this->dealerships = new InMemoryDealershipRepository();
         $this->vehicles = new InMemoryVehicleRepository();
         $this->audit = new FakeAuditLogger();
+        $amenities = new VehicleAmenities(new InMemoryVehicleAmenityCatalog(), new InMemoryVehicleAmenityLinkRepository(), new DirectTransaction());
         $this->updateVehicle = new UpdateVehicle(
             new VehicleFinder($this->vehicles),
             new DealershipFinder($this->dealerships),
             $this->vehicles,
+            $amenities,
             $this->audit,
         );
 
         $this->origin = $this->registerDealership('Origem');
-        $this->vehicle = Vehicle::register($this->origin->id, 'Chevrolet', 'Onix', 'LTZ 1.0 Turbo', 2023, new Money(8990000));
+        $this->vehicle = Vehicle::register($this->origin->id, 'Chevrolet', 'Onix', 'LTZ 1.0 Turbo', 2023, 2023, new Money(8990000));
         $this->vehicles->insert($this->vehicle);
     }
 
     #[Test]
     public function campo_ausente_mantem_o_valor_gravado(): void
     {
-        $profile = ($this->updateVehicle)($this->vehicle->id, new ValidatedInput(['price' => '79900.00']), $this->actor());
+        $profile = ($this->updateVehicle)($this->vehicle->id, new ValidatedInput(['price' => '79900.00']), null, $this->actor());
 
         $this->assertSame('79900.00', $profile->price->toDecimal());
         $this->assertSame('Chevrolet', $profile->brand);
         $this->assertSame('LTZ 1.0 Turbo', $profile->version);
-        $this->assertSame(2023, $profile->year);
+        $this->assertSame(2023, $profile->modelYear);
     }
 
     #[Test]
@@ -69,6 +75,7 @@ final class UpdateVehicleTest extends TestCase
         $profile = ($this->updateVehicle)(
             $this->vehicle->id,
             new ValidatedInput(['dealership_id' => $destination->id]),
+            null,
             $this->actor(),
         );
 
@@ -82,6 +89,7 @@ final class UpdateVehicleTest extends TestCase
         ($this->updateVehicle)(
             $this->vehicle->id,
             new ValidatedInput(['dealership_id' => $this->origin->id, 'brand' => 'Fiat']),
+            null,
             $this->actor(),
         );
 
@@ -96,6 +104,7 @@ final class UpdateVehicleTest extends TestCase
             ($this->updateVehicle)(
                 $this->vehicle->id,
                 new ValidatedInput(['dealership_id' => '11111111-1111-4111-8111-111111111111']),
+                null,
                 $this->actor(),
             );
             $this->fail('Expected a not found error.');

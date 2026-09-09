@@ -6,7 +6,7 @@ use App\Infrastructure\Persistence\Schema\Migration;
 
 /**
  * A policy só olha `status = 'active'`, sem checar dono, porque quem limita o alcance é a marca de
- * leitura pública na rota -- nenhuma rota de gerenciamento a seta. Ver docs/architecture.md.
+ * leitura pública na rota -- nenhuma rota de gerenciamento a seta. Ver docs/03-security/authorization.md.
  */
 return new class () implements Migration {
     public function up(\PDO $pdo): void

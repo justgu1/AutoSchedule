@@ -30,7 +30,24 @@ final class VehicleTest extends TestCase
     {
         $vehicle = $this->registerFixture();
 
-        $updated = $vehicle->withDetails('Fiat', 'Argo', 'Drive 1.3', 2024, new Money(7550000), 'Único dono');
+        $updated = $vehicle->withDetails(
+            brand: 'Fiat',
+            model: 'Argo',
+            version: 'Drive 1.3',
+            manufactureYear: 2023,
+            modelYear: 2024,
+            price: new Money(7550000),
+            description: 'Único dono',
+            mileageKm: null,
+            transmission: null,
+            bodyType: null,
+            fuelType: null,
+            color: null,
+            plateEndDigit: null,
+            acceptsTrade: false,
+            ipvaPaid: false,
+            licensed: false,
+        );
 
         $this->assertSame('Fiat', $updated->brand);
         $this->assertSame('Argo', $updated->model);
@@ -74,7 +91,7 @@ final class VehicleTest extends TestCase
 
     private function registerFixture(): Vehicle
     {
-        return Vehicle::register('dealership-1', 'Chevrolet', 'Onix', 'LTZ 1.0 Turbo', 2023, new Money(8990000));
+        return Vehicle::register('dealership-1', 'Chevrolet', 'Onix', 'LTZ 1.0 Turbo', 2023, 2023, new Money(8990000));
     }
 
     private function trashedFixture(\DateTimeImmutable $trashedAt, ?\DateTimeImmutable $anonymizedAt): Vehicle
@@ -88,9 +105,19 @@ final class VehicleTest extends TestCase
             brand: $vehicle->brand,
             model: $vehicle->model,
             version: $vehicle->version,
-            year: $vehicle->year,
+            manufactureYear: $vehicle->manufactureYear,
+            modelYear: $vehicle->modelYear,
             price: $vehicle->price,
             description: $vehicle->description,
+            mileageKm: $vehicle->mileageKm,
+            transmission: $vehicle->transmission,
+            bodyType: $vehicle->bodyType,
+            fuelType: $vehicle->fuelType,
+            color: $vehicle->color,
+            plateEndDigit: $vehicle->plateEndDigit,
+            acceptsTrade: $vehicle->acceptsTrade,
+            ipvaPaid: $vehicle->ipvaPaid,
+            licensed: $vehicle->licensed,
             trash: new TrashState($status, $trashedAt, $anonymizedAt),
             trashedByDealershipTrash: false,
             createdAt: $vehicle->createdAt,

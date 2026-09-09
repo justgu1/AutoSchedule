@@ -9,6 +9,10 @@ import { expect, test } from '@playwright/test';
  */
 test('login é operável só com teclado, sem mouse', async ({ page }) => {
     await page.goto('/login');
+    // Sem esperar o form montar, o 1º Tab pode ocorrer antes de qualquer elemento
+    // focável existir no DOM (foco fica solto, `toBeFocused()` falha) -- flakiness
+    // de timing, não de ordem de foco.
+    await page.getByLabel('E-mail').waitFor();
 
     await page.keyboard.press('Tab');
     await expect(page.getByLabel('E-mail')).toBeFocused();

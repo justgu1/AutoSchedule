@@ -85,7 +85,7 @@ final class VehicleTrashCascadeTest extends TestCase
 
     private function registerVehicle(): Vehicle
     {
-        $vehicle = Vehicle::register($this->dealership->id, 'Chevrolet', 'Onix', null, 2023, new Money(8990000));
+        $vehicle = Vehicle::register($this->dealership->id, 'Chevrolet', 'Onix', null, 2023, 2023, new Money(8990000));
         $this->vehicles->insert($vehicle);
 
         return $vehicle;

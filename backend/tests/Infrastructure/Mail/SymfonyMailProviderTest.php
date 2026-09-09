@@ -20,7 +20,12 @@ final class SymfonyMailProviderTest extends TestCase
 
         $provider->send('destinatario@example.com', $subject, '<p>corpo do teste</p>');
 
-        $this->assertTrue($this->arrivedInMailpit($subject), 'E-mail não chegou no Mailpit dentro do timeout.');
+        $messageId = $this->arrivedInMailpit($subject);
+        $this->assertNotNull($messageId, 'E-mail não chegou no Mailpit dentro do timeout.');
+
+        // Mailpit é compartilhado com o inbox de dev/demo -- sem isso, rodar a suíte deixa
+        // "SymfonyMailProviderTest ..." misturado com e-mail real de agendamento pra sempre.
+        $this->deleteFromMailpit($messageId);
     }
 
     #[Test]
@@ -32,24 +37,39 @@ final class SymfonyMailProviderTest extends TestCase
         $this->assertInstanceOf(SymfonyMailProvider::class, $provider);
     }
 
-    private function arrivedInMailpit(string $subject): bool
+    private function arrivedInMailpit(string $subject): ?string
     {
         $host = getenv('MAIL_HOST') ?: '127.0.0.1';
 
         for ($attempt = 0; $attempt < 20; $attempt++) {
             $raw = file_get_contents("http://{$host}:8025/api/v1/messages?limit=20");
-            /** @var array{messages?: list<array{Subject: string}>} $list */
+            /** @var array{messages?: list<array{ID: string, Subject: string}>} $list */
             $list = json_decode($raw !== false ? $raw : '{}', true, flags: JSON_THROW_ON_ERROR);
 
             foreach ($list['messages'] ?? [] as $message) {
                 if ($message['Subject'] === $subject) {
-                    return true;
+                    return $message['ID'];
                 }
             }
 
             usleep(250_000);
         }
 
-        return false;
+        return null;
+    }
+
+    private function deleteFromMailpit(string $messageId): void
+    {
+        $host = getenv('MAIL_HOST') ?: '127.0.0.1';
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'DELETE',
+                'header' => 'Content-Type: application/json',
+                'content' => json_encode(['IDs' => [$messageId]], JSON_THROW_ON_ERROR),
+                'ignore_errors' => true,
+            ],
+        ]);
+
+        file_get_contents("http://{$host}:8025/api/v1/messages", context: $context);
     }
 }

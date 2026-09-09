@@ -1,4 +1,4 @@
-import { apiFetch } from './apiClient';
+import { apiFetch, apiFetchPage } from './apiClient';
 
 export type UserRole = 'admin' | 'seller' | 'customer';
 
@@ -14,6 +14,11 @@ const CLIENT_ID = 'autoschedule-web';
 
 export function getMe(): Promise<UserProfile> {
     return apiFetch<UserProfile>('/me');
+}
+
+/** Admin-only -- alimenta o seletor de dono ao criar/editar concessionária, sem exigir digitar UUID. */
+export function listSellers(): Promise<UserProfile[]> {
+    return apiFetchPage<UserProfile>('/users?role=seller&per_page=100').then((page) => page.data);
 }
 
 export interface LoginResult {
@@ -44,6 +49,15 @@ export function loginWithGoogle(idToken: string): Promise<LoginResult> {
 /** Self-service: só funciona de customer pra seller, o backend rejeita qualquer outra transição. */
 export function becomeSeller(): Promise<UserProfile> {
     return apiFetch<UserProfile>('/me', { method: 'PATCH', body: JSON.stringify({ role: 'seller' }) });
+}
+
+export interface UpdateMeInput {
+    name?: string;
+    phone?: string;
+}
+
+export function updateMe(input: UpdateMeInput): Promise<UserProfile> {
+    return apiFetch<UserProfile>('/me', { method: 'PATCH', body: JSON.stringify(input) });
 }
 
 export interface RegisterInput {
