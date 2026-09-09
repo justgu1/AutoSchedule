@@ -197,13 +197,30 @@ jobs:
         run: make keys
 
       - name: Sobe a stack
-        run: docker compose up -d nginx mailpit backend
+        run: docker compose up -d nginx mailpit minio backend
 
       # Imagem é buildada `--no-dev`, e o bind-mount local (docker-compose.override.yml)
       # deixa o checkout do runner (sem vendor/, é gitignored) por cima disso -- precisa
       # instalar aqui dentro antes de rodar qualquer bin/*.php.
       - name: Instala dependências do Composer
         run: docker compose exec backend composer install --no-interaction --prefer-dist
+
+      # O seeder de demonstração faz upload de verdade (foto de concessionária/veículo) --
+      # sem o bucket, `bin/seed.php` quebra com `NoSuchBucket` num runner novo (mesmo passo do `make e2e-setup`).
+      - name: Cria o bucket do MinIO
+        run: |
+          MINIO_PORT=$(docker compose port minio 9000 | cut -d: -f2)
+          MINIO_USER=$(docker compose exec minio printenv MINIO_ROOT_USER)
+          MINIO_PASS=$(docker compose exec minio printenv MINIO_ROOT_PASSWORD)
+          for i in $(seq 1 20); do
+            curl -sf http://127.0.0.1:$MINIO_PORT/minio/health/live && break
+            sleep 1
+          done
+          docker run --rm --network host --entrypoint sh minio/mc -c "
+            mc alias set local http://127.0.0.1:$MINIO_PORT $MINIO_USER $MINIO_PASS &&
+            mc mb --ignore-existing local/autoschedule &&
+            mc anonymous set download local/autoschedule
+          "
 
       # k6 loga como o admin/client seedados -- sem isso o "setup: login
       # succeeded" falha de cara (banco sobe vazio num runner novo).
