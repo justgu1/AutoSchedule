@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openMenuIfCollapsed } from './support/ui';
 
 function uniqueEmail(prefix: string): string {
     return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@example.com`;
@@ -66,16 +67,16 @@ async function registerSellerAndGetId(
 }
 
 /**
- * Lista paginada e sem filtro por nome -- procura clicando "próxima página"
+ * Grid paginado e sem filtro por nome -- procura clicando "próxima página"
  * até achar ou acabarem as páginas. `toBeVisible` (com timeout curto, não
  * `isVisible` cru) importa aqui: clicar "próxima" já desabilita o botão da
  * MESMA vez que a página muda de número, antes do refetch daquela página
  * terminar -- sem esperar, a última página sempre parece "não achou".
  */
-async function findRowAcrossPages(page: Page, cellText: string) {
+async function findCardAcrossPages(page: Page, cardName: string) {
     for (;;) {
         try {
-            await expect(page.getByRole('cell', { name: cellText })).toBeVisible({ timeout: 2000 });
+            await expect(page.getByRole('group', { name: cardName })).toBeVisible({ timeout: 2000 });
 
             return;
         } catch {
@@ -85,7 +86,7 @@ async function findRowAcrossPages(page: Page, cellText: string) {
         const nextPage = page.getByRole('button', { name: 'Go to next page' });
 
         if (!(await nextPage.isEnabled().catch(() => false))) {
-            throw new Error(`Linha "${cellText}" não encontrada em nenhuma página.`);
+            throw new Error(`Card "${cardName}" não encontrado em nenhuma página.`);
         }
 
         await nextPage.click();
@@ -118,6 +119,7 @@ test('seller cria, edita, envia foto, move pra lixeira e restaura a própria con
 
     await registerSeller(page, 'Seller Dealershiptest');
 
+    await openMenuIfCollapsed(page);
     await page.getByRole('link', { name: 'Concessionárias' }).click();
     await expect(page).toHaveURL(/\/dealerships$/);
     await expect(page.getByText('Nenhuma concessionária ainda')).toBeVisible();
@@ -136,24 +138,22 @@ test('seller cria, edita, envia foto, move pra lixeira e restaura a própria con
     await expect(page.getByLabel('Número')).toHaveValue('100');
     await page.getByRole('button', { name: 'Criar' }).click();
 
-    await expect(page.getByRole('cell', { name: 'Auto Center E2E' })).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Auto Center E2E' })).toBeVisible();
     await expect(page.getByText('São Paulo/SP')).toBeVisible();
 
-    // Editar -- reabre o mesmo form pré-preenchido, muda só o nome.
+    // Editar -- clicar no corpo do card (não é mais um botão "Editar" à parte) reabre o form pré-preenchido.
     await page
-        .getByRole('row', { name: /Auto Center E2E/ })
-        .getByRole('button', { name: 'Editar' })
+        .getByRole('group', { name: 'Auto Center E2E' })
+        .getByRole('button', { name: 'Editar Auto Center E2E' })
         .click();
     await expect(page.getByLabel('Cidade')).toHaveValue('São Paulo');
     await page.getByLabel('Nome').fill('Auto Center Renomeado');
     await page.getByRole('button', { name: 'Salvar' }).click();
-    await expect(page.getByRole('cell', { name: 'Auto Center Renomeado' })).toBeVisible();
+    const card = page.getByRole('group', { name: 'Auto Center Renomeado' });
+    await expect(card).toBeVisible();
 
     // Foto -- só uma, processada de forma assíncrona (job + SSE), acompanhada até "done".
-    await page
-        .getByRole('row', { name: /Auto Center Renomeado/ })
-        .getByRole('button', { name: 'Foto' })
-        .click();
+    await card.getByRole('button', { name: 'Foto' }).click();
     await expect(page.getByText('Nenhuma foto ainda.')).toBeVisible();
     await page
         .locator('input[type="file"]')
@@ -164,14 +164,13 @@ test('seller cria, edita, envia foto, move pra lixeira e restaura a própria con
     await page.getByRole('button', { name: 'Fechar' }).click();
 
     // Lixeira -- some da lista? não, seller ainda enxerga o próprio status trashed. Restaura em seguida.
-    const row = page.getByRole('row', { name: /Auto Center Renomeado/ });
-    await row.getByRole('button', { name: 'Mover pra lixeira' }).click();
+    await card.getByRole('button', { name: 'Mover pra lixeira' }).click();
     await page.getByRole('button', { name: 'Mover pra lixeira', exact: true }).click();
-    await expect(row.getByText('Na lixeira')).toBeVisible();
+    await expect(card.getByText('Na lixeira')).toBeVisible();
 
-    await row.getByRole('button', { name: 'Restaurar' }).click();
+    await card.getByRole('button', { name: 'Restaurar' }).click();
     await expect(page.getByText('Concessionária restaurada.')).toBeVisible();
-    await expect(row.getByText('Ativa')).toBeVisible();
+    await expect(card.getByText('Ativa')).toBeVisible();
 });
 
 test('UF é um autocomplete com busca, selecionável mesmo sem preencher o CEP', async ({ page }) => {
@@ -203,11 +202,13 @@ test('admin cria concessionária pra um seller e reassocia o dono pra outro', as
 
     const ownerAName = `Dono Original ${Date.now()}`;
     const { email: ownerAEmail } = await registerSellerAndGetId(page, ownerAName);
+    await openMenuIfCollapsed(page);
     await page.getByRole('button', { name: 'Sair' }).click();
     await expect(page).toHaveURL(/\/login$/);
 
     const ownerBName = `Dono Novo ${Date.now()}`;
     const { email: ownerBEmail } = await registerSellerAndGetId(page, ownerBName);
+    await openMenuIfCollapsed(page);
     await page.getByRole('button', { name: 'Sair' }).click();
     await expect(page).toHaveURL(/\/login$/);
 
@@ -216,6 +217,7 @@ test('admin cria concessionária pra um seller e reassocia o dono pra outro', as
     await page.getByRole('button', { name: 'Entrar' }).click();
     await expect(page).toHaveURL(/\/me$/);
 
+    await openMenuIfCollapsed(page);
     await page.getByRole('link', { name: 'Concessionárias' }).click();
     await page.getByRole('button', { name: 'Nova concessionária' }).click();
     const dealershipName = `Admin Reassoc ${Date.now()}`;
@@ -231,10 +233,10 @@ test('admin cria concessionária pra um seller e reassocia o dono pra outro', as
     await page.getByRole('button', { name: 'Criar' }).click();
     await expect(page.getByRole('dialog')).not.toBeVisible();
 
-    await findRowAcrossPages(page, dealershipName);
+    await findCardAcrossPages(page, dealershipName);
     await page
-        .getByRole('row', { name: new RegExp(dealershipName) })
-        .getByRole('button', { name: 'Editar' })
+        .getByRole('group', { name: dealershipName })
+        .getByRole('button', { name: `Editar ${dealershipName}` })
         .click();
     await expect(page.getByLabel(/Dono/)).toHaveValue(`${ownerAName} (${ownerAEmail})`);
     await page.getByLabel(/Dono/).fill(ownerBEmail);
@@ -242,10 +244,10 @@ test('admin cria concessionária pra um seller e reassocia o dono pra outro', as
     await page.getByRole('button', { name: 'Salvar' }).click();
     await expect(page.getByRole('dialog')).not.toBeVisible();
 
-    await findRowAcrossPages(page, dealershipName);
+    await findCardAcrossPages(page, dealershipName);
     await page
-        .getByRole('row', { name: new RegExp(dealershipName) })
-        .getByRole('button', { name: 'Editar' })
+        .getByRole('group', { name: dealershipName })
+        .getByRole('button', { name: `Editar ${dealershipName}` })
         .click();
     await expect(page.getByLabel(/Dono/)).toHaveValue(`${ownerBName} (${ownerBEmail})`);
 });
@@ -264,14 +266,15 @@ test('página pública da concessionária mostra nome, endereço e vendedor sem 
     // `getByLabel` sozinho bateria também no botão "Usar o meu telefone" (nome acessível contém o rótulo do campo).
     await page.getByRole('textbox', { name: 'Telefone' }).fill('1133334444');
     await page.getByRole('button', { name: 'Criar' }).click();
-    await expect(page.getByRole('cell', { name: 'Public Page Center' })).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Public Page Center' })).toBeVisible();
 
     const publicUrl = await page
-        .getByRole('row', { name: /Public Page Center/ })
+        .getByRole('group', { name: 'Public Page Center' })
         .getByRole('link', { name: 'Ver página pública' })
         .getAttribute('href');
 
     // "Sair" limpa a sessão -- prova que a rota abaixo funciona mesmo sem conta nenhuma.
+    await openMenuIfCollapsed(page);
     await page.getByRole('button', { name: 'Sair' }).click();
     await expect(page).toHaveURL(/\/login$/);
 

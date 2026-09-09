@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { waitForAppointmentConfirmationLink } from './support/mailpit';
-import { searchOnHome } from './support/ui';
+import { openMenuIfCollapsed, searchOnHome } from './support/ui';
 
 function uniqueEmail(prefix: string): string {
     return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@example.com`;
@@ -36,7 +36,7 @@ async function createDealership(page: Page, name: string): Promise<void> {
     await expect(page.getByLabel('Endereço')).toHaveValue('Rua de Teste');
     await page.getByLabel('Número').fill('10');
     await page.getByRole('button', { name: 'Criar' }).click();
-    await expect(page.getByRole('cell', { name })).toBeVisible();
+    await expect(page.getByRole('group', { name })).toBeVisible();
 }
 
 async function createVehicle(
@@ -83,10 +83,7 @@ async function openAvailabilityAllDayToday(page: Page): Promise<void> {
 
 async function setUpBookableVehicle(page: Page, dealershipName: string, brand: string, model: string): Promise<void> {
     await createDealership(page, dealershipName);
-    await page
-        .getByRole('row', { name: new RegExp(dealershipName) })
-        .getByRole('button', { name: 'Disponibilidade' })
-        .click();
+    await page.getByRole('group', { name: dealershipName }).getByRole('button', { name: 'Disponibilidade' }).click();
     await openAvailabilityAllDayToday(page);
     await page.getByRole('button', { name: 'Fechar' }).click();
 
@@ -122,6 +119,7 @@ test('seller cadastra disponibilidade e cliente agenda pelo site público', asyn
     const brand = `Fiat${Date.now()}`;
     await setUpBookableVehicle(page, dealershipName, brand, 'Argo');
 
+    await openMenuIfCollapsed(page);
     await page.getByRole('button', { name: 'Sair' }).click();
     await expect(page).toHaveURL(/\/login$/);
     await page.goto('/');
@@ -136,7 +134,7 @@ test('seller cadastra disponibilidade e cliente agenda pelo site público', asyn
     await page.getByLabel('Telefone').fill('11999990000');
 
     await page.getByRole('button', { name: 'Confirmar agendamento' }).click();
-    await expect(page.getByText('Agendamento recebido!')).toBeVisible();
+    await expect(page.getByText('Agendamento concluído!')).toBeVisible();
 });
 
 test('reserva concorrente do mesmo horário vira 409', async ({ page }) => {
@@ -145,6 +143,7 @@ test('reserva concorrente do mesmo horário vira 409', async ({ page }) => {
     const dealershipName = `Conflict Center ${Date.now()}`;
     const brand = `Chevrolet${Date.now()}`;
     await setUpBookableVehicle(page, dealershipName, brand, 'Onix');
+    await openMenuIfCollapsed(page);
     await page.getByRole('button', { name: 'Sair' }).click();
     await expect(page).toHaveURL(/\/login$/);
 
@@ -157,7 +156,7 @@ test('reserva concorrente do mesmo horário vira 409', async ({ page }) => {
     await page.getByLabel('E-mail').fill(uniqueEmail('first'));
     await page.getByLabel('Telefone').fill('11888880000');
     await page.getByRole('button', { name: 'Confirmar agendamento' }).click();
-    await expect(page.getByText('Agendamento recebido!')).toBeVisible();
+    await expect(page.getByText('Agendamento concluído!')).toBeVisible();
 
     // Mesmo vehicle_id/scheduled_at direto pela API -- reproduz a corrida sem depender de UI-timing.
     const vehicleUrl = new URL(page.url());
@@ -191,6 +190,7 @@ test('seller confirma agendamento pendente direto pelo painel, sem token', async
     const brand = `Renault${Date.now()}`;
     await setUpBookableVehicle(page, dealershipName, brand, 'Kwid');
 
+    await openMenuIfCollapsed(page);
     await page.getByRole('button', { name: 'Sair' }).click();
     await expect(page).toHaveURL(/\/login$/);
     await page.goto('/');
@@ -202,7 +202,7 @@ test('seller confirma agendamento pendente direto pelo painel, sem token', async
     await page.getByLabel('E-mail').fill(uniqueEmail('override-confirm'));
     await page.getByLabel('Telefone').fill('11999990000');
     await page.getByRole('button', { name: 'Confirmar agendamento' }).click();
-    await expect(page.getByText('Agendamento recebido!')).toBeVisible();
+    await expect(page.getByText('Agendamento concluído!')).toBeVisible();
 
     await page.goto('/login');
     await page.getByLabel('E-mail').fill('admin@autoschedule.local');
@@ -243,6 +243,7 @@ test('ciclo completo: e-mail de confirmação, token, retirada e devolução', a
     const dealershipName = `Fullcycle Center ${Date.now()}`;
     const brand = `Toyota${Date.now()}`;
     await setUpBookableVehicle(page, dealershipName, brand, 'Corolla');
+    await openMenuIfCollapsed(page);
     await page.getByRole('button', { name: 'Sair' }).click();
     await expect(page).toHaveURL(/\/login$/);
 
@@ -256,7 +257,7 @@ test('ciclo completo: e-mail de confirmação, token, retirada e devolução', a
     await page.getByLabel('E-mail').fill(customerEmail);
     await page.getByLabel('Telefone').fill('11999990000');
     await page.getByRole('button', { name: 'Confirmar agendamento' }).click();
-    await expect(page.getByText('Agendamento recebido!')).toBeVisible();
+    await expect(page.getByText('Agendamento concluído!')).toBeVisible();
 
     const confirmationLink = await waitForAppointmentConfirmationLink(customerEmail);
     const confirmationPath = new URL(confirmationLink).pathname + new URL(confirmationLink).search;

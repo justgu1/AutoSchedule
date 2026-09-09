@@ -1,6 +1,6 @@
 # AutoSchedule — Estilo de código
 
-O que ferramenta não checa. O que ela checa está em `docs/testing.md` (PHPStan, Deptrac,
+O que ferramenta não checa. O que ela checa está em `docs/06-testing/strategy.md` (PHPStan, Deptrac,
 PHP-CS-Fixer, Rector).
 
 ## Comentário

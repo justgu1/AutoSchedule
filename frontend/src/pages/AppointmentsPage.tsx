@@ -81,7 +81,7 @@ export function AppointmentsPage() {
     if (me.isPending) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                <CircularProgress />
+                <CircularProgress aria-label="Carregando" />
             </Box>
         );
     }

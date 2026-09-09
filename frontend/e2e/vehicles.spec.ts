@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { openFiltersIfCollapsed } from './support/ui';
+import { closeFiltersIfOpen, openFiltersIfCollapsed, openMenuIfCollapsed } from './support/ui';
 
 function uniqueEmail(prefix: string): string {
     return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@example.com`;
@@ -36,7 +36,7 @@ async function createDealership(page: Page, name: string): Promise<void> {
     await expect(page.getByLabel('Endereço')).toHaveValue('Rua de Teste');
     await page.getByLabel('Número').fill('10');
     await page.getByRole('button', { name: 'Criar' }).click();
-    await expect(page.getByRole('cell', { name })).toBeVisible();
+    await expect(page.getByRole('group', { name })).toBeVisible();
 }
 
 /**
@@ -72,6 +72,7 @@ test('seller cadastra veículo, edita, envia fotos da galeria e move pra lixeira
     await registerSeller(page, 'Seller Vehicletest');
     await createDealership(page, 'Auto Center Vehicle E2E');
 
+    await openMenuIfCollapsed(page);
     await page.getByRole('link', { name: 'Veículos' }).click();
     await expect(page).toHaveURL(/\/vehicles$/);
     await expect(page.getByText('Nenhum veículo encontrado')).toBeVisible();
@@ -118,6 +119,7 @@ test('filtro de marca encontra o veículo pelo painel', async ({ page }) => {
 
     await openFiltersIfCollapsed(page);
     await page.getByLabel('Buscar').fill('corola');
+    await closeFiltersIfOpen(page);
     await expect(page.getByRole('group', { name: 'Toyota Corolla' })).toBeVisible();
 });
 

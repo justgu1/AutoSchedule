@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
-import { searchOnHome } from './support/ui';
+import { openMenuIfCollapsed, searchOnHome } from './support/ui';
 
 /**
  * WCAG 2.1 nível AA nas telas públicas (sem exigir login) -- as tags abaixo
@@ -61,7 +61,7 @@ async function registerSellerWithVehicle(
     await expect(page.getByLabel('Endereço')).toHaveValue('Rua de Teste');
     await page.getByLabel('Número').fill('10');
     await page.getByRole('button', { name: 'Criar' }).click();
-    await expect(page.getByRole('cell', { name: dealershipName })).toBeVisible();
+    await expect(page.getByRole('group', { name: dealershipName })).toBeVisible();
 
     await page.goto('/vehicles');
     await page.getByRole('button', { name: 'Novo veículo' }).click();
@@ -79,6 +79,7 @@ test('página pública do veículo não tem violação de WCAG 2.1 AA', async ({
     await mockZipCodeLookup(page);
     const brand = `A11y${Date.now()}`;
     await registerSellerWithVehicle(page, `A11y Center ${Date.now()}`, brand, 'Vehicle');
+    await openMenuIfCollapsed(page);
     await page.getByRole('button', { name: 'Sair' }).click();
 
     await page.goto('/');
@@ -96,9 +97,10 @@ test('página pública da concessionária não tem violação de WCAG 2.1 AA', a
 
     await page.goto('/dealerships');
     const publicUrl = await page
-        .getByRole('row', { name: new RegExp(dealershipName) })
+        .getByRole('group', { name: dealershipName })
         .getByRole('link', { name: 'Ver página pública' })
         .getAttribute('href');
+    await openMenuIfCollapsed(page);
     await page.getByRole('button', { name: 'Sair' }).click();
 
     await page.goto(publicUrl!);

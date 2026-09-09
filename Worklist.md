@@ -119,12 +119,15 @@ Backlog do projeto: epic > issue > task. Cada `[x]` já está em `main`; `[ ]` �
 
 ## Epic: Veículo
 
-- [x] `Vehicle` (marca/modelo/versão/ano/preço/descrição/status), pertence a uma concessionária -- status é só a lixeira (`active`/`trashed`/`deleted`), idêntica à da conta e da concessionária; sem estado "vendido" nem "agendado" guardado; dono transitivo pela concessionária (RLS por `EXISTS`, sem `owner_user_id` duplicado)
+- [x] `Vehicle` (marca/modelo/versão/ano de fabricação e modelo/preço/descrição/status), pertence a uma concessionária -- status é só a lixeira (`active`/`trashed`/`deleted`), idêntica à da conta e da concessionária; sem estado "vendido" nem "agendado" guardado; dono transitivo pela concessionária (RLS por `EXISTS`, sem `owner_user_id` duplicado)
+- [x] Especificações (câmbio, carroceria, combustível, cor, km, final de placa, aceita troca, IPVA, licenciado) -- campos planos, dropdown no formulário (nunca texto livre)
+- [x] Itens de veículo (amenities) -- catálogo global fora do agregado, curado só por seed, RLS de vínculo delegada pro veículo
 - [x] Galeria de fotos -- referencia `files` como a foto da concessionária, upload em lote pela fila com um `job_id` só, reordenação em duas passadas, arquivo compartilhado só sai do storage quando ninguém mais aponta pra ele
 - [ ] GC de `files` órfãos: a purga agendada limpa linha, não storage, então arquivo sem referência sobra pago no MinIO
 - [x] Busca (PostgreSQL Full Text Search + `pg_trgm`) -- filtros empilhados na mesma rota da listagem, `search_vector` gerado, filtro de marca alcançando a descrição, facetas do estoque em `GET /vehicles/filters`
+- [x] Prefixo progressivo (1+ caractere) e substring alcançando termo só em `description`; ordenação explícita (preço/ano/criação) ao lado da relevância; filtro combinado de specs (câmbio/carroceria/combustível/km)
 - [x] CRUD (seller gerencia os das próprias concessionárias, admin qualquer um) -- lixeira/restore/purge iguais aos outros domínios, cascata de dois níveis (conta -> concessionária -> veículo), auditoria `vehicle.*`
-- [x] Painel do vendedor -- tabela com filtros empilhados, form, galeria e lixeira, mesmo molde do painel de concessionárias
+- [x] Painel do vendedor -- grid de cards igual à vitrine pública, com botão de criar, mesmo molde do painel de concessionárias
 - [x] Catálogo público -- `GET /vehicles`/`GET /vehicles/{id}` viram públicas por padrão (`scope=mine` reusa a mesma rota pro painel), index do site com filtros e vitrine no perfil da concessionária (até 12 veículos, `vehicles_total` separado)
 
 ## Epic: Disponibilidade e agendamento
@@ -136,6 +139,7 @@ Fluxo do cliente final -- o motivo de tudo acima existir:
 - [x] Regras recorrentes por concessionária e por veículo (dia da semana + janela de horário)
 - [x] Exceções pontuais por data (feriado, manutenção, horário especial)
 - [x] Cálculo do horário efetivo: concessionária ∩ veículo ∩ exceção ∩ sem conflito de agendamento
+- [x] Fallback: veículo sem regra/exceção não restringe nada; concessionária sem regra/exceção usa default seg-sex 9h-18h
 
 ### Issue: Agendamento do cliente
 
@@ -145,6 +149,28 @@ Fluxo do cliente final -- o motivo de tudo acima existir:
 - [x] Proteção contra reserva concorrente do mesmo veículo/horário (`409 Conflict`)
 - [x] Notificação por e-mail (cliente, vendedores da concessionária) -- inclui o ciclo de retirada/devolução do veículo e o e-mail de confirmação por token, além do planejado originalmente
 - [x] Painel do vendedor (gestão de regras/exceções, lista de agendamentos, marcar retirada/devolução) e fluxo público de agendamento
+- [x] Tela de confirmação com data/horário/endereço do agendamento e botão pra voltar ao catálogo
+
+## Epic: Credenciais de API (OAuth2 self-service, m2m)
+
+- [x] `client_credentials` com dono autentica como o próprio dono (`subject`/`role` do JWT viram os do dono), sem mudança em RLS/`RoleMiddleware`
+- [x] CRUD em `/me` (gerar, listar, rotacionar, revogar) -- secret em texto puro só na resposta de criação/rotação
+- [x] Client revogado ou dono trashed nega o login
+
+## Epic: Redesign de frontend
+
+- [x] Componentes compartilhados (`VehicleCard`, `VehicleManagementCard`, `Breadcrumb`, `FilterSidebar`, `ImageLightbox`, `DateTimeCarousel`) substituindo JSX duplicado entre páginas
+- [x] Agendamento de visita inline (calendário aberto + horários), sem modal
+- [x] `AvailabilityDialog` com seleção múltipla de dias da semana e `TimePicker`/`DatePicker`
+- [x] Owner de concessionária e cor de veículo viram dropdown, nunca texto/UUID livre
+- [x] WCAG 2.1 AA nas páginas dinâmicas (perfil de veículo/concessionária) e no painel autenticado inteiro
+
+## Epic: Seeder de demonstração
+
+- [x] 10 concessionárias (endereço/CEP real, conferido contra o ViaCEP), agenda semanal própria cada uma
+- [x] ~10 veículos por concessionária, specs/itens, 1 a 10 fotos reais via Wikimedia Commons (fallback pro placeholder de GD sem rede)
+- [x] 5 agendamentos por concessionária cobrindo todo o ciclo de vida (pending/confirmed/completed/cancelled/no_show)
+- [x] `make e2e` isolado num banco irmão (`autoschedule_e2e`), nunca mais o de dev
 
 ## Epic: Qualidade
 
@@ -153,7 +179,7 @@ Fluxo do cliente final -- o motivo de tudo acima existir:
 - [x] Suíte E2E (Playwright): login, registro, reset de senha, logout, self-upgrade, lixeira de conta, teclado, acessibilidade
 - [x] Suíte de carga (k6)
 - [x] Acessibilidade WCAG 2.1 AA (axe-core)
-- [ ] Suíte própria pro `UserController`/`DealershipController`/`VehicleController` (hoje cobertos indiretamente -- ver `docs/test-catalog.md`)
+- [ ] Suíte própria pro `UserController`/`DealershipController`/`VehicleController`/`ApiClientController` (hoje cobertos indiretamente -- ver `docs/06-testing/test-cases.md`)
 - [x] E2E do domínio de concessionária
 
 ### Issue: Camada de aplicação explícita
@@ -164,7 +190,7 @@ Fluxo do cliente final -- o motivo de tudo acima existir:
 - [x] `Application.php` (era um config holder, não bootstrap) renomeado pra `Config`, com acesso tipado por caminho (`$app->int('auth.access_token_ttl')`)
 - [x] `Validator` devolve `ValidatedInput` tipado: `mixed` morre na fronteira HTTP em vez de vazar até a entidade
 - [x] Módulos no singular (`Domain/User/`, `Infrastructure/Dealership/`, ...) e `Domain/Support/` fundido em `Domain/Shared/`
-- [x] Deptrac no CI (`make arch`) -- a regra de dependência entre camadas deixou de ser só prosa no `docs/architecture.md`
+- [x] Deptrac no CI (`make arch`) -- a regra de dependência entre camadas deixou de ser só prosa no `docs/02-architecture/dependencies.md`
 - [x] `#[Group('integration')]` separa os testes que precisam de Postgres/Redis/MinIO dos puros (`make test-unit`)
 - [x] `phpstan-baseline.neon` reduzida, zero entrada em `Domain/`, `Application/` e `Bootstrap/`
 

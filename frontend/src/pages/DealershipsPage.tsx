@@ -1,17 +1,10 @@
 import Alert from '@mui/material/Alert';
-import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
+import Grid from '@mui/material/Grid';
 import Pagination from '@mui/material/Pagination';
-import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -20,6 +13,7 @@ import { AvailabilityDialog } from '../components/AvailabilityDialog';
 import { Breadcrumb } from '../components/Breadcrumb';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { DealershipFormDialog } from '../components/DealershipFormDialog';
+import { DealershipManagementCard } from '../components/DealershipManagementCard';
 import { DealershipPhotoDialog } from '../components/DealershipPhotoDialog';
 import { Toast } from '../components/Toast';
 import { ApiError } from '../lib/apiClient';
@@ -33,16 +27,9 @@ import {
     updateDealership,
     type Dealership,
     type DealershipProfileInput,
-    type DealershipStatus,
 } from '../lib/dealerships';
 
-const PER_PAGE = 10;
-
-const STATUS_LABEL: Record<DealershipStatus, string> = {
-    active: 'Ativa',
-    trashed: 'Na lixeira',
-    deleted: 'Removida',
-};
+const PER_PAGE = 12;
 
 type ConfirmAction = { type: 'trash' | 'purge'; dealership: Dealership };
 
@@ -133,7 +120,7 @@ export function DealershipsPage() {
     if (me.isPending) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                <CircularProgress />
+                <CircularProgress aria-label="Carregando" />
             </Box>
         );
     }
@@ -146,172 +133,98 @@ export function DealershipsPage() {
     return (
         <>
             <Breadcrumb items={[{ label: 'Concessionárias' }]} />
-            <Paper sx={{ p: 3 }}>
-                <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h6" component="h1">
-                        Concessionárias
-                    </Typography>
-                    <Button variant="contained" onClick={openCreate}>
-                        Nova concessionária
-                    </Button>
+            <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" component="h1">
+                    Concessionárias
+                </Typography>
+                <Button variant="contained" onClick={openCreate}>
+                    Nova concessionária
+                </Button>
+            </Stack>
+
+            {dealerships.isError && <Alert severity="error">Não foi possível carregar as concessionárias.</Alert>}
+
+            {dealerships.data?.data.length === 0 && (
+                <Alert severity="info">Nenhuma concessionária ainda -- crie a primeira acima.</Alert>
+            )}
+
+            {dealerships.data && dealerships.data.data.length > 0 && (
+                <Grid container spacing={2}>
+                    {dealerships.data.data.map((dealership) => (
+                        <Grid key={dealership.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
+                            <DealershipManagementCard
+                                dealership={dealership}
+                                onEdit={() => openEdit(dealership)}
+                                onPhoto={() => setPhotoDealership(dealership)}
+                                onAvailability={() => setAvailabilityDealership(dealership)}
+                                onTrash={() => setConfirmAction({ type: 'trash', dealership })}
+                                onRestore={() => restoreMutation.mutate(dealership.id)}
+                                onPurge={() => setConfirmAction({ type: 'purge', dealership })}
+                                restoring={restoreMutation.isPending}
+                            />
+                        </Grid>
+                    ))}
+                </Grid>
+            )}
+
+            {dealerships.data && dealerships.data.meta.last_page > 1 && (
+                <Stack sx={{ alignItems: 'center', mt: 2 }}>
+                    <Pagination
+                        page={page}
+                        count={dealerships.data.meta.last_page}
+                        onChange={(_, value) => setPage(value)}
+                    />
                 </Stack>
+            )}
 
-                {dealerships.isError && <Alert severity="error">Não foi possível carregar as concessionárias.</Alert>}
-
-                {dealerships.data?.data.length === 0 && (
-                    <Alert severity="info">Nenhuma concessionária ainda -- crie a primeira acima.</Alert>
-                )}
-
-                {dealerships.data && dealerships.data.data.length > 0 && (
-                    <Table size="small">
-                        <TableHead>
-                            <TableRow>
-                                <TableCell />
-                                <TableCell>Nome</TableCell>
-                                <TableCell>Cidade</TableCell>
-                                <TableCell>Status</TableCell>
-                                <TableCell align="right">Ações</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {dealerships.data.data.map((dealership) => (
-                                <TableRow key={dealership.id}>
-                                    <TableCell sx={{ width: 48 }}>
-                                        <Avatar src={dealership.photo_url ?? undefined} variant="rounded">
-                                            {dealership.name.charAt(0)}
-                                        </Avatar>
-                                    </TableCell>
-                                    <TableCell>{dealership.name}</TableCell>
-                                    <TableCell>
-                                        {dealership.city}/{dealership.state}
-                                    </TableCell>
-                                    <TableCell>
-                                        <Chip
-                                            size="small"
-                                            label={STATUS_LABEL[dealership.status]}
-                                            color={dealership.status === 'active' ? 'success' : 'default'}
-                                        />
-                                    </TableCell>
-                                    <TableCell align="right">
-                                        <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
-                                            <Button size="small" onClick={() => openEdit(dealership)}>
-                                                Editar
-                                            </Button>
-                                            <Button size="small" onClick={() => setPhotoDealership(dealership)}>
-                                                Foto
-                                            </Button>
-                                            <Button size="small" onClick={() => setAvailabilityDealership(dealership)}>
-                                                Disponibilidade
-                                            </Button>
-                                            {dealership.status === 'active' && (
-                                                <Button
-                                                    size="small"
-                                                    component="a"
-                                                    href={`/concessionarias/${dealership.slug}`}
-                                                    target="_blank"
-                                                    rel="noopener"
-                                                >
-                                                    Ver página pública
-                                                </Button>
-                                            )}
-                                            {dealership.status === 'active' && (
-                                                <Button
-                                                    size="small"
-                                                    color="error"
-                                                    onClick={() => setConfirmAction({ type: 'trash', dealership })}
-                                                >
-                                                    Mover pra lixeira
-                                                </Button>
-                                            )}
-                                            {dealership.status === 'trashed' && (
-                                                <>
-                                                    <Button
-                                                        size="small"
-                                                        disabled={restoreMutation.isPending}
-                                                        onClick={() => restoreMutation.mutate(dealership.id)}
-                                                    >
-                                                        Restaurar
-                                                    </Button>
-                                                    <Button
-                                                        size="small"
-                                                        color="error"
-                                                        onClick={() => setConfirmAction({ type: 'purge', dealership })}
-                                                    >
-                                                        Excluir agora
-                                                    </Button>
-                                                </>
-                                            )}
-                                        </Stack>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                )}
-
-                {dealerships.data && dealerships.data.meta.last_page > 1 && (
-                    <Stack sx={{ alignItems: 'center', mt: 2 }}>
-                        <Pagination
-                            page={page}
-                            count={dealerships.data.meta.last_page}
-                            onChange={(_, value) => setPage(value)}
-                        />
-                    </Stack>
-                )}
-
-                <DealershipFormDialog
-                    key={editing?.id ?? 'new'}
-                    open={formOpen}
-                    dealership={editing}
-                    isAdmin={isAdmin}
-                    myPhone={me.data?.phone}
-                    myEmail={me.data?.email}
-                    submitting={createMutation.isPending || updateMutation.isPending}
-                    error={formError}
-                    onSubmit={handleFormSubmit}
-                    onClose={() => setFormOpen(false)}
-                />
-                <DealershipPhotoDialog
-                    key={photoDealership?.id ?? 'none'}
-                    open={photoDealership !== null}
-                    dealership={photoDealership}
-                    onClose={() => setPhotoDealership(null)}
-                />
-                <AvailabilityDialog
-                    open={availabilityDealership !== null}
-                    scope={availabilityDealership ? { type: 'dealership', id: availabilityDealership.id } : null}
-                    onClose={() => setAvailabilityDealership(null)}
-                />
-                <ConfirmDialog
-                    open={confirmAction !== null}
-                    title={confirmAction?.type === 'purge' ? 'Excluir em definitivo?' : 'Mover pra lixeira?'}
-                    description={
-                        confirmAction?.type === 'purge'
-                            ? 'Anonimiza a concessionária agora, sem esperar os 30 dias. Não pode ser desfeito.'
-                            : 'Recuperável em até 30 dias pela própria tela de lixeira, ou anonimizada em definitivo antes disso.'
+            <DealershipFormDialog
+                key={editing?.id ?? 'new'}
+                open={formOpen}
+                dealership={editing}
+                isAdmin={isAdmin}
+                myPhone={me.data?.phone}
+                myEmail={me.data?.email}
+                submitting={createMutation.isPending || updateMutation.isPending}
+                error={formError}
+                onSubmit={handleFormSubmit}
+                onClose={() => setFormOpen(false)}
+            />
+            <DealershipPhotoDialog
+                key={photoDealership?.id ?? 'none'}
+                open={photoDealership !== null}
+                dealership={photoDealership}
+                onClose={() => setPhotoDealership(null)}
+            />
+            <AvailabilityDialog
+                open={availabilityDealership !== null}
+                scope={availabilityDealership ? { type: 'dealership', id: availabilityDealership.id } : null}
+                onClose={() => setAvailabilityDealership(null)}
+            />
+            <ConfirmDialog
+                open={confirmAction !== null}
+                title={confirmAction?.type === 'purge' ? 'Excluir em definitivo?' : 'Mover pra lixeira?'}
+                description={
+                    confirmAction?.type === 'purge'
+                        ? 'Anonimiza a concessionária agora, sem esperar os 30 dias. Não pode ser desfeito.'
+                        : 'Recuperável em até 30 dias pela própria tela de lixeira, ou anonimizada em definitivo antes disso.'
+                }
+                confirmLabel={confirmAction?.type === 'purge' ? 'Excluir' : 'Mover pra lixeira'}
+                confirmColor="error"
+                loading={trashMutation.isPending || purgeMutation.isPending}
+                onConfirm={() => {
+                    if (!confirmAction) {
+                        return;
                     }
-                    confirmLabel={confirmAction?.type === 'purge' ? 'Excluir' : 'Mover pra lixeira'}
-                    confirmColor="error"
-                    loading={trashMutation.isPending || purgeMutation.isPending}
-                    onConfirm={() => {
-                        if (!confirmAction) {
-                            return;
-                        }
 
-                        if (confirmAction.type === 'purge') {
-                            purgeMutation.mutate(confirmAction.dealership.id);
-                        } else {
-                            trashMutation.mutate(confirmAction.dealership.id);
-                        }
-                    }}
-                    onCancel={() => setConfirmAction(null)}
-                />
-                <Toast
-                    open={toastMessage !== null}
-                    message={toastMessage ?? ''}
-                    onClose={() => setToastMessage(null)}
-                />
-            </Paper>
+                    if (confirmAction.type === 'purge') {
+                        purgeMutation.mutate(confirmAction.dealership.id);
+                    } else {
+                        trashMutation.mutate(confirmAction.dealership.id);
+                    }
+                }}
+                onCancel={() => setConfirmAction(null)}
+            />
+            <Toast open={toastMessage !== null} message={toastMessage ?? ''} onClose={() => setToastMessage(null)} />
         </>
     );
 }

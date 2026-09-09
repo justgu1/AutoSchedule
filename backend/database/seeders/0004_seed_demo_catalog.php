@@ -12,7 +12,7 @@ use App\Infrastructure\Persistence\Schema\Seeder;
  * Idempotente pelo slug da concessionária; foto real por modelo via Wikimedia, cai pro placeholder de GD sem rede.
  */
 return new class () implements Seeder {
-    // Endereço/CEP/bairro de cada linha conferido contra o ViaCEP real -- ver docs/testing.md.
+    // Endereço/CEP/bairro de cada linha conferido contra o ViaCEP real.
     private const array DEALERSHIPS = [
         ['Auto Estrela São Paulo', 'Avenida Paulista', '2000', 'Bela Vista', 'São Paulo', 'SP', '01310-200'],
         ['Rio Motors Copacabana', 'Avenida Nossa Senhora de Copacabana', '500', 'Copacabana', 'Rio de Janeiro', 'RJ', '22020-001'],

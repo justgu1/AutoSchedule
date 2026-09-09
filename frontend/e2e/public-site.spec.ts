@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { searchOnHome } from './support/ui';
+import { openMenuIfCollapsed, searchOnHome } from './support/ui';
 
 function uniqueEmail(prefix: string): string {
     return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@example.com`;
@@ -14,13 +14,13 @@ async function mockZipCodeLookup(page: Page): Promise<void> {
 }
 
 /**
- * Lista paginada e sem filtro por nome -- procura clicando "próxima página" até achar
+ * Grid paginado e sem filtro por nome -- procura clicando "próxima página" até achar
  * ou acabarem as páginas. Mesmo helper de `dealerships.spec.ts`.
  */
-async function findRowAcrossPages(page: Page, cellText: string) {
+async function findCardAcrossPages(page: Page, cardName: string) {
     for (;;) {
         try {
-            await expect(page.getByRole('cell', { name: cellText })).toBeVisible({ timeout: 2000 });
+            await expect(page.getByRole('group', { name: cardName })).toBeVisible({ timeout: 2000 });
 
             return;
         } catch {
@@ -30,7 +30,7 @@ async function findRowAcrossPages(page: Page, cellText: string) {
         const nextPage = page.getByRole('button', { name: 'Go to next page' });
 
         if (!(await nextPage.isEnabled().catch(() => false))) {
-            throw new Error(`Linha "${cellText}" não encontrada em nenhuma página.`);
+            throw new Error(`Card "${cardName}" não encontrado em nenhuma página.`);
         }
 
         await nextPage.click();
@@ -62,7 +62,7 @@ async function registerSellerWithVehicle(
     await expect(page.getByLabel('Endereço')).toHaveValue('Rua de Teste');
     await page.getByLabel('Número').fill('10');
     await page.getByRole('button', { name: 'Criar' }).click();
-    await expect(page.getByRole('cell', { name: dealershipName })).toBeVisible();
+    await expect(page.getByRole('group', { name: dealershipName })).toBeVisible();
 
     await page.goto('/vehicles');
     await page.getByRole('button', { name: 'Novo veículo' }).click();
@@ -76,6 +76,7 @@ async function registerSellerWithVehicle(
     await dialog.getByRole('button', { name: 'Criar' }).click();
     await expect(page.getByRole('group', { name: `${brand} ${model}` })).toBeVisible();
 
+    await openMenuIfCollapsed(page);
     await page.getByRole('button', { name: 'Sair' }).click();
     await expect(page).toHaveURL(/\/login$/);
 }
@@ -125,11 +126,12 @@ test('vitrine da página pública da concessionária mostra o veículo cadastrad
     await page.getByRole('button', { name: 'Entrar' }).click();
     await expect(page).toHaveURL(/\/me$/);
     await page.goto('/dealerships');
-    await findRowAcrossPages(page, dealershipName);
+    await findCardAcrossPages(page, dealershipName);
     const publicUrl = await page
-        .getByRole('row', { name: new RegExp(dealershipName) })
+        .getByRole('group', { name: dealershipName })
         .getByRole('link', { name: 'Ver página pública' })
         .getAttribute('href');
+    await openMenuIfCollapsed(page);
     await page.getByRole('button', { name: 'Sair' }).click();
     await expect(page).toHaveURL(/\/login$/);
 

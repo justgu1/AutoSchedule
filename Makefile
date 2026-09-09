@@ -141,8 +141,8 @@ e2e-setup:
 	@RATE_LIMIT_AUTH_MAX=1000 docker compose up -d nginx mailpit minio backend
 	@echo "==> instalando dependências do backend (imagem é --no-dev, bind-mount local some com o vendor/)..."
 	@docker compose exec backend composer install --no-interaction --prefer-dist
-	@echo "==> criando o banco isolado do E2E, nunca o de dev (ver docs/testing.md)..."
-	@docker compose exec backend php bin/setup_test_database.php $(E2E_DB)
+	@echo "==> recriando o banco isolado do E2E do zero, nunca o de dev (ver docs/05-data/migrations.md)..."
+	@docker compose exec backend php bin/setup_test_database.php $(E2E_DB) --fresh
 	@echo "==> apontando backend/nginx pro banco isolado do E2E..."
 	@RATE_LIMIT_AUTH_MAX=1000 DB_DATABASE=$(E2E_DB) docker compose up -d nginx mailpit minio backend
 	@echo "==> aplicando migrations e seeders no banco do E2E (pode estar vazio -- ambiente novo/CI)..."

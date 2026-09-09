@@ -1,3 +1,6 @@
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import PlaceIcon from '@mui/icons-material/Place';
 import Alert from '@mui/material/Alert';
 import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
@@ -8,6 +11,7 @@ import Divider from '@mui/material/Divider';
 import Grid from '@mui/material/Grid';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
+import { alpha } from '@mui/material/styles';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -70,7 +74,7 @@ export function PublicVehiclePage() {
     if (vehicle.isPending) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                <CircularProgress />
+                <CircularProgress aria-label="Carregando" />
             </Box>
         );
     }
@@ -256,7 +260,14 @@ export function PublicVehiclePage() {
                             {Number(data.price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </Typography>
 
-                        <BookingSection vehicleId={data.id} />
+                        <BookingSection
+                            vehicleId={data.id}
+                            dealershipAddress={
+                                dealership.data
+                                    ? `${dealership.data.address}, ${dealership.data.number} - ${dealership.data.city}`
+                                    : `${data.dealership.city}/${data.dealership.state}`
+                            }
+                        />
                     </Paper>
                 </Grid>
             </Grid>
@@ -274,7 +285,7 @@ export function PublicVehiclePage() {
 }
 
 /** Carrossel de data/horário + formulário de contato, sem modal -- reserva direto na própria página. */
-function BookingSection({ vehicleId }: { vehicleId: string }) {
+function BookingSection({ vehicleId, dealershipAddress }: { vehicleId: string; dealershipAddress: string }) {
     const [date, setDate] = useState<string | null>(null);
     const [time, setTime] = useState<string | null>(null);
     const [customerName, setCustomerName] = useState('');
@@ -302,10 +313,49 @@ function BookingSection({ vehicleId }: { vehicleId: string }) {
         customerPhone !== '';
 
     if (bookingMutation.isSuccess) {
+        const scheduledAt = new Date(bookingMutation.data.scheduled_at).toLocaleString('pt-BR', {
+            weekday: 'long',
+            day: '2-digit',
+            month: 'long',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+
         return (
-            <Alert severity="success">
-                Agendamento recebido! Em instantes você recebe um e-mail pra confirmar o horário.
-            </Alert>
+            <Stack spacing={3} sx={{ alignItems: 'center', textAlign: 'center', py: 2 }}>
+                <Box
+                    sx={{
+                        display: 'flex',
+                        borderRadius: '50%',
+                        p: 2,
+                        bgcolor: (theme) => alpha(theme.palette.success.main, 0.12),
+                    }}
+                >
+                    <CheckCircleIcon sx={{ fontSize: 56, color: 'success.main' }} />
+                </Box>
+                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                    Agendamento concluído!
+                </Typography>
+                <Stack
+                    direction="row"
+                    spacing={2}
+                    divider={<Divider orientation="vertical" flexItem />}
+                    sx={{ color: 'text.secondary', flexWrap: 'wrap', justifyContent: 'center', rowGap: 1 }}
+                >
+                    <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                        <CalendarTodayIcon fontSize="small" />
+                        <Typography variant="body2">{scheduledAt}</Typography>
+                    </Stack>
+                    <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                        <PlaceIcon fontSize="small" />
+                        <Typography variant="body2">{dealershipAddress}</Typography>
+                    </Stack>
+                </Stack>
+                <Button component={RouterLink} to="/" variant="contained" sx={{ width: '100%' }}>
+                    Outros veículos
+                </Button>
+            </Stack>
         );
     }
 

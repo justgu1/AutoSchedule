@@ -34,6 +34,13 @@ export function FilterSidebar({ value, facets, onChange }: FilterSidebarProps) {
                 </Typography>
             )}
             <VehicleFilterBar value={value} facets={facets} onChange={onChange} />
+            {/* Drawer é modal (some o resultado atrás) -- sem um jeito explícito de fechar, o filtro
+                aplicado fica invisível até o usuário adivinhar que precisa fechar o drawer sozinho. */}
+            {!isDesktop && (
+                <Button fullWidth variant="contained" sx={{ mt: 2 }} onClick={() => setDrawerOpen(false)}>
+                    Ver resultados
+                </Button>
+            )}
         </Box>
     );
 
@@ -47,16 +54,31 @@ export function FilterSidebar({ value, facets, onChange }: FilterSidebarProps) {
 
     return (
         <>
-            <Badge badgeContent={count} color="primary">
-                <Button
-                    variant="outlined"
-                    startIcon={<FilterListIcon />}
-                    onClick={() => setDrawerOpen(true)}
-                    aria-haspopup="dialog"
-                >
-                    Filtros
-                </Button>
-            </Badge>
+            {/* `sticky` logo abaixo do AppBar (também sticky) -- mesmo critério, pra não sumir rolando uma lista longa. */}
+            <Box
+                sx={{
+                    position: 'sticky',
+                    top: { xs: 56, sm: 64 },
+                    zIndex: (theme) => theme.zIndex.appBar - 1,
+                    bgcolor: 'grey.50',
+                    py: 1,
+                    width: '100%',
+                }}
+            >
+                <Badge badgeContent={count} color="primary">
+                    {/* `primary.dark` em vez do padrão -- o azul default do MUI (#1976d2) fica em 4.4:1
+                        contra o `grey.50` do fundo, abaixo do mínimo 4.5:1 de WCAG 2.1 AA. */}
+                    <Button
+                        variant="outlined"
+                        startIcon={<FilterListIcon />}
+                        onClick={() => setDrawerOpen(true)}
+                        aria-haspopup="dialog"
+                        sx={{ color: 'primary.dark', borderColor: 'primary.dark' }}
+                    >
+                        Filtros
+                    </Button>
+                </Badge>
+            </Box>
             <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
                 {content}
             </Drawer>

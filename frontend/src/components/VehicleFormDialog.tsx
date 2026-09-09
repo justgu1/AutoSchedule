@@ -1,6 +1,5 @@
 import Autocomplete from '@mui/material/Autocomplete';
 import Checkbox from '@mui/material/Checkbox';
-import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -12,6 +11,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useQuery } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
+import { ResponsiveDialog as Dialog } from './ResponsiveDialog';
 import { FormError } from './FormError';
 import { FormTextField } from './FormTextField';
 import { SubmitButton } from './SubmitButton';

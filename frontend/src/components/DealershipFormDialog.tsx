@@ -1,5 +1,4 @@
 import Autocomplete from '@mui/material/Autocomplete';
-import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -8,6 +7,7 @@ import InputAdornment from '@mui/material/InputAdornment';
 import Button from '@mui/material/Button';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState, type FormEvent } from 'react';
+import { ResponsiveDialog as Dialog } from './ResponsiveDialog';
 import { FormError } from './FormError';
 import { FormTextField } from './FormTextField';
 import { SubmitButton } from './SubmitButton';

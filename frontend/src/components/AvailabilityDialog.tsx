@@ -1,7 +1,6 @@
 import DeleteIcon from '@mui/icons-material/Delete';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
-import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -22,6 +21,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs, { type Dayjs } from 'dayjs';
 import 'dayjs/locale/pt-br';
 import { useState } from 'react';
+import { ResponsiveDialog as Dialog } from './ResponsiveDialog';
 import {
     createAvailabilityException,
     createDealershipAvailabilityRule,

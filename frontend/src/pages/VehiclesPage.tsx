@@ -126,7 +126,7 @@ export function VehiclesPage() {
     if (me.isPending) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                <CircularProgress />
+                <CircularProgress aria-label="Carregando" />
             </Box>
         );
     }
